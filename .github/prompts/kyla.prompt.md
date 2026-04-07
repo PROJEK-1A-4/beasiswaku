@@ -2,9 +2,7 @@
 name: kyla-development-context
 description: >-
   Kyla's development context for BeasiswaKu. Use when: working on Tab Beasiswa, Tkinter UI, widget design, filtering/searching, or any GUI component. Focuses Copilot on UI-first approaches and KYLA's responsibilities as PIC for gui_beasiswa.py and main window layout.
-applyTo: >-
-  gui_beasiswa.py,main.py
-pinned: true
+
 ---
 
 # Kyla's Development Context

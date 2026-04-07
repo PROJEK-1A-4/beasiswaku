@@ -2,9 +2,7 @@
 name: darva-development-context
 description: >-
   Darva's development context for BeasiswaKu. Use when: working on CRUD operations, database schema, authentication, session management, or data operations. Focuses Copilot on database-first approaches and DARVA's responsibilities as PIC for crud.py and session management in main.py.
-applyTo: >-
-  **/*.py
-pinned: true
+
 ---
 
 # Darva's Development Context

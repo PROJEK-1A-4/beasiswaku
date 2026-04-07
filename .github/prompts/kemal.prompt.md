@@ -2,9 +2,7 @@
 name: kemal-development-context
 description: >-
   Kemal's development context for BeasiswaKu. Use when: working on web scraping, data fetching, search functionality, or data validation. Focuses Copilot on data-first approaches and KEMAL's responsibilities as PIC for scraper.py and search features.
-applyTo: >-
-  scraper.py,gui_beasiswa.py
-pinned: true
+
 ---
 
 # Kemal's Development Context

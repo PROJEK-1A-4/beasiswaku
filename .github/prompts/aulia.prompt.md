@@ -2,9 +2,7 @@
 name: aulia-development-context
 description: >-
   Aulia's development context for BeasiswaKu. Use when: working on charts, visualization, analytics, dark mode, or UI themes. Focuses Copilot on data visualization approaches and AULIA's responsibilities as PIC for visualisasi.py and UI theming.
-applyTo: >-
-  visualisasi.py,main.py
-pinned: true
+
 ---
 
 # Aulia's Development Context

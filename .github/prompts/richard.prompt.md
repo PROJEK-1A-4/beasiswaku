@@ -2,9 +2,7 @@
 name: richard-development-context
 description: >-
   Richard's development context for BeasiswaKu. Use when: working on advanced analytics, trend charts, complex visualizations, or statistical analysis. Focuses Copilot on analytics-first approaches and RICHARD's responsibilities as supporting analyst for visualisasi.py.
-applyTo: >-
-  visualisasi.py
-pinned: true
+
 ---
 
 # Richard's Development Context
