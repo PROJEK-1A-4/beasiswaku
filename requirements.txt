@@ -1,0 +1,7 @@
+PyQt6
+matplotlib
+requests
+beautifulsoup4
+lxml
+bcrypt
+plyer
