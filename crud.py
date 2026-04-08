@@ -466,6 +466,121 @@ def add_beasiswa(judul: str, jenjang: str, deadline: str,
         conn.close()
 
 
+def get_beasiswa_list(filter_jenjang: Optional[str] = None,
+                     filter_status: Optional[str] = None,
+                     search_judul: Optional[str] = None,
+                     sort_by: str = 'deadline',
+                     sort_order: str = 'ASC') -> Tuple[List[Dict], int]:
+    """
+    Mengambil list beasiswa dari database dengan support filter dan sorting.
+    
+    Args:
+        filter_jenjang (str, optional): Filter by jenjang (D3, D4, S1, S2)
+        filter_status (str, optional): Filter by status (Buka, Segera Tutup, Tutup)
+        search_judul (str, optional): Search by judul (case-insensitive LIKE)
+        sort_by (str, optional): Column to sort by (deadline, judul, created_at, status)
+            - default: 'deadline'
+        sort_order (str, optional): Sort order (ASC, DESC) - default: 'ASC'
+    
+    Returns:
+        Tuple[List[Dict], int]:
+            - (beasiswa_list, total_count) - list of beasiswa records and total count
+            - Each record contains: id, judul, jenjang, deadline, status, 
+              benefit, minimal_ipk, coverage, penyelenggara_id, created_at, updated_at
+    
+    Example:
+        >>> beasiswa_list, total = get_beasiswa_list(
+        ...     filter_jenjang='S1',
+        ...     filter_status='Buka',
+        ...     search_judul='LPDP',
+        ...     sort_by='deadline',
+        ...     sort_order='ASC'
+        ... )
+        >>> print(f"Found {total} beasiswa")
+        >>> for b in beasiswa_list:
+        ...     print(f"{b['judul']} - {b['deadline']}")
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Build WHERE clause dynamically
+        where_clauses = []
+        params = []
+        
+        # Filter by jenjang
+        if filter_jenjang:
+            filter_jenjang = filter_jenjang.strip().upper()
+            if filter_jenjang in ['D3', 'D4', 'S1', 'S2']:
+                where_clauses.append("jenjang = ?")
+                params.append(filter_jenjang)
+        
+        # Filter by status
+        if filter_status:
+            filter_status = filter_status.strip()
+            valid_status = ['Buka', 'Segera Tutup', 'Tutup']
+            if filter_status in valid_status:
+                where_clauses.append("status = ?")
+                params.append(filter_status)
+        
+        # Search by judul (case-insensitive LIKE)
+        if search_judul:
+            search_judul = search_judul.strip()
+            where_clauses.append("judul LIKE ?")
+            params.append(f"%{search_judul}%")
+        
+        # Build WHERE clause string
+        where_sql = ""
+        if where_clauses:
+            where_sql = "WHERE " + " AND ".join(where_clauses)
+        
+        # Validate sort_by
+        valid_sort_columns = ['deadline', 'judul', 'created_at', 'jenjang', 'status', 'id']
+        sort_by = sort_by.strip().lower() if sort_by else 'deadline'
+        if sort_by not in valid_sort_columns:
+            sort_by = 'deadline'
+        
+        # Validate sort_order
+        sort_order = sort_order.strip().upper() if sort_order else 'ASC'
+        if sort_order not in ['ASC', 'DESC']:
+            sort_order = 'ASC'
+        
+        # Get total count
+        count_query = f"SELECT COUNT(*) as count FROM beasiswa {where_sql}"
+        cursor.execute(count_query, params)
+        total_count = cursor.fetchone()[0]
+        
+        # Get data with sorting
+        query = f"""
+            SELECT 
+                id, judul, penyelenggara_id, jenjang, deadline, deskripsi,
+                benefit, persyaratan, minimal_ipk, coverage, status,
+                link_aplikasi, scrape_date, created_at, updated_at
+            FROM beasiswa
+            {where_sql}
+            ORDER BY {sort_by} {sort_order}
+        """
+        
+        cursor.execute(query, params)
+        results = cursor.fetchall()
+        
+        # Convert to list of dictionaries
+        beasiswa_list = [dict(row) for row in results]
+        
+        logger.info(f"✅ Retrieved {len(beasiswa_list)} beasiswa "
+                   f"(Total: {total_count}, Filter: jenjang={filter_jenjang}, "
+                   f"status={filter_status}, search={search_judul})")
+        
+        cursor.close()
+        conn.close()
+        
+        return beasiswa_list, total_count
+        
+    except sqlite3.Error as e:
+        logger.error(f"❌ Database error saat retrieve beasiswa: {e}")
+        return [], 0
+
+
 if __name__ == "__main__":
     # Script untuk testing
     init_db()
