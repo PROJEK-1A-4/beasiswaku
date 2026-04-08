@@ -831,6 +831,122 @@ def delete_beasiswa(beasiswa_id: int) -> Tuple[bool, str]:
         conn.close()
 
 
+# =====================================================================
+# PHASE 3.1: CRUD LAMARAN FUNCTIONS
+# =====================================================================
+
+def add_lamaran(user_id: int, beasiswa_id: int, tanggal_daftar: Optional[str] = None,
+               status: str = "Pending", catatan: str = "") -> Tuple[bool, str, Optional[int]]:
+    """
+    Menambahkan lamaran beasiswa baru (application record).
+    
+    Args:
+        user_id (int): ID user yang melakukan lamaran (required)
+        beasiswa_id (int): ID beasiswa yang didaftar (required)
+        tanggal_daftar (str, optional): Tanggal pendaftaran (format YYYY-MM-DD)
+            - Jika None, akan menggunakan tanggal hari ini
+        status (str, optional): Status lamaran - default 'Pending'
+            - Valid values: Pending, Submitted, Accepted, Rejected, Withdrawn
+        catatan (str, optional): Catatan/notes tentang lamaran
+    
+    Returns:
+        Tuple[bool, str, Optional[int]]:
+            - (True, "Success message", lamaran_id) jika berhasil
+            - (False, "Error message", None) jika gagal
+    
+    Error cases:
+        - User ID tidak valid
+        - Beasiswa ID tidak valid (foreign key)
+        - User sudah pernah mendaftar beasiswa ini (UNIQUE constraint)
+        - Database error
+    
+    Example:
+        >>> success, msg, id = add_lamaran(
+        ...     user_id=1,
+        ...     beasiswa_id=5,
+        ...     tanggal_daftar="2026-04-08",
+        ...     status="Submitted"
+        ... )
+        >>> if success:
+        ...     print(f"Lamaran added with ID: {id}")
+    """
+    # Validasi input
+    if not user_id or not isinstance(user_id, int):
+        return False, "User ID harus berupa angka integer", None
+    
+    if not beasiswa_id or not isinstance(beasiswa_id, int):
+        return False, "Beasiswa ID harus berupa angka integer", None
+    
+    # Set default tanggal_daftar jika tidak diberikan
+    if tanggal_daftar is None or tanggal_daftar.strip() == "":
+        tanggal_daftar = datetime.now().strftime('%Y-%m-%d')
+    else:
+        # Validasi format tanggal_daftar (YYYY-MM-DD)
+        try:
+            datetime.strptime(tanggal_daftar.strip(), '%Y-%m-%d')
+            tanggal_daftar = tanggal_daftar.strip()
+        except ValueError:
+            return False, "Format tanggal_daftar harus YYYY-MM-DD (contoh: 2026-04-08)", None
+    
+    # Validasi status
+    valid_status = ['Pending', 'Submitted', 'Accepted', 'Rejected', 'Withdrawn']
+    if status not in valid_status:
+        return False, f"Status harus salah satu dari: {', '.join(valid_status)}", None
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Enable foreign key checking
+        cursor.execute("PRAGMA foreign_keys = ON")
+        
+        # Check if user exists
+        cursor.execute("SELECT id, username FROM akun WHERE id = ?", (user_id,))
+        user = cursor.fetchone()
+        if not user:
+            return False, f"User dengan ID {user_id} tidak ditemukan", None
+        
+        # Check if beasiswa exists
+        cursor.execute("SELECT id, judul FROM beasiswa WHERE id = ?", (beasiswa_id,))
+        beasiswa = cursor.fetchone()
+        if not beasiswa:
+            return False, f"Beasiswa dengan ID {beasiswa_id} tidak ditemukan", None
+        
+        # Insert lamaran
+        cursor.execute("""
+            INSERT INTO riwayat_lamaran (
+                user_id, beasiswa_id, tanggal_daftar, status, catatan
+            ) VALUES (?, ?, ?, ?, ?)
+        """, (user_id, beasiswa_id, tanggal_daftar, status, catatan.strip()))
+        
+        conn.commit()
+        lamaran_id = cursor.lastrowid
+        
+        logger.info(f"✅ Lamaran '{beasiswa['judul']}' for user {user['username']} "
+                   f"added successfully (ID: {lamaran_id}, Status: {status})")
+        return True, f"Lamaran untuk '{beasiswa['judul']}' berhasil ditambahkan!", lamaran_id
+        
+    except sqlite3.IntegrityError as e:
+        conn.rollback()
+        if "UNIQUE" in str(e):
+            error_msg = "Anda sudah pernah mendaftar beasiswa ini sebelumnya"
+        elif "FOREIGN KEY" in str(e):
+            error_msg = f"User atau Beasiswa tidak ditemukan"
+        else:
+            error_msg = f"Data constraint violation: {str(e)}"
+        logger.warning(f"⚠️ Lamaran add failed: {error_msg}")
+        return False, error_msg, None
+        
+    except sqlite3.Error as e:
+        conn.rollback()
+        logger.error(f"❌ Database error saat menambah lamaran: {e}")
+        return False, f"Terjadi error database: {str(e)}", None
+        
+    finally:
+        cursor.close()
+        conn.close()
+
+
 if __name__ == "__main__":
     # Script untuk testing
     init_db()
