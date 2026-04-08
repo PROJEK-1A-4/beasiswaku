@@ -947,6 +947,128 @@ def add_lamaran(user_id: int, beasiswa_id: int, tanggal_daftar: Optional[str] = 
         conn.close()
 
 
+def get_lamaran_list(filter_user_id: Optional[int] = None,
+                    filter_beasiswa_id: Optional[int] = None,
+                    filter_status: Optional[str] = None,
+                    sort_by: str = 'tanggal_daftar',
+                    sort_order: str = 'DESC') -> Tuple[List[Dict], int]:
+    """
+    Mengambil list lamaran dari database dengan support filter dan sorting.
+    
+    Args:
+        filter_user_id (int, optional): Filter by user ID
+        filter_beasiswa_id (int, optional): Filter by beasiswa ID
+        filter_status (str, optional): Filter by status (Pending, Submitted, Accepted, Rejected, Withdrawn)
+        sort_by (str, optional): Column to sort by (tanggal_daftar, status, created_at, user_id, beasiswa_id)
+            - default: 'tanggal_daftar'
+        sort_order (str, optional): Sort order (ASC, DESC) - default: 'DESC'
+    
+    Returns:
+        Tuple[List[Dict], int]:
+            - (lamaran_list, total_count) - list of lamaran records and total count
+            - Each record contains: id, user_id, beasiswa_id, status, tanggal_daftar, 
+              catatan, created_at, updated_at, plus joined fields: username, beasiswa_judul, jenjang
+    
+    Example:
+        >>> lamarans, total = get_lamaran_list(
+        ...     filter_user_id=1,
+        ...     filter_status='Accepted',
+        ...     sort_by='tanggal_daftar',
+        ...     sort_order='DESC'
+        ... )
+        >>> print(f"Found {total} accepted applications")
+        >>> for l in lamarans:
+        ...     print(f"{l['username']} - {l['beasiswa_judul']}: {l['status']}")
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Build WHERE clause dynamically
+        where_clauses = []
+        params = []
+        
+        # Filter by user_id
+        if filter_user_id:
+            if isinstance(filter_user_id, int):
+                where_clauses.append("rl.user_id = ?")
+                params.append(filter_user_id)
+        
+        # Filter by beasiswa_id
+        if filter_beasiswa_id:
+            if isinstance(filter_beasiswa_id, int):
+                where_clauses.append("rl.beasiswa_id = ?")
+                params.append(filter_beasiswa_id)
+        
+        # Filter by status
+        if filter_status:
+            filter_status = filter_status.strip()
+            valid_status = ['Pending', 'Submitted', 'Accepted', 'Rejected', 'Withdrawn']
+            if filter_status in valid_status:
+                where_clauses.append("rl.status = ?")
+                params.append(filter_status)
+        
+        # Build WHERE clause string
+        where_sql = ""
+        if where_clauses:
+            where_sql = "WHERE " + " AND ".join(where_clauses)
+        
+        # Validate sort_by
+        valid_sort_columns = ['tanggal_daftar', 'status', 'created_at', 'user_id', 'beasiswa_id']
+        sort_by = sort_by.strip().lower() if sort_by else 'tanggal_daftar'
+        if sort_by not in valid_sort_columns:
+            sort_by = 'tanggal_daftar'
+        
+        # Add table alias for sort
+        sort_column = f"rl.{sort_by}"
+        
+        # Validate sort_order
+        sort_order = sort_order.strip().upper() if sort_order else 'DESC'
+        if sort_order not in ['ASC', 'DESC']:
+            sort_order = 'DESC'
+        
+        # Get total count
+        count_query = f"""
+            SELECT COUNT(*) as count 
+            FROM riwayat_lamaran rl
+            {where_sql}
+        """
+        cursor.execute(count_query, params)
+        total_count = cursor.fetchone()['count']
+        
+        # Get data with sorting and joined fields
+        query = f"""
+            SELECT 
+                rl.id, rl.user_id, rl.beasiswa_id, rl.status, rl.tanggal_daftar, 
+                rl.catatan, rl.created_at, rl.updated_at,
+                a.username, b.judul as beasiswa_judul, b.jenjang
+            FROM riwayat_lamaran rl
+            JOIN akun a ON rl.user_id = a.id
+            JOIN beasiswa b ON rl.beasiswa_id = b.id
+            {where_sql}
+            ORDER BY {sort_column} {sort_order}
+        """
+        
+        cursor.execute(query, params)
+        results = cursor.fetchall()
+        
+        # Convert to list of dictionaries
+        lamaran_list = [dict(row) for row in results]
+        
+        logger.info(f"✅ Retrieved {len(lamaran_list)} lamarans "
+                   f"(Total: {total_count}, Filter: user_id={filter_user_id}, "
+                   f"beasiswa_id={filter_beasiswa_id}, status={filter_status})")
+        
+        cursor.close()
+        conn.close()
+        
+        return lamaran_list, total_count
+        
+    except sqlite3.Error as e:
+        logger.error(f"❌ Database error saat retrieve lamarans: {e}")
+        return [], 0
+
+
 if __name__ == "__main__":
     # Script untuk testing
     init_db()
