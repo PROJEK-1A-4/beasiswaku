@@ -757,6 +757,80 @@ def edit_beasiswa(beasiswa_id: int, **kwargs) -> Tuple[bool, str]:
         conn.close()
 
 
+def delete_beasiswa(beasiswa_id: int) -> Tuple[bool, str]:
+    """
+    Menghapus beasiswa dari database dengan cascade deletion dari tabel terkait.
+    
+    Args:
+        beasiswa_id (int): ID beasiswa yang akan dihapus
+    
+    Returns:
+        Tuple[bool, str]:
+            - (True, "Success message") jika berhasil
+            - (False, "Error message") jika gagal
+    
+    Cascade deletion:
+        - Delete dari riwayat_lamaran (applications history)
+        - Delete dari favorit (favorite list)
+        - Delete dari beasiswa (main table)
+    
+    Example:
+        >>> success, msg = delete_beasiswa(1)
+        >>> if success:
+        ...     print("Beasiswa deleted successfully")
+        ... else:
+        ...     print(f"Error: {msg}")
+    """
+    if not beasiswa_id or not isinstance(beasiswa_id, int):
+        return False, "ID beasiswa harus berupa angka integer"
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Enable foreign key checking untuk SQLite
+        cursor.execute("PRAGMA foreign_keys = ON")
+        
+        # Check if beasiswa exists
+        cursor.execute("SELECT id, judul FROM beasiswa WHERE id = ?", (beasiswa_id,))
+        existing = cursor.fetchone()
+        
+        if not existing:
+            return False, f"Beasiswa dengan ID {beasiswa_id} tidak ditemukan"
+        
+        existing_judul = existing['judul']
+        
+        # Get count of related records before deletion
+        cursor.execute("SELECT COUNT(*) as count FROM riwayat_lamaran WHERE beasiswa_id = ?", (beasiswa_id,))
+        lamaran_count = cursor.fetchone()['count']
+        
+        cursor.execute("SELECT COUNT(*) as count FROM favorit WHERE beasiswa_id = ?", (beasiswa_id,))
+        favorit_count = cursor.fetchone()['count']
+        
+        # Delete from dependent tables (cascade deletion)
+        cursor.execute("DELETE FROM riwayat_lamaran WHERE beasiswa_id = ?", (beasiswa_id,))
+        cursor.execute("DELETE FROM favorit WHERE beasiswa_id = ?", (beasiswa_id,))
+        
+        # Delete from beasiswa table
+        cursor.execute("DELETE FROM beasiswa WHERE id = ?", (beasiswa_id,))
+        
+        conn.commit()
+        
+        logger.info(f"✅ Beasiswa '{existing_judul}' (ID: {beasiswa_id}) deleted successfully")
+        logger.info(f"   └─ Cascade deleted: {lamaran_count} lamaran record(s), {favorit_count} favorit record(s)")
+        
+        return True, f"Beasiswa '{existing_judul}' berhasil dihapus! (Cascade: {lamaran_count} lamaran, {favorit_count} favorit)"
+        
+    except sqlite3.Error as e:
+        conn.rollback()
+        logger.error(f"❌ Database error saat delete beasiswa: {e}")
+        return False, f"Terjadi error database: {str(e)}"
+        
+    finally:
+        cursor.close()
+        conn.close()
+
+
 if __name__ == "__main__":
     # Script untuk testing
     init_db()
