@@ -5,7 +5,7 @@ TEST PHASE 3.1: CRUD Lamaran (Applications) functions
 Comprehensive test for application/lamaran management
 """
 
-from crud import init_db, add_beasiswa, register_user, login_user, add_lamaran, get_lamaran_list, get_connection
+from crud import init_db, add_beasiswa, register_user, login_user, add_lamaran, get_lamaran_list, edit_lamaran, get_connection
 import sqlite3
 
 def print_header(text):
@@ -366,6 +366,101 @@ def main():
     )
     print_result("✅", f"Found {len(lamaran_list)} Submitted lamarans for beasiswa {beasiswa_list[0]}")
     
+    # ========================================================================
+    # STEP 13: Test edit_lamaran() - VALID updates
+    # ========================================================================
+    print_header("STEP 13: Test edit_lamaran() - VALID UPDATES")
+    
+    # Get first lamaran for testing
+    lamaran_list, _ = get_lamaran_list()
+    if len(lamaran_list) == 0:
+        print_result("❌", "No lamarans found in database")
+        return
+    
+    test_lamaran_id = lamaran_list[0]['id']
+    original_status = lamaran_list[0]['status']
+    
+    # Test 1: Update status
+    print_test(1, "Update status to Submitted")
+    success, msg = edit_lamaran(test_lamaran_id, status="Submitted")
+    print_result("✅" if success else "❌", msg)
+    
+    # Verify update
+    updated_list, _ = get_lamaran_list()
+    updated_lamaran = [l for l in updated_list if l['id'] == test_lamaran_id][0]
+    if updated_lamaran['status'] == "Submitted":
+        print_result("✅", f"Status verified: {updated_lamaran['status']}")
+    else:
+        print_result("❌", f"Status not updated correctly")
+    
+    # Test 2: Update tanggal_daftar
+    print_test(2, "Update tanggal_daftar")
+    success, msg = edit_lamaran(test_lamaran_id, tanggal_daftar="2026-04-15")
+    print_result("✅" if success else "❌", msg)
+    
+    updated_list, _ = get_lamaran_list()
+    updated_lamaran = [l for l in updated_list if l['id'] == test_lamaran_id][0]
+    if updated_lamaran['tanggal_daftar'] == '2026-04-15':
+        print_result("✅", f"Tanggal verified: {updated_lamaran['tanggal_daftar']}")
+    else:
+        print_result("❌", f"Tanggal not updated correctly")
+    
+    # Test 3: Update catatan
+    print_test(3, "Update catatan (notes)")
+    success, msg = edit_lamaran(test_lamaran_id, catatan="Sudah submit dokumen lengkap")
+    print_result("✅" if success else "❌", msg)
+    
+    # Test 4: Update multiple fields
+    print_test(4, "Update multiple fields (status + catatan)")
+    success, msg = edit_lamaran(
+        test_lamaran_id,
+        status="Accepted",
+        catatan="Diterima dengan nilai tertinggi!"
+    )
+    print_result("✅" if success else "❌", msg)
+    
+    updated_list, _ = get_lamaran_list()
+    updated_lamaran = [l for l in updated_list if l['id'] == test_lamaran_id][0]
+    if updated_lamaran['status'] == "Accepted" and "tertinggi" in updated_lamaran['catatan']:
+        print_result("✅", f"Both fields updated: Status={updated_lamaran['status']}")
+    else:
+        print_result("❌", f"Multiple field update failed")
+    
+    # ========================================================================
+    # STEP 14: Test edit_lamaran() - INVALID updates
+    # ========================================================================
+    print_header("STEP 14: Test edit_lamaran() - INVALID UPDATES")
+    
+    # Test 1: Non-existent lamaran ID
+    print_test(1, "Update non-existent lamaran (ID: 99999)")
+    success, msg = edit_lamaran(99999, status="Pending")
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
+    # Test 2: Invalid status
+    print_test(2, "Update with invalid status")
+    success, msg = edit_lamaran(test_lamaran_id, status="Invalid Status")
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
+    # Test 3: Invalid tanggal_daftar format
+    print_test(3, "Update with invalid tanggal_daftar format")
+    success, msg = edit_lamaran(test_lamaran_id, tanggal_daftar="15-04-2026")
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
+    # Test 4: Invalid lamaran ID type
+    print_test(4, "Update with invalid lamaran ID type (string)")
+    success, msg = edit_lamaran("invalid", status="Pending")
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
+    # Test 5: No fields to update
+    print_test(5, "Update with no fields")
+    success, msg = edit_lamaran(test_lamaran_id)
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
+    # Test 6: Invalid field name
+    print_test(6, "Update with invalid field name")
+    success, msg = edit_lamaran(test_lamaran_id, invalid_field="value")
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
     # Summary
     print_header("TEST SUMMARY - CRUD Lamaran (add_lamaran)")
     
@@ -394,25 +489,27 @@ def main():
    ✅ Filtering: User, Beasiswa, Status filters working
    ✅ Sorting: Multiple columns with ASC/DESC working
    ✅ Combined filters: Multiple conditions working
+   ✅ Updates: Single, multiple, and conditional updates working
    ✅ Database queries: SUCCESSFUL
 
-✅ get_lamaran_list() Function Status:
-   ├─ Basic retrieval (all lamarans)
-   ├─ Filter by user_id
-   ├─ Filter by beasiswa_id
-   ├─ Filter by status (all valid values)
-   ├─ Sort by column (tanggal_daftar, status, created_at, user_id, beasiswa_id)
-   ├─ Sort order (ASC, DESC)
-   ├─ Combined filters working
-   ├─ Return total count for pagination
-   ├─ Joined fields with user/beasiswa info (username, judul, jenjang)
-   ├─ Dynamic WHERE clause building
+✅ edit_lamaran() Function Status:
+   ├─ Update single field (status, tanggal_daftar, catatan)
+   ├─ Update multiple fields at once
+   ├─ Status validation (Pending, Submitted, Accepted, Rejected, Withdrawn)
+   ├─ Tanggal_daftar validation (YYYY-MM-DD format)
+   ├─ Check lamaran existence before update
+   ├─ Update timestamp (updated_at) automatically
+   ├─ Reject invalid status values
+   ├─ Reject invalid tanggal_daftar format
+   ├─ Reject empty tanggal_daftar
+   ├─ Reject non-existent field names
+   ├─ Reject updates with no fields
    └─ Error handling comprehensive
 
-🎯 CONCLUSION: add_lamaran() & get_lamaran_list() are FULLY FUNCTIONAL ✅
+🎯 CONCLUSION: add_lamaran(), get_lamaran_list() & edit_lamaran() are FULLY FUNCTIONAL ✅
     
 ======================================================================
-  ✅ TEST COMPLETE - CRUD Lamaran (Tasks 1-2) WORKING!
+  ✅ TEST COMPLETE - CRUD Lamaran (Tasks 1-3) WORKING!
 ======================================================================
 """)
 

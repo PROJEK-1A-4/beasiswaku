@@ -1069,6 +1069,128 @@ def get_lamaran_list(filter_user_id: Optional[int] = None,
         return [], 0
 
 
+def edit_lamaran(lamaran_id: int, **kwargs) -> Tuple[bool, str]:
+    """
+    Mengupdate data lamaran yang sudah ada.
+    
+    Args:
+        lamaran_id (int): ID lamaran yang akan diupdate
+        **kwargs: Field-field yang ingin diupdate (status, tanggal_daftar, catatan)
+    
+    Returns:
+        Tuple[bool, str]:
+            - (True, "Success message") jika berhasil
+            - (False, "Error message") jika gagal
+    
+    Validation rules:
+        - status: harus salah satu dari Pending, Submitted, Accepted, Rejected, Withdrawn
+        - tanggal_daftar: format YYYY-MM-DD
+        - catatan: text field, optional
+    
+    Example:
+        >>> success, msg = edit_lamaran(
+        ...     1,
+        ...     status="Accepted",
+        ...     catatan="Diterima dengan nilai tertinggi"
+        ... )
+        >>> if success:
+        ...     print("Update successful!")
+    """
+    if not lamaran_id or not isinstance(lamaran_id, int):
+        return False, "ID lamaran harus berupa angka integer"
+    
+    if not kwargs:
+        return False, "Tidak ada field yang diupdate"
+    
+    # Validasi setiap field yang akan diupdate
+    allowed_fields = {
+        'status': str,
+        'tanggal_daftar': str,
+        'catatan': str,
+    }
+    
+    # Build update clauses dan prepare params
+    update_clauses = []
+    params = []
+    
+    for field, value in kwargs.items():
+        if field not in allowed_fields:
+            return False, f"Field '{field}' tidak diizinkan untuk diupdate"
+        
+        # Validasi field-specific rules
+        if field == 'status':
+            status_val = str(value).strip()
+            valid_status = ['Pending', 'Submitted', 'Accepted', 'Rejected', 'Withdrawn']
+            if status_val not in valid_status:
+                return False, f"Status harus salah satu dari: {', '.join(valid_status)}"
+            update_clauses.append("status = ?")
+            params.append(status_val)
+        
+        elif field == 'tanggal_daftar':
+            if not value or not str(value).strip():
+                return False, "Tanggal daftar tidak boleh kosong"
+            try:
+                datetime.strptime(str(value).strip(), '%Y-%m-%d')
+            except ValueError:
+                return False, "Format tanggal_daftar harus YYYY-MM-DD (contoh: 2026-04-08)"
+            update_clauses.append("tanggal_daftar = ?")
+            params.append(str(value).strip())
+        
+        elif field == 'catatan':
+            update_clauses.append("catatan = ?")
+            params.append(str(value).strip() if value else "")
+    
+    if not update_clauses:
+        return False, "Tidak ada field yang valid untuk diupdate"
+    
+    # Add updated_at timestamp
+    update_clauses.append("updated_at = CURRENT_TIMESTAMP")
+    
+    # Add lamaran_id untuk WHERE clause
+    params.append(lamaran_id)
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Check if lamaran exists
+        cursor.execute("""
+            SELECT rl.id, a.username, b.judul 
+            FROM riwayat_lamaran rl
+            JOIN akun a ON rl.user_id = a.id
+            JOIN beasiswa b ON rl.beasiswa_id = b.id
+            WHERE rl.id = ?
+        """, (lamaran_id,))
+        existing = cursor.fetchone()
+        
+        if not existing:
+            return False, f"Lamaran dengan ID {lamaran_id} tidak ditemukan"
+        
+        existing_desc = f"{existing['username']} → {existing['judul']}"
+        
+        # Update lamaran
+        update_sql = f"""
+            UPDATE riwayat_lamaran
+            SET {', '.join(update_clauses)}
+            WHERE id = ?
+        """
+        
+        cursor.execute(update_sql, params)
+        conn.commit()
+        
+        logger.info(f"✅ Lamaran '{existing_desc}' (ID: {lamaran_id}) updated successfully")
+        return True, f"Lamaran '{existing_desc}' berhasil diupdate!"
+        
+    except sqlite3.Error as e:
+        conn.rollback()
+        logger.error(f"❌ Database error saat update lamaran: {e}")
+        return False, f"Terjadi error database: {str(e)}"
+        
+    finally:
+        cursor.close()
+        conn.close()
+
+
 if __name__ == "__main__":
     # Script untuk testing
     init_db()
