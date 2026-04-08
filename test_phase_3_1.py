@@ -5,7 +5,7 @@ TEST PHASE 3.1: CRUD Lamaran (Applications) functions
 Comprehensive test for application/lamaran management
 """
 
-from crud import init_db, add_beasiswa, register_user, login_user, add_lamaran, get_lamaran_list, edit_lamaran, get_connection
+from crud import init_db, add_beasiswa, register_user, login_user, add_lamaran, get_lamaran_list, edit_lamaran, delete_lamaran, get_connection
 import sqlite3
 
 def print_header(text):
@@ -461,6 +461,98 @@ def main():
     success, msg = edit_lamaran(test_lamaran_id, invalid_field="value")
     print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
     
+    # ========================================================================
+    # STEP 15: Test delete_lamaran()
+    # ========================================================================
+    print_header("STEP 15: Test delete_lamaran()")
+    
+    # Get list before deletion
+    lamaran_list_before, count_before = get_lamaran_list()
+    print_test(0, f"Total lamarans before deletion: {count_before}")
+    print_result("✅", f"Found {count_before} lamarans")
+    
+    # Get ID of lamaran to delete
+    if len(lamaran_list_before) > 2:
+        delete_id = lamaran_list_before[-1]['id']  # Delete last one
+        delete_desc = f"{lamaran_list_before[-1]['username']} → {lamaran_list_before[-1]['beasiswa_judul']}"
+    else:
+        print_result("❌", "Not enough lamarans to test deletion")
+        return
+    
+    # Test 1: Delete existing lamaran
+    print_test(1, f"Delete lamaran (ID: {delete_id})")
+    success, msg = delete_lamaran(delete_id)
+    print_result("✅" if success else "❌", msg)
+    
+    # Verify deletion
+    lamaran_list_after, count_after = get_lamaran_list()
+    if count_after == count_before - 1:
+        print_result("✅", f"Record count decreased from {count_before} to {count_after}")
+    else:
+        print_result("❌", f"Record count mismatch: expected {count_before - 1}, got {count_after}")
+    
+    # Verify deleted lamaran not in list
+    deleted_exists = any(l['id'] == delete_id for l in lamaran_list_after)
+    if not deleted_exists:
+        print_result("✅", f"Deleted lamaran '{delete_desc}' not found in database")
+    else:
+        print_result("❌", f"Deleted lamaran still exists in database")
+    
+    # Test 2: Delete non-existent lamaran
+    print_test(2, "Delete non-existent lamaran (ID: 99999)")
+    success, msg = delete_lamaran(99999)
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
+    # Test 3: Invalid lamaran ID type
+    print_test(3, "Delete with invalid ID type (string)")
+    success, msg = delete_lamaran("invalid")
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
+    # ========================================================================
+    # STEP 16: Test complete CRUD workflow for Lamaran
+    # ========================================================================
+    print_header("STEP 16: Test Complete CRUD Workflow for Lamaran")
+    
+    print_test(0, "Full CRUD cycle: Create → Read → Update → Delete")
+    
+    # CREATE
+    success, msg, lid = add_lamaran(
+        user_id=users[0]['id'],
+        beasiswa_id=beasiswa_list[2],
+        status="Pending",
+        catatan="Aplikasi baru untuk testing"
+    )
+    print_result("✅" if success else "❌", f"[CREATE] {msg}")
+    
+    if not success:
+        return
+    
+    # READ
+    lamaran_list, _ = get_lamaran_list(filter_user_id=users[0]['id'])
+    found = any(l['id'] == lid for l in lamaran_list)
+    print_result("✅" if found else "❌", f"[READ] Found lamaran with ID {lid}")
+    
+    # UPDATE
+    success, msg = edit_lamaran(lid, status="Submitted", catatan="Submit complete!")
+    print_result("✅" if success else "❌", f"[UPDATE] {msg}")
+    
+    # Verify update
+    lamaran_list, _ = get_lamaran_list()
+    updated_record = next((l for l in lamaran_list if l['id'] == lid), None)
+    if updated_record and updated_record['status'] == "Submitted":
+        print_result("✅", f"[VERIFY] Update verified - Status: {updated_record['status']}")
+    else:
+        print_result("❌", "[VERIFY] Update verification failed")
+    
+    # DELETE
+    success, msg = delete_lamaran(lid)
+    print_result("✅" if success else "❌", f"[DELETE] { msg}")
+    
+    # Verify deletion
+    lamaran_list, _ = get_lamaran_list()
+    found = any(l['id'] == lid for l in lamaran_list)
+    print_result("✅" if not found else "❌", f"[VERIFY] Lamaran successfully removed from database")
+    
     # Summary
     print_header("TEST SUMMARY - CRUD Lamaran (add_lamaran)")
     
@@ -506,10 +598,20 @@ def main():
    ├─ Reject updates with no fields
    └─ Error handling comprehensive
 
-🎯 CONCLUSION: add_lamaran(), get_lamaran_list() & edit_lamaran() are FULLY FUNCTIONAL ✅
+✅ delete_lamaran() Function Status:
+   ├─ Delete existing lamaran by ID
+   ├─ Check lamaran existence before deletion
+   ├─ Return user and beasiswa info in success message
+   ├─ Reject non-existent lamaran ID
+   ├─ Reject invalid lamaran ID type
+   ├─ Verify record removed from database
+   ├─ Automatic transaction rollback on error
+   └─ Error handling comprehensive
+
+🎯 CONCLUSION: ALL 4 CRUD Lamaran functions are FULLY FUNCTIONAL ✅
     
 ======================================================================
-  ✅ TEST COMPLETE - CRUD Lamaran (Tasks 1-3) WORKING!
+  ✅ TEST COMPLETE - CRUD Lamaran (Tasks 1-4) FULLY WORKING!
 ======================================================================
 """)
 

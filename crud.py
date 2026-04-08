@@ -1191,6 +1191,64 @@ def edit_lamaran(lamaran_id: int, **kwargs) -> Tuple[bool, str]:
         conn.close()
 
 
+def delete_lamaran(lamaran_id: int) -> Tuple[bool, str]:
+    """
+    Menghapus lamaran dari database.
+    
+    Args:
+        lamaran_id (int): ID lamaran yang akan dihapus
+    
+    Returns:
+        Tuple[bool, str]:
+            - (True, "Success message") jika berhasil
+            - (False, "Error message") jika gagal
+    
+    Example:
+        >>> success, msg = delete_lamaran(1)
+        >>> if success:
+        ...     print("Lamaran deleted successfully")
+        ... else:
+        ...     print(f"Error: {msg}")
+    """
+    if not lamaran_id or not isinstance(lamaran_id, int):
+        return False, "ID lamaran harus berupa angka integer"
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Check if lamaran exists
+        cursor.execute("""
+            SELECT rl.id, a.username, b.judul 
+            FROM riwayat_lamaran rl
+            JOIN akun a ON rl.user_id = a.id
+            JOIN beasiswa b ON rl.beasiswa_id = b.id
+            WHERE rl.id = ?
+        """, (lamaran_id,))
+        existing = cursor.fetchone()
+        
+        if not existing:
+            return False, f"Lamaran dengan ID {lamaran_id} tidak ditemukan"
+        
+        existing_desc = f"{existing['username']} → {existing['judul']}"
+        
+        # Delete lamaran
+        cursor.execute("DELETE FROM riwayat_lamaran WHERE id = ?", (lamaran_id,))
+        conn.commit()
+        
+        logger.info(f"✅ Lamaran '{existing_desc}' (ID: {lamaran_id}) deleted successfully")
+        return True, f"Lamaran '{existing_desc}' berhasil dihapus!"
+        
+    except sqlite3.Error as e:
+        conn.rollback()
+        logger.error(f"❌ Database error saat delete lamaran: {e}")
+        return False, f"Terjadi error database: {str(e)}"
+        
+    finally:
+        cursor.close()
+        conn.close()
+
+
 if __name__ == "__main__":
     # Script untuk testing
     init_db()
