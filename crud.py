@@ -344,6 +344,128 @@ def login_user(username: str, password: str) -> Tuple[bool, str, Optional[Dict]]
         conn.close()
 
 
+# =====================================================================
+# PHASE 2.2: CRUD BEASISWA FUNCTIONS
+# =====================================================================
+
+def add_beasiswa(judul: str, jenjang: str, deadline: str,
+                penyelenggara_id: Optional[int] = None,
+                deskripsi: str = "", benefit: str = "",
+                persyaratan: str = "", minimal_ipk: Optional[float] = None,
+                coverage: str = "", status: str = "Buka",
+                link_aplikasi: str = "") -> Tuple[bool, str, Optional[int]]:
+    """
+    Menambahkan beasiswa baru ke database.
+    
+    Args:
+        judul (str): Judul/nama beasiswa (required)
+        jenjang (str): Jenjang pendidikan (D3, D4, S1, S2)
+        deadline (str): Deadline pendaftaran (format YYYY-MM-DD)
+        penyelenggara_id (int, optional): ID penyelenggara
+        deskripsi (str, optional): Deskripsi beasiswa
+        benefit (str, optional): Benefit/keuntungan beasiswa
+        persyaratan (str, optional): Persyaratan beasiswa
+        minimal_ipk (float, optional): IPK minimal (0.0 - 4.0)
+        coverage (str, optional): Jenis coverage (Fully, Partially, etc)
+        status (str, optional): Status beasiswa (Buka, Segera Tutup, Tutup) - default 'Buka'
+        link_aplikasi (str, optional): Link aplikasi/form
+    
+    Returns:
+        Tuple[bool, str, Optional[int]]:
+            - (True, "Success message", beasiswa_id) jika berhasil
+            - (False, "Error message", None) jika gagal
+    
+    Error cases:
+        - Judul kosong
+        - Jenjang tidak valid
+        - Deadline format tidak valid
+        - Penyelenggara_id tidak ada (foreign key violation)
+        - Database error
+    
+    Example:
+        >>> success, msg, id = add_beasiswa(
+        ...     "Beasiswa A1",
+        ...     "S1",
+        ...     "2026-12-31",
+        ...     penyelenggara_id=1,
+        ...     benefit="Subsidi penuh"
+        ... )
+        >>> if success:
+        ...     print(f"Beasiswa added with ID: {id}")
+    """
+    # Validasi input
+    if not judul or not judul.strip():
+        return False, "Judul beasiswa tidak boleh kosong", None
+    
+    if not jenjang or jenjang.strip().upper() not in ['D3', 'D4', 'S1', 'S2']:
+        return False, "Jenjang harus salah satu dari: D3, D4, S1, S2", None
+    
+    if not deadline or not deadline.strip():
+        return False, "Deadline tidak boleh kosong", None
+    
+    # Validasi format deadline (YYYY-MM-DD)
+    try:
+        datetime.strptime(deadline, '%Y-%m-%d')
+    except ValueError:
+        return False, "Format deadline harus YYYY-MM-DD (contoh: 2026-12-31)", None
+    
+    # Validasi minimal_ipk jika ada
+    if minimal_ipk is not None:
+        try:
+            ipk_float = float(minimal_ipk)
+            if ipk_float < 0.0 or ipk_float > 4.0:
+                return False, "IPK minimal harus antara 0.0 - 4.0", None
+        except (ValueError, TypeError):
+            return False, "IPK minimal harus berupa angka desimal", None
+    
+    judul = judul.strip()
+    jenjang = jenjang.strip().upper()
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Enable foreign key checking untuk SQLite
+        cursor.execute("PRAGMA foreign_keys = ON")
+        
+        # Insert beasiswa
+        cursor.execute("""
+            INSERT INTO beasiswa (
+                judul, jenjang, deadline, penyelenggara_id,
+                deskripsi, benefit, persyaratan, minimal_ipk,
+                coverage, status, link_aplikasi, scrape_date
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """, (
+            judul, jenjang, deadline, penyelenggara_id,
+            deskripsi.strip(), benefit.strip(), persyaratan.strip(),
+            minimal_ipk, coverage.strip(), status, link_aplikasi.strip()
+        ))
+        
+        conn.commit()
+        beasiswa_id = cursor.lastrowid
+        
+        logger.info(f"✅ Beasiswa '{judul}' added successfully (ID: {beasiswa_id}, Jenjang: {jenjang})")
+        return True, f"Beasiswa '{judul}' berhasil ditambahkan!", beasiswa_id
+        
+    except sqlite3.IntegrityError as e:
+        conn.rollback()
+        if "FOREIGN KEY" in str(e):
+            error_msg = f"Penyelenggara dengan ID {penyelenggara_id} tidak ditemukan"
+        else:
+            error_msg = f"Data constraint violation: {str(e)}"
+        logger.warning(f"⚠️ Beasiswa add failed: {error_msg}")
+        return False, error_msg, None
+        
+    except sqlite3.Error as e:
+        conn.rollback()
+        logger.error(f"❌ Database error saat menambah beasiswa: {e}")
+        return False, f"Terjadi error database: {str(e)}", None
+        
+    finally:
+        cursor.close()
+        conn.close()
+
+
 if __name__ == "__main__":
     # Script untuk testing
     init_db()
