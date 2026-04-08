@@ -581,6 +581,182 @@ def get_beasiswa_list(filter_jenjang: Optional[str] = None,
         return [], 0
 
 
+def edit_beasiswa(beasiswa_id: int, **kwargs) -> Tuple[bool, str]:
+    """
+    Mengupdate data beasiswa yang sudah ada.
+    
+    Args:
+        beasiswa_id (int): ID beasiswa yang akan diupdate
+        **kwargs: Field-field yang ingin diupdate (judul, jenjang, deadline, status, 
+                  deskripsi, benefit, persyaratan, minimal_ipk, coverage, link_aplikasi)
+    
+    Returns:
+        Tuple[bool, str]:
+            - (True, "Success message") jika berhasil
+            - (False, "Error message") jika gagal
+    
+    Validation rules:
+        - judul: tidak boleh kosong
+        - jenjang: harus salah satu dari D3, D4, S1, S2
+        - deadline: format YYYY-MM-DD
+        - status: harus salah satu dari Buka, Segera Tutup, Tutup
+        - minimal_ipk: harus antara 0.0 - 4.0 (jika ada)
+    
+    Example:
+        >>> success, msg = edit_beasiswa(
+        ...     1,
+        ...     judul="Beasiswa A2 Updated",
+        ...     status="Segera Tutup"
+        ... )
+        >>> if success:
+        ...     print("Update successful!")
+    """
+    if not beasiswa_id or not isinstance(beasiswa_id, int):
+        return False, "ID beasiswa harus berupa angka integer"
+    
+    if not kwargs:
+        return False, "Tidak ada field yang diupdate"
+    
+    # Validasi setiap field yang akan diupdate
+    allowed_fields = {
+        'judul': str,
+        'jenjang': str,
+        'deadline': str,
+        'penyelenggara_id': int,
+        'deskripsi': str,
+        'benefit': str,
+        'persyaratan': str,
+        'minimal_ipk': (int, float, type(None)),
+        'coverage': str,
+        'status': str,
+        'link_aplikasi': str
+    }
+    
+    # Build update clauses dan prepare params
+    update_clauses = []
+    params = []
+    
+    for field, value in kwargs.items():
+        if field not in allowed_fields:
+            return False, f"Field '{field}' tidak diizinkan untuk diupdate"
+        
+        # Validasi field-specific rules
+        if field == 'judul':
+            if not value or not str(value).strip():
+                return False, "Judul beasiswa tidak boleh kosong"
+            update_clauses.append("judul = ?")
+            params.append(str(value).strip())
+        
+        elif field == 'jenjang':
+            jenjang_upper = str(value).strip().upper()
+            if jenjang_upper not in ['D3', 'D4', 'S1', 'S2']:
+                return False, "Jenjang harus salah satu dari: D3, D4, S1, S2"
+            update_clauses.append("jenjang = ?")
+            params.append(jenjang_upper)
+        
+        elif field == 'deadline':
+            if not value or not str(value).strip():
+                return False, "Deadline tidak boleh kosong"
+            try:
+                datetime.strptime(str(value).strip(), '%Y-%m-%d')
+            except ValueError:
+                return False, "Format deadline harus YYYY-MM-DD (contoh: 2026-12-31)"
+            update_clauses.append("deadline = ?")
+            params.append(str(value).strip())
+        
+        elif field == 'status':
+            status_val = str(value).strip()
+            valid_status = ['Buka', 'Segera Tutup', 'Tutup']
+            if status_val not in valid_status:
+                return False, f"Status harus salah satu dari: {', '.join(valid_status)}"
+            update_clauses.append("status = ?")
+            params.append(status_val)
+        
+        elif field == 'minimal_ipk':
+            if value is not None:
+                try:
+                    ipk_float = float(value)
+                    if ipk_float < 0.0 or ipk_float > 4.0:
+                        return False, "IPK minimal harus antara 0.0 - 4.0"
+                except (ValueError, TypeError):
+                    return False, "IPK minimal harus berupa angka desimal"
+            update_clauses.append("minimal_ipk = ?")
+            params.append(value)
+        
+        elif field == 'penyelenggara_id':
+            if value is not None:
+                try:
+                    int_val = int(value)
+                    update_clauses.append("penyelenggara_id = ?")
+                    params.append(int_val)
+                except (ValueError, TypeError):
+                    return False, "Penyelenggara ID harus berupa angka"
+            else:
+                update_clauses.append("penyelenggara_id = ?")
+                params.append(None)
+        
+        else:
+            # untuk field lainnya (deskripsi, benefit, persyaratan, coverage, link_aplikasi)
+            update_clauses.append(f"{field} = ?")
+            params.append(str(value).strip() if value else "")
+    
+    if not update_clauses:
+        return False, "Tidak ada field yang valid untuk diupdate"
+    
+    # Add updated_at timestamp
+    update_clauses.append("updated_at = CURRENT_TIMESTAMP")
+    
+    # Add beasiswa_id untuk WHERE clause
+    params.append(beasiswa_id)
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Enable foreign key checking untuk SQLite
+        cursor.execute("PRAGMA foreign_keys = ON")
+        
+        # Check if beasiswa exists
+        cursor.execute("SELECT id, judul FROM beasiswa WHERE id = ?", (beasiswa_id,))
+        existing = cursor.fetchone()
+        
+        if not existing:
+            return False, f"Beasiswa dengan ID {beasiswa_id} tidak ditemukan"
+        
+        existing_judul = existing['judul']
+        
+        # Update beasiswa
+        update_sql = f"""
+            UPDATE beasiswa
+            SET {', '.join(update_clauses)}
+            WHERE id = ?
+        """
+        
+        cursor.execute(update_sql, params)
+        conn.commit()
+        
+        logger.info(f"✅ Beasiswa '{existing_judul}' (ID: {beasiswa_id}) updated successfully")
+        return True, f"Beasiswa '{existing_judul}' berhasil diupdate!"
+        
+    except sqlite3.IntegrityError as e:
+        conn.rollback()
+        if "FOREIGN KEY" in str(e):
+            error_msg = f"Penyelenggara dengan ID tidak ditemukan"
+        else:
+            error_msg = f"Data constraint violation: {str(e)}"
+        logger.warning(f"⚠️ Beasiswa update failed: {error_msg}")
+        return False, error_msg
+        
+    except sqlite3.Error as e:
+        conn.rollback()
+        logger.error(f"❌ Database error saat update beasiswa: {e}")
+        return False, f"Terjadi error database: {str(e)}"
+        
+    finally:
+        cursor.close()
+        conn.close()
+
+
 if __name__ == "__main__":
     # Script untuk testing
     init_db()

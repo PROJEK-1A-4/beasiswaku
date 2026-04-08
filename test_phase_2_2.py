@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-TEST PHASE 2.2: CRUD Beasiswa - add_beasiswa() & get_beasiswa_list()
-=====================================================================
-Comprehensive test for beasiswa creation and retrieval with filtering
+TEST PHASE 2.2: CRUD Beasiswa - add_beasiswa() & get_beasiswa_list() & edit_beasiswa()
+=======================================================================================
+Comprehensive test for beasiswa creation, retrieval, and update with filtering
 """
 
-from crud import init_db, add_beasiswa, get_beasiswa_list, get_connection
+from crud import init_db, add_beasiswa, get_beasiswa_list, edit_beasiswa, get_connection
 import sqlite3
 
 def print_header(text):
@@ -337,6 +337,141 @@ def main():
         for b in beasiswa_list:
             print(f"   └─ {b['judul']} ({b['jenjang']}, {b['status']})")
     
+    # ========================================================================
+    # STEP 12: Test edit_beasiswa() - VALID updates
+    # ========================================================================
+    print_header("STEP 12: Test edit_beasiswa() - VALID UPDATES")
+    
+    # Get first beasiswa for testing
+    beasiswa_list, _ = get_beasiswa_list()
+    if len(beasiswa_list) == 0:
+        print_result("❌", "No beasiswa found in database")
+        return
+    
+    test_beasiswa_id = beasiswa_list[0]['id']
+    original_judul = beasiswa_list[0]['judul']
+    
+    # Test 1: Update judul
+    print_test(1, "Update judul")
+    success, msg = edit_beasiswa(test_beasiswa_id, judul="Updated Beasiswa Title")
+    print_result("✅" if success else "❌", msg)
+    
+    # Verify update
+    updated_list, _ = get_beasiswa_list()
+    updated_beasiswa = [b for b in updated_list if b['id'] == test_beasiswa_id][0]
+    if updated_beasiswa['judul'] == "Updated Beasiswa Title":
+        print_result("✅", f"Judul verified: {updated_beasiswa['judul']}")
+    else:
+        print_result("❌", f"Judul not updated correctly")
+    
+    # Test 2: Update jenjang and status
+    print_test(2, "Update jenjang to S2 and status to Segera Tutup")
+    success, msg = edit_beasiswa(test_beasiswa_id, jenjang='S2', status='Segera Tutup')
+    print_result("✅" if success else "❌", msg)
+    
+    updated_list, _ = get_beasiswa_list()
+    updated_beasiswa = [b for b in updated_list if b['id'] == test_beasiswa_id][0]
+    if updated_beasiswa['jenjang'] == "S2" and updated_beasiswa['status'] == "Segera Tutup":
+        print_result("✅", f"Jenjang: {updated_beasiswa['jenjang']}, Status: {updated_beasiswa['status']}")
+    else:
+        print_result("❌", f"Jenjang or status not updated correctly")
+    
+    # Test 3: Update deadline
+    print_test(3, "Update deadline")
+    success, msg = edit_beasiswa(test_beasiswa_id, deadline='2027-12-31')
+    print_result("✅" if success else "❌", msg)
+    
+    updated_list, _ = get_beasiswa_list()
+    updated_beasiswa = [b for b in updated_list if b['id'] == test_beasiswa_id][0]
+    if updated_beasiswa['deadline'] == '2027-12-31':
+        print_result("✅", f"Deadline verified: {updated_beasiswa['deadline']}")
+    else:
+        print_result("❌", f"Deadline not updated correctly")
+    
+    # Test 4: Update minimal_ipk
+    print_test(4, "Update minimal IPK")
+    success, msg = edit_beasiswa(test_beasiswa_id, minimal_ipk=3.5)
+    print_result("✅" if success else "❌", msg)
+    
+    updated_list, _ = get_beasiswa_list()
+    updated_beasiswa = [b for b in updated_list if b['id'] == test_beasiswa_id][0]
+    if updated_beasiswa['minimal_ipk'] == 3.5:
+        print_result("✅", f"IPK verified: {updated_beasiswa['minimal_ipk']}")
+    else:
+        print_result("❌", f"IPK not updated correctly")
+    
+    # Test 5: Update multiple fields at once
+    print_test(5, "Update multiple fields (benefit, coverage, link)")
+    success, msg = edit_beasiswa(
+        test_beasiswa_id,
+        benefit="Tuition + Living allowance",
+        coverage="Full",
+        link_aplikasi="https://example.com/apply"
+    )
+    print_result("✅" if success else "❌", msg)
+    
+    # ========================================================================
+    # STEP 13: Test edit_beasiswa() - INVALID updates
+    # ========================================================================
+    print_header("STEP 13: Test edit_beasiswa() - INVALID UPDATES")
+    
+    # Test 1: Non-existent beasiswa ID
+    print_test(1, "Update non-existent beasiswa (ID: 99999)")
+    success, msg = edit_beasiswa(99999, judul="Non Existent")
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
+    # Test 2: Empty judul
+    print_test(2, "Update with empty judul")
+    success, msg = edit_beasiswa(test_beasiswa_id, judul="")
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
+    # Test 3: Invalid jenjang
+    print_test(3, "Update with invalid jenjang")
+    success, msg = edit_beasiswa(test_beasiswa_id, jenjang="M2")
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
+    # Test 4: Invalid deadline format
+    print_test(4, "Update with invalid deadline format")
+    success, msg = edit_beasiswa(test_beasiswa_id, deadline="31-12-2027")
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
+    # Test 5: Invalid status
+    print_test(5, "Update with invalid status")
+    success, msg = edit_beasiswa(test_beasiswa_id, status="Invalid Status")
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
+    # Test 6: Invalid IPK (too high)
+    print_test(6, "Update with invalid IPK (> 4.0)")
+    success, msg = edit_beasiswa(test_beasiswa_id, minimal_ipk=4.5)
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
+    # Test 7: Invalid IPK (negative)
+    print_test(7, "Update with invalid IPK (negative)")
+    success, msg = edit_beasiswa(test_beasiswa_id, minimal_ipk=-0.5)
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
+    # Test 8: No fields to update
+    print_test(8, "Update with no fields")
+    success, msg = edit_beasiswa(test_beasiswa_id)
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
+    # Test 9: Invalid field name
+    print_test(9, "Update with invalid field name")
+    success, msg = edit_beasiswa(test_beasiswa_id, invalid_field="value")
+    print_result("✅" if not success else "❌", f"Correctly rejected: {msg}")
+    
+    # Test 10: Case insensitivity for jenjang
+    print_test(10, "Update jenjang (case insensitive)")
+    success, msg = edit_beasiswa(test_beasiswa_id, jenjang='s1')
+    print_result("✅" if success else "❌", msg)
+    
+    updated_list, _ = get_beasiswa_list()
+    updated_beasiswa = [b for b in updated_list if b['id'] == test_beasiswa_id][0]
+    if updated_beasiswa['jenjang'] == "S1":
+        print_result("✅", f"Jenjang correctly normalized to: {updated_beasiswa['jenjang']}")
+    else:
+        print_result("❌", f"Jenjang not normalized: {updated_beasiswa['jenjang']}")
+    
     # Summary
     print_header("TEST SUMMARY - CRUD Beasiswa")
     
@@ -362,12 +497,27 @@ def main():
    ├─ Return total count for pagination
    └─ Error handling comprehensive
 
+✅ edit_beasiswa() Function Status:
+   ├─ Update single field (judul, jenjang, deadline, status, ipk)
+   ├─ Update multiple fields at once
+   ├─ Validation for all fields (same as add_beasiswa)
+   ├─ Case insensitivity for jenjang (s1 → S1)
+   ├─ Check beasiswa existence before update
+   ├─ Update timestamp (updated_at) automatically
+   ├─ Reject invalid jenjang, deadline format, status
+   ├─ Reject invalid IPK range (0.0-4.0)
+   ├─ Reject empty judul
+   ├─ Reject non-existent field names
+   ├─ Reject updates with no fields
+   └─ Error handling comprehensive
+
 📊 Test Results:
    ✅ Valid data: ACCEPTED correctly
    ✅ Invalid data: REJECTED correctly
    ✅ Filtering: WORKS correctly
    ✅ Searching: FINDS appropriate data
    ✅ Sorting: ORDERS correctly
+   ✅ Updates: MODIFIES correctly with validation
    ✅ Database queries: SUCCESSFUL
    ✅ Error messages: CLEAR & HELPFUL
 
