@@ -49,7 +49,7 @@ MAX_PAGES_CONFIG = {
     "s1": 10,              # Top 10 pages
     "s2": 10,              # Top 10 pages
     "diploma": 10,         # Top 10 pages
-    "dalam_negeri": 1,     # Only 1 page available
+    "dalam_negeri": 1,     # 1 page (5 beasiswa)
     "luar_negeri": 10      # Top 10 pages
 }
 
