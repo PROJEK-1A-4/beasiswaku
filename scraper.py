@@ -33,8 +33,8 @@ CATEGORIES = {
     "s1": "beasiswa-s1",
     "s2": "beasiswa-s2",
     "diploma": "beasiswa-diploma",
-    "umum": "beasiswa-umum",
-    "internasional": "beasiswa-internasional"
+    "dalam_negeri": "beasiswa-dalam-negeri",
+    "luar_negeri": "beasiswa-luar-negeri"
 }
 
 # Headers untuk menghindari 403 Forbidden
@@ -208,10 +208,10 @@ def extract_beasiswa_info(item, category_name: str) -> Optional[Dict]:
             "s1": "S1",
             "s2": "S2",
             "diploma": "Diploma",
-            "umum": "Umum",
-            "internasional": "Internasional"
+            "dalam_negeri": "Dalam Negeri",
+            "luar_negeri": "Luar Negeri"
         }
-        jenjang = jenjang_map.get(category_name, "Umum")
+        jenjang = jenjang_map.get(category_name, "Dalam Negeri")
         
         # Tentukan status (TASK KEMAL: adjust logic sesuai kebutuhan)
         status = determine_status(deadline_text)
@@ -266,14 +266,13 @@ def extract_penyelenggara(nama_beasiswa: str, deskripsi: str) -> str:
     - "BEASISWA DJARUM PLUS..." → "DJARUM"
     - "PROGRAM BSI SCHOLARSHIP..." → "BSI"
     """
-    # TASK KEMAL: Improve heuristic ini untuk parser lebih akurat
-    # Cari kata pertama yang bukan common words (BEASISWA, PROGRAM, dll)
+    # Cari kata pertama yang bukan common words (case-insensitive)
     common_words = {'beasiswa', 'program', 'tahun', 'untuk', 'mahasiswa', 'the', 'a', 'an'}
     
-    words = nama_beasiswa.upper().split()
+    words = nama_beasiswa.lower().split()  # FIXED: lowercase untuk case-insensitive comparison
     for word in words:
         if len(word) > 3 and word not in common_words:
-            return word
+            return word.upper()  # Return uppercase hasil
     
     return "Tidak Diketahui"
 
@@ -313,15 +312,16 @@ def parse_deadline(deadline_text: str) -> str:
 
             if len(tahun) == 2:  # Jika tahun hanya 2 digit, tambahkan prefix '20'
                 tahun = '20' + tahun
-                
-                if bulan_text in bulan_map:
-                    bulan_angka = bulan_map[bulan_text]
-                    return f"{tahun}-{bulan_angka}-{hari}"
+            
+            # FIXED: Check bulan_map di level yang sama (tidak nested)
+            if bulan_text in bulan_map:
+                bulan_angka = bulan_map[bulan_text]
+                return f"{tahun}-{bulan_angka}-{hari}"
                 
     except Exception as e:
         logger.debug(f"Gagal memproses deadline: {deadline_text}. Error: {e}")
 
-        
+
     return "0000-00-00"
 
 
