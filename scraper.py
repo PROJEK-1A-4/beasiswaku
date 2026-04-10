@@ -15,8 +15,9 @@ from bs4 import BeautifulSoup
 import json
 import os
 import re
+import time
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Set, Tuple
 import logging
 
 # Konfigurasi logging
@@ -42,6 +43,19 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
 
+# Konfigurasi pagination - Smart Hybrid (Option 3)
+# NOTE: Limited to 5 pages max untuk avoid timeout + server overload
+MAX_PAGES_CONFIG = {
+    "s1": 5,               # Top 5 pages (25 beasiswa)
+    "s2": 5,               # Top 5 pages (25 beasiswa)
+    "diploma": 5,          # Top 5 pages (25 beasiswa) - bisa increase later
+    "dalam_negeri": 1,     # Only 1 page available
+    "luar_negeri": 5       # Top 5 pages (25 beasiswa)
+}
+
+# Rate limiting
+REQUEST_DELAY = 1  # 1 second antara requests untuk polite scraping
+
 
 def scrape_beasiswa_data() -> Dict[str, List[Dict]]:
     """
@@ -61,14 +75,15 @@ def scrape_beasiswa_data() -> Dict[str, List[Dict]]:
     """
     all_beasiswa = []
     all_penyelenggara = set()  # Set untuk avoid duplicate penyelenggara
+    seen_beasiswa: Set[Tuple[str, str]] = set()  # Track (nama, penyelenggara) untuk avoid duplicate
     
-    logger.info("🔄 Memulai proses scraping indbeasiswa.com...")
+    logger.info("🔄 Memulai proses scraping indbeasiswa.com (dengan pagination)...")
     
     for category_name, category_slug in CATEGORIES.items():
         logger.info(f"  → Scraping kategori: {category_name}")
         try:
-            beasiswa_list = scrape_category(category_slug, category_name)
-            logger.info(f"     ✅ Berhasil scrape {len(beasiswa_list)} beasiswa")
+            beasiswa_list = scrape_category(category_slug, category_name, seen_beasiswa)
+            logger.info(f"     ✅ Berhasil scrape {len(beasiswa_list)} beasiswa (unique)")
             
             # Ekstrak penyelenggara unik
             for b in beasiswa_list:
@@ -113,59 +128,77 @@ def scrape_beasiswa_data() -> Dict[str, List[Dict]]:
     }
 
 
-def scrape_category(category_slug: str, category_name: str) -> List[Dict]:
+def scrape_category(category_slug: str, category_name: str, seen_beasiswa: Set[Tuple[str, str]]) -> List[Dict]:
     """
-    Scrape satu kategori beasiswa dari indbeasiswa.com
+    Scrape satu kategori beasiswa dari indbeasiswa.com dengan PAGINATION
     
     Args:
         category_slug: URL slug kategori (e.g., "beasiswa-s1")
         category_name: Nama kategori untuk jenjang field (e.g., "s1", "diploma")
+        seen_beasiswa: Set untuk track (nama, penyelenggara) yang sudah di-scrape (untuk dedup)
     
     Return:
-        List of beasiswa dicts dengan struktur:
-        {
-            "nama": "Nama Beasiswa",
-            "penyelenggara": "Nama Institusi",
-            "jenjang": "S1" | "S2" | "Diploma" | "Umum",
-            "deadline": "2025-05-15",
-            "status": "Buka" | "Segera Tutup" | "Tutup",
-            "link": "https://indbeasiswa.com/...",
-            "deskripsi": "Deskripsi beasiswa"
-        }
+        List of beasiswa dicts yang UNIQUE (tidak ada duplikasi)
     """
-    url = f"{BASE_URL}/{category_slug}"
     beasiswa_list = []
+    max_pages = MAX_PAGES_CONFIG.get(category_name, 1)
     
-    try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
-        response.raise_for_status()
+    for page_num in range(1, max_pages + 1):
+        try:
+            # Construct URL dengan pagination
+            if page_num == 1:
+                url = f"{BASE_URL}/{category_slug}"
+            else:
+                url = f"{BASE_URL}/{category_slug}/page/{page_num}/"
+            
+            logger.debug(f"    Fetching page {page_num}/{max_pages}: {url}")
+            
+            response = requests.get(url, headers=HEADERS, timeout=10)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, "html.parser")  # Built-in parser
+            
+            # Parse beasiswa items dari halaman
+            beasiswa_items = soup.select(".type-post")
+            
+            if not beasiswa_items and page_num == 1:
+                logger.warning(f"  ⚠️  Tidak ada item ditemukan untuk {category_slug} page 1. Cek selector HTML.")
+            
+            # Extract beasiswa dari tiap item
+            page_beasiswa_count = 0
+            for item in beasiswa_items:
+                try:
+                    beasiswa = extract_beasiswa_info(item, category_name)
+                    if beasiswa:
+                        # DEDUPLICATION: Check if sudah ada sebelumnya
+                        unique_key = (beasiswa["nama"], beasiswa["penyelenggara"])
+                        if unique_key not in seen_beasiswa:
+                            seen_beasiswa.add(unique_key)
+                            beasiswa_list.append(beasiswa)
+                            page_beasiswa_count += 1
+                        else:
+                            logger.debug(f"    Duplicate skipped: {beasiswa['nama'][:40]}")
+                except Exception as e:
+                    logger.warning(f"  ⚠️  Error extract item: {str(e)}")
+                    continue
+            
+            logger.debug(f"    Page {page_num}: {page_beasiswa_count} new items, total so far: {len(beasiswa_list)}")
+            
+            # Rate limiting: delay sebelum request berikutnya (kecuali last page)
+            if page_num < max_pages:
+                time.sleep(REQUEST_DELAY)
         
-        soup = BeautifulSoup(response.content, "html.parser")  # Built-in parser (lxml optional)
-        
-        # TASK KEMAL: Inspect HTML indbeasiswa.com dan tentukan selector yang tepat
-        # Placeholder selector — HARUS diganti sesuai struktur HTML asli
-        # Contoh: article.beasiswa-card, div.scholarship-item, etc.
-        beasiswa_items = soup.select(".type-post")
-        if not beasiswa_items:
-            logger.warning(f"  ⚠️  Tidak ada item ditemukan untuk {category_slug}. Cek selector HTML.")
-        
-        for item in beasiswa_items:
-            try:
-                beasiswa = extract_beasiswa_info(item, category_name)
-                if beasiswa:
-                    beasiswa_list.append(beasiswa)
-            except Exception as e:
-                logger.warning(f"  ⚠️  Error extract beasiswa item: {str(e)}")
-                continue
-        
-        return beasiswa_list
+        except requests.exceptions.Timeout:
+            logger.warning(f"  ⚠️  Timeout page {page_num}: {url}")
+            continue
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"  ⚠️  Error page {page_num}: {url} - {str(e)}")
+            continue
+        except Exception as e:
+            logger.warning(f"  ⚠️  Unexpected error page {page_num}: {str(e)}")
+            continue
     
-    except requests.exceptions.Timeout:
-        logger.error(f"❌ Timeout scraping {url}")
-        return []
-    except requests.exceptions.RequestException as e:
-        logger.error(f"❌ Request error scraping {url}: {str(e)}")
-        return []
+    return beasiswa_list
 
 
 def extract_beasiswa_info(item, category_name: str) -> Optional[Dict]:
@@ -323,6 +356,13 @@ def parse_deadline(deadline_text: str) -> str:
 
 
     return "0000-00-00"
+
+
+def get_max_pages_for_category(category_name: str) -> int:
+    """
+    Get maximum pages untuk kategori tertentu (dari MAX_PAGES_CONFIG)
+    """
+    return MAX_PAGES_CONFIG.get(category_name, 1)
 
 
 def detect_penyelenggara_type(penyelenggara_name: str) -> str:
