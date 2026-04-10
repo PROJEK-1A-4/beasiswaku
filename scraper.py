@@ -43,14 +43,14 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
 
-# Konfigurasi pagination - Smart Hybrid (Option 3)
-# NOTE: Limited to 5 pages max untuk avoid timeout + server overload
+# Konfigurasi pagination - Smart Hybrid (Option 1: 10 pages)
+# NOTE: Increased to 10 pages per kategori untuk dapat ~200 beasiswa total
 MAX_PAGES_CONFIG = {
-    "s1": 5,               # Top 5 pages (25 beasiswa)
-    "s2": 5,               # Top 5 pages (25 beasiswa)
-    "diploma": 5,          # Top 5 pages (25 beasiswa) - bisa increase later
+    "s1": 10,              # Top 10 pages
+    "s2": 10,              # Top 10 pages
+    "diploma": 10,         # Top 10 pages
     "dalam_negeri": 1,     # Only 1 page available
-    "luar_negeri": 5       # Top 5 pages (25 beasiswa)
+    "luar_negeri": 10      # Top 10 pages
 }
 
 # Rate limiting
