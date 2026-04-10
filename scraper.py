@@ -1,12 +1,4 @@
 """
-BeasiswaKu Web Scraper Module
-
-Bertanggung jawab untuk:
-1. Web scraping dari indbeasiswa.com (5 kategori)
-2. Validasi dan cleaning data
-3. Generate JSON backup (beasiswa.json, penyelenggara.json)
-4. Siap untuk integrasi ke database (saat Darva selesai CRUD)
-
 Tim: KEMAL (Scraping & Search Specialist)
 """
 
@@ -43,13 +35,13 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
 
-# Konfigurasi pagination - Smart Hybrid (Option 1: 10 pages per kategori)
+# Konfigurasi pagination - Smart Hybrid (10 pages per kategori)
 # NOTE: Consistent 10 pages untuk semua kategori untuk dapat maksimal beasiswa
 MAX_PAGES_CONFIG = {
     "s1": 10,              # Top 10 pages
     "s2": 10,              # Top 10 pages
     "diploma": 10,         # Top 10 pages
-    "dalam_negeri": 10,    # Top 10 pages (50 beasiswa)
+    "dalam_negeri": 10,    # Top 10 pages
     "luar_negeri": 10      # Top 10 pages
 }
 
@@ -198,14 +190,6 @@ def extract_beasiswa_info(item, category_name: str) -> Optional[Dict]:
     """
     Extract informasi beasiswa dari HTML element
     
-    Args:
-        item: BeautifulSoup element untuk satu beasiswa
-        category_name: Kategori untuk fill jenjang field
-    
-    Return:
-        Dict beasiswa atau None jika parsing gagal
-    
-    NOTE: Selector sudah diverifikasi dengan indbeasiswa.com (April 2026)
     """
     try:
         # Verifikasi selector - SUDAH TESTED dengan HTML asli
@@ -265,10 +249,7 @@ def extract_beasiswa_info(item, category_name: str) -> Optional[Dict]:
 
 def determine_status(deadline_text: str) -> str:
     """
-    Tentukan status beasiswa (Buka / Segera Tutup / Tutup)
-    
-    TASK KEMAL: Implement logic untuk parse deadline_text
-    dan tentukan status berdasarkan days remaining
+    menentukan status beasiswa (Buka / Segera Tutup / Tutup)
     
     Kriteria:
     - Buka: ≥ 8 hari lagi
@@ -392,15 +373,7 @@ def normalize_url(url: str) -> str:
 
 
 def save_backup(data: Dict) -> Dict[str, str]:
-    """
-    Generate 3 file JSON backup sesuai requirement:
-    - beasiswa.json
-    - penyelenggara.json
-    - riwayat_lamaran.json (empty template untuk fase awal)
     
-    Return:
-        Dict dengan status masing-masing file
-    """
     backup_files = {}
     
     try:
@@ -450,7 +423,7 @@ def save_backup(data: Dict) -> Dict[str, str]:
 
 if __name__ == "__main__":
     """
-    TASK KEMAL: Test scraper standalone
+    Test scraper standalone
     
     Jalankan: python scraper.py
     
