@@ -17,7 +17,7 @@ import os
 import re
 import time
 from datetime import datetime
-from typing import List, Dict, Optional, Set, Tuple
+from typing import List, Dict, Optional
 import logging
 
 # Konfigurasi logging
@@ -75,15 +75,14 @@ def scrape_beasiswa_data() -> Dict[str, List[Dict]]:
     """
     all_beasiswa = []
     all_penyelenggara = set()  # Set untuk avoid duplicate penyelenggara
-    seen_beasiswa: Set[Tuple[str, str]] = set()  # Track (nama, penyelenggara) untuk avoid duplicate
     
     logger.info("🔄 Memulai proses scraping indbeasiswa.com (dengan pagination)...")
     
     for category_name, category_slug in CATEGORIES.items():
         logger.info(f"  → Scraping kategori: {category_name}")
         try:
-            beasiswa_list = scrape_category(category_slug, category_name, seen_beasiswa)
-            logger.info(f"     ✅ Berhasil scrape {len(beasiswa_list)} beasiswa (unique)")
+            beasiswa_list = scrape_category(category_slug, category_name)
+            logger.info(f"     ✅ Berhasil scrape {len(beasiswa_list)} beasiswa")
             
             # Ekstrak penyelenggara unik
             for b in beasiswa_list:
@@ -128,17 +127,17 @@ def scrape_beasiswa_data() -> Dict[str, List[Dict]]:
     }
 
 
-def scrape_category(category_slug: str, category_name: str, seen_beasiswa: Set[Tuple[str, str]]) -> List[Dict]:
+def scrape_category(category_slug: str, category_name: str) -> List[Dict]:
     """
     Scrape satu kategori beasiswa dari indbeasiswa.com dengan PAGINATION
     
     Args:
         category_slug: URL slug kategori (e.g., "beasiswa-s1")
         category_name: Nama kategori untuk jenjang field (e.g., "s1", "diploma")
-        seen_beasiswa: Set untuk track (nama, penyelenggara) yang sudah di-scrape (untuk dedup)
     
     Return:
-        List of beasiswa dicts yang UNIQUE (tidak ada duplikasi)
+        List of beasiswa dicts (termasuk duplikasi - penting untuk UI filtering per jenjang)
+        NOTE: Duplikasi di-keep karena beasiswa bisa berlaku di multiple jenjang
     """
     beasiswa_list = []
     max_pages = MAX_PAGES_CONFIG.get(category_name, 1)
@@ -170,19 +169,13 @@ def scrape_category(category_slug: str, category_name: str, seen_beasiswa: Set[T
                 try:
                     beasiswa = extract_beasiswa_info(item, category_name)
                     if beasiswa:
-                        # DEDUPLICATION: Check if sudah ada sebelumnya
-                        unique_key = (beasiswa["nama"], beasiswa["penyelenggara"])
-                        if unique_key not in seen_beasiswa:
-                            seen_beasiswa.add(unique_key)
-                            beasiswa_list.append(beasiswa)
-                            page_beasiswa_count += 1
-                        else:
-                            logger.debug(f"    Duplicate skipped: {beasiswa['nama'][:40]}")
+                        beasiswa_list.append(beasiswa)
+                        page_beasiswa_count += 1
                 except Exception as e:
                     logger.warning(f"  ⚠️  Error extract item: {str(e)}")
                     continue
             
-            logger.debug(f"    Page {page_num}: {page_beasiswa_count} new items, total so far: {len(beasiswa_list)}")
+            logger.debug(f"    Page {page_num}: {page_beasiswa_count} items, total so far: {len(beasiswa_list)}")
             
             # Rate limiting: delay sebelum request berikutnya (kecuali last page)
             if page_num < max_pages:
