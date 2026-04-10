@@ -34,7 +34,7 @@ CATEGORIES = {
     "s1": "beasiswa-s1",
     "s2": "beasiswa-s2",
     "diploma": "beasiswa-diploma",
-    "dalam_negeri": "beasiswa-dalam-negeri",
+    "dalam_negeri": "beasiswa-indonesia",
     "luar_negeri": "beasiswa-luar-negeri"
 }
 
@@ -43,13 +43,13 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
 
-# Konfigurasi pagination - Smart Hybrid (Option 1: 10 pages)
-# NOTE: Increased to 10 pages per kategori untuk dapat ~200 beasiswa total
+# Konfigurasi pagination - Smart Hybrid (Option 1: 10 pages per kategori)
+# NOTE: Consistent 10 pages untuk semua kategori untuk dapat maksimal beasiswa
 MAX_PAGES_CONFIG = {
     "s1": 10,              # Top 10 pages
     "s2": 10,              # Top 10 pages
     "diploma": 10,         # Top 10 pages
-    "dalam_negeri": 1,     # 1 page (5 beasiswa)
+    "dalam_negeri": 10,    # Top 10 pages (50 beasiswa)
     "luar_negeri": 10      # Top 10 pages
 }
 
