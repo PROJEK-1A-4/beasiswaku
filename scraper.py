@@ -284,6 +284,44 @@ def parse_deadline(deadline_text: str) -> str:
 
     if text == "tidak diketahui" or "segera" in text or "dibuka" in text:
         return "0000-00-00"
+    
+    bulan_map = {
+        'januari': '01', 'jan': '01',
+        'februari': '02', 'feb': '02',
+        'maret': '03', 'mar': '03',
+        'april': '04', 'apr': '04',
+        'mei': '05', 'may': '05',
+        'juni': '06', 'jun': '06',
+        'juli': '07', 'jul': '07',
+        'agustus': '08', 'agu': '08', 'aug': '08',
+        'september': '09', 'sep': '09',
+        'oktober': '10', 'okt': '10', 'oct': '10',
+        'november': '11', 'nov': '11',
+        'desember': '12', 'des': '12', 'dec': '12'
+    }
+
+    try:
+        # Ekstrak semua angka dan huruf menggunakan Regular Expression (Regex)
+        # Contoh: dari "10 Juni 2026", kita dapat list: ['10', 'juni', '2026']
+        parts = re.findall(r'[a-z]+|\d+', text)
+        #Asumsi format umum adalah: Tanggal, Bulan(teks), Tahun
+        if len(parts) >= 3:
+            # Format tanggal menjadi 2 digit (misal: '5' menjadi '05')
+            hari = parts[0].zfill(2)  # Pad dengan 0 jika hanya 1 digit 
+            bulan_text = parts[1]
+            tahun = parts[2]
+
+            if len(tahun) == 2:  # Jika tahun hanya 2 digit, tambahkan prefix '20'
+                tahun = '20' + tahun
+                
+                if bulan_text in bulan_map:
+                    bulan_angka = bulan_map[bulan_text]
+                    return f"{tahun}-{bulan_angka}-{hari}"
+                
+    except Exception as e:
+        logger.debug(f"Gagal memproses deadline: {deadline_text}. Error: {e}")
+
+        
     return "0000-00-00"
 
 
