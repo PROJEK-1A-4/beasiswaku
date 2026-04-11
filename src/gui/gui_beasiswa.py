@@ -167,6 +167,16 @@ class BeasiswaTab(QWidget):
         # ===== TASK 23: CONNECT HAPUS BUTTON SIGNAL =====
         # Will be implemented in Task 23 (connect to on_hapus_clicked)
         
+        # ===== TASK 16: CONNECT REFRESH BUTTON SIGNAL (Task 10) =====
+        if self.btn_refresh:
+            self.btn_refresh.clicked.connect(self.on_refresh_clicked)
+            logger.debug("✅ Refresh button clicked signal connected to on_refresh_clicked()")
+        
+        # ===== TASK 30: CONNECT EXPORT CSV BUTTON SIGNAL (Task 10) =====
+        if self.btn_export_csv:
+            self.btn_export_csv.clicked.connect(self.on_export_csv_clicked)
+            logger.debug("✅ Export CSV button clicked signal connected to on_export_csv_clicked()")
+        
         # ===== FINALIZE LAYOUT =====
         self.setLayout(main_layout)
         logger.info("✅ BeasiswaTab UI initialized with all sections")
@@ -479,11 +489,53 @@ class BeasiswaTab(QWidget):
         layout.addWidget(self.btn_hapus)
         logger.debug("✅ Hapus button created (red, #f44336)")
         
-        # ===== TASK 10: REFRESH BUTTON (will be added in Task 10) =====
-        # Placeholder untuk Refresh button di Task 10
+        # ===== TASK 10: REFRESH BUTTON (Gray) =====
+        self.btn_refresh = QPushButton("🔄 Refresh")
+        self.btn_refresh.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        self.btn_refresh.setMinimumHeight(35)
+        self.btn_refresh.setMinimumWidth(100)
+        self.btn_refresh.setStyleSheet("""
+            QPushButton {
+                background-color: #757575;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 15px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #616161;
+            }
+            QPushButton:pressed {
+                background-color: #424242;
+            }
+        """)
+        layout.addWidget(self.btn_refresh)
+        logger.debug("✅ Refresh button created (gray, #757575)")
         
-        # ===== TASK 10: EXPORT CSV BUTTON (will be added in Task 10) =====
-        # Placeholder untuk Export CSV button di Task 10
+        # ===== TASK 10: EXPORT CSV BUTTON (Orange) =====
+        self.btn_export_csv = QPushButton("📊 Export CSV")
+        self.btn_export_csv.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        self.btn_export_csv.setMinimumHeight(35)
+        self.btn_export_csv.setMinimumWidth(120)
+        self.btn_export_csv.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 15px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #F57C00;
+            }
+            QPushButton:pressed {
+                background-color: #E65100;
+            }
+        """)
+        layout.addWidget(self.btn_export_csv)
+        logger.debug("✅ Export CSV button created (orange, #FF9800)")
         
         # ===== SPACER =====
         layout.addStretch()
@@ -640,9 +692,17 @@ class BeasiswaTab(QWidget):
         """
         Handle Refresh button click (Task 16).
         Reload data from database and refresh table.
+        
+        Steps:
+        1. Load fresh data from database
+        2. Update timestamp label
+        3. Apply current filters
+        4. Show success message
         """
-        # Will be implemented in Task 16
-        pass
+        logger.info("Refresh button clicked - reloading data from database")
+        self.refresh_after_crud()
+        QMessageBox.information(self, "Sukses", "✅ Data beasiswa berhasil di-refresh!")
+        logger.info("✅ Data refresh completed successfully")
     
     # =====================================================================
     # SECTION 4: CRUD OPERATIONS (Tasks 17-24)
@@ -782,7 +842,17 @@ class BeasiswaTab(QWidget):
     # =====================================================================
     
     def on_export_csv_clicked(self):
-        """Handle Export CSV button click (Task 30)"""
+        """
+        Handle Export CSV button click (Task 30).
+        Open file dialog and export filtered data.
+        
+        Steps:
+        1. Open file save dialog
+        2. Get filename from user
+        3. Export current table data to CSV
+        4. Show success/error message
+        """
+        logger.info("Export CSV button clicked - opening file save dialog")
         # Will be implemented in Task 30
         pass
     
