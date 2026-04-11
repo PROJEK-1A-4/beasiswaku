@@ -186,7 +186,7 @@ def main():
             print(f"{row['id']:<4} {judul:<35} {row['jenjang']:<8} {row['deadline']:<12} {row['status']:<12} {ipk:<6}")
         
         cursor.close()
-        conn.close()
+        # Note: Do NOT close conn - it's managed by DatabaseManager singleton
         print_result("✅", "Data verified in database")
         
     except Exception as e:

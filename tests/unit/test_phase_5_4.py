@@ -22,10 +22,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src.database.crud import (
     init_db, register_user, add_beasiswa, add_lamaran,
-    add_catatan, get_catatan, edit_catatan, delete_catatan, get_catatan_list,
+    add_catatan, get_catatan, edit_catatan, delete_catatan,
     get_connection
 )
-from gui_notes import has_note, get_note_preview, note_status_icon
+
+# GUI notes functions (has_note, get_note_preview, note_status_icon) 
+# are in src/gui/ and require PyQt6
+# This test focuses on CRUD operations via src/database.crud module
+# GUI integration tests can be added in tests/integration/
 
 # Setup logging
 logging.basicConfig(
@@ -78,7 +82,6 @@ def test_step_1_setup():
                 cursor.execute("SELECT id FROM akun WHERE username = ?", (username,))
                 result = cursor.fetchone()
                 user_id = result['id'] if result else None
-                conn.close()
                 
                 if user_id:
                     user_ids.append(user_id)

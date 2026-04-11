@@ -83,7 +83,6 @@ def test_aggregation_queries():
         logger.error(f"❌ Failed to add penyelenggara: {e}")
         return False
     finally:
-        conn.close()
     
     # Add diverse beasiswa
     test_beasiswa = [
@@ -245,7 +244,6 @@ def test_aggregation_queries():
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) as total FROM beasiswa")
         db_total = cursor.fetchone()[0]
-        conn.close()
         
         print(f"\nTotal Beasiswa Count Verification:")
         print(f"  From jenjang aggregation: {jenjang_total}")

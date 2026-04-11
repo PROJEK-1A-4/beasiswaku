@@ -163,7 +163,7 @@ def register_user(username: str, email: str, password: str,
         
     finally:
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
 
 
 def login_user(username: str, password: str) -> Tuple[bool, str, Optional[Dict]]:
@@ -241,7 +241,8 @@ def login_user(username: str, password: str) -> Tuple[bool, str, Optional[Dict]]
         return False, f"Terjadi error saat login: {str(e)}", None
         
     finally:
-        conn.close()
+        # Connection managed by DatabaseManager singleton
+        pass
 
 
 # =====================================================================
@@ -363,7 +364,7 @@ def add_beasiswa(judul: str, jenjang: str, deadline: str,
         
     finally:
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
 
 
 def get_beasiswa_list(filter_jenjang: Optional[str] = None,
@@ -472,7 +473,7 @@ def get_beasiswa_list(filter_jenjang: Optional[str] = None,
                    f"status={filter_status}, search={search_judul})")
         
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
         
         return beasiswa_list, total_count
         
@@ -654,7 +655,7 @@ def edit_beasiswa(beasiswa_id: int, **kwargs) -> Tuple[bool, str]:
         
     finally:
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
 
 
 def delete_beasiswa(beasiswa_id: int) -> Tuple[bool, str]:
@@ -728,7 +729,7 @@ def delete_beasiswa(beasiswa_id: int) -> Tuple[bool, str]:
         
     finally:
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
 
 
 # =====================================================================
@@ -844,7 +845,7 @@ def add_lamaran(user_id: int, beasiswa_id: int, tanggal_daftar: Optional[str] = 
         
     finally:
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
 
 
 def get_lamaran_list(filter_user_id: Optional[int] = None,
@@ -960,7 +961,7 @@ def get_lamaran_list(filter_user_id: Optional[int] = None,
                    f"beasiswa_id={filter_beasiswa_id}, status={filter_status})")
         
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
         
         return lamaran_list, total_count
         
@@ -1088,7 +1089,7 @@ def edit_lamaran(lamaran_id: int, **kwargs) -> Tuple[bool, str]:
         
     finally:
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
 
 
 def delete_lamaran(lamaran_id: int) -> Tuple[bool, str]:
@@ -1146,7 +1147,7 @@ def delete_lamaran(lamaran_id: int) -> Tuple[bool, str]:
         
     finally:
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
 
 
 # =====================================================================
@@ -1232,7 +1233,7 @@ def add_favorit(user_id: int, beasiswa_id: int) -> Tuple[bool, str, Optional[int
         
     finally:
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
 
 
 def get_favorit_list(user_id: int, sort_by: str = 'created_at',
@@ -1312,7 +1313,7 @@ def get_favorit_list(user_id: int, sort_by: str = 'created_at',
         logger.info(f"✅ Retrieved {len(favorit_list)} favorites for user {user_id} (Total: {total_count})")
         
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
         
         return favorit_list, total_count
         
@@ -1381,7 +1382,7 @@ def delete_favorit(user_id: int, beasiswa_id: int) -> Tuple[bool, str]:
         
     finally:
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
 
 
 # ========================== PHASE 4.1 AGGREGATION QUERIES ==========================
@@ -1426,7 +1427,7 @@ def get_beasiswa_per_jenjang() -> Dict[str, int]:
         logger.info(f"✅ Retrieved beasiswa per jenjang: {jenjang_dict} (Total: {total_beasiswa})")
         
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
         
         return jenjang_dict
         
@@ -1495,7 +1496,7 @@ def get_top_penyelenggara(limit: int = 10) -> List[Dict[str, any]]:
         logger.info(f"✅ Retrieved top {total_count} penyelenggara")
         
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
         
         return penyelenggara_list
         
@@ -1556,7 +1557,7 @@ def get_status_availability() -> Dict[str, int]:
         logger.info(f"✅ Retrieved status availability: {status_dict} (Total: {total_beasiswa})")
         
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
         
         return status_dict
         
@@ -1604,7 +1605,7 @@ def check_user_applied(user_id: int, beasiswa_id: int) -> bool:
         result = cursor.fetchone()
         
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
         
         return result is not None
         
@@ -1746,7 +1747,7 @@ def add_catatan(user_id: int, beasiswa_id: int, content: str) -> Tuple[bool, str
         return False, f"Error: {str(e)}", None
     finally:
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
 
 
 def get_catatan(user_id: int, beasiswa_id: int) -> Tuple[Optional[Dict], str]:
@@ -1801,7 +1802,7 @@ def get_catatan(user_id: int, beasiswa_id: int) -> Tuple[Optional[Dict], str]:
         return None, f"Error: {str(e)}"
     finally:
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
 
 
 def edit_catatan(user_id: int, beasiswa_id: int, content: str) -> Tuple[bool, str]:
@@ -1860,7 +1861,7 @@ def edit_catatan(user_id: int, beasiswa_id: int, content: str) -> Tuple[bool, st
         return False, f"Error: {str(e)}"
     finally:
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
 
 
 def delete_catatan(user_id: int, beasiswa_id: int) -> Tuple[bool, str]:
@@ -1911,7 +1912,7 @@ def delete_catatan(user_id: int, beasiswa_id: int) -> Tuple[bool, str]:
         return False, f"Error: {str(e)}"
     finally:
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
 
 
 def get_catatan_list(user_id: int, filter_jenjang: Optional[str] = None,
@@ -1993,7 +1994,7 @@ def get_catatan_list(user_id: int, filter_jenjang: Optional[str] = None,
         return [], 0
     finally:
         cursor.close()
-        conn.close()
+        # Connection managed by DatabaseManager singleton
 
 
 if __name__ == "__main__":

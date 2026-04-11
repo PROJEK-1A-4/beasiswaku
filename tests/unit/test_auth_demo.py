@@ -60,8 +60,8 @@ def main():
         print_result("✅", f"Found {len(tables)} tables: {', '.join(tables)}")
         
         cursor.close()
-        conn.close()
-        print_result("✅", "Connection closed properly")
+        # Note: Do NOT close conn - it's managed by DatabaseManager singleton
+        print_result("✅", "Connection verified successfully")
         
     except Exception as e:
         print_result("❌", f"Connection failed: {e}")
@@ -133,7 +133,6 @@ def main():
             print(f"{row['id']:<4} {row['username']:<18} {row['email']:<25} {row['nama_lengkap']:<20} {row['jenjang']:<6}")
         
         cursor.close()
-        conn.close()
         print_result("✅", "Query successful - Data retrieved from database")
         
     except Exception as e:
@@ -162,7 +161,6 @@ def main():
             print_result("✅", "UNIQUE constraint working (duplicate rejected)")
         
         cursor.close()
-        conn.close()
         
     except Exception as e:
         print_result("❌", f"Constraint test failed: {e}")
@@ -182,7 +180,6 @@ def main():
             print_result("✅", f"Table '{table}': {count} records (ready for data)")
         
         cursor.close()
-        conn.close()
         
     except Exception as e:
         print_result("❌", f"Table check failed: {e}")

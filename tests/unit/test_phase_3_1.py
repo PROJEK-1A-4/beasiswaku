@@ -266,7 +266,6 @@ def main():
     print_result("✅", f"Found {len(statuses)} unique status values: {', '.join([s['status'] for s in statuses])}")
     
     cursor.close()
-    conn.close()
     
     # ========================================================================
     # STEP 7: Test get_lamaran_list() - Basic retrieval

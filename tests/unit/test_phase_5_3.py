@@ -24,10 +24,10 @@ from src.database.crud import (
     add_favorit, delete_favorit, get_favorit_list,
     check_user_applied, get_connection
 )
-from gui_favorit import (
-    toggle_favorit, is_beasiswa_favorited, get_favorit_icon,
-    get_favorit_stats
-)
+
+# GUI favorit functions are in src/gui/ and require PyQt6
+# This test focuses on CRUD operations via src/database.crud module
+# GUI integration tests can be added in tests/integration/
 
 # Setup logging
 logging.basicConfig(
@@ -81,7 +81,6 @@ def test_step_1_setup():
                 cursor.execute("SELECT id FROM akun WHERE username = ?", (username,))
                 result = cursor.fetchone()
                 user_id = result['id'] if result else None
-                conn.close()
                 
                 if user_id:
                     user_ids.append(user_id)

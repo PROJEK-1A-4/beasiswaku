@@ -282,7 +282,6 @@ def main():
         print(f"   └─ {row['username']} → {row['judul']} ({row['jenjang']})")
     
     cursor.close()
-    conn.close()
     
     # Summary
     print_header("TEST SUMMARY - CRUD Favorit")

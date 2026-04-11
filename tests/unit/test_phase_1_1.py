@@ -84,7 +84,6 @@ def test_table_existence():
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
         existing_tables = [row[0] for row in cursor.fetchall()]
         cursor.close()
-        conn.close()
         
         print_test(1, f"Check untuk 5 tabel yang diperlukan: {', '.join(expected_tables)}")
         
@@ -142,7 +141,6 @@ def test_table_schemas():
                 all_correct = False
         
         cursor.close()
-        conn.close()
         return all_correct
         
     except Exception as e:
@@ -222,7 +220,6 @@ def test_constraints():
             all_pass = False
         
         cursor.close()
-        conn.close()
         return all_pass
         
     except Exception as e:
@@ -298,7 +295,6 @@ def test_foreign_keys():
             all_pass = False
         
         cursor.close()
-        conn.close()
         return all_pass
         
     except Exception as e:
@@ -354,7 +350,6 @@ def test_unique_constraints_complex():
             all_pass = False
         
         cursor.close()
-        conn.close()
         return all_pass
         
     except Exception as e:
@@ -416,7 +411,6 @@ def test_data_integrity():
             all_pass = False
         
         cursor.close()
-        conn.close()
         return all_pass
         
     except Exception as e:

@@ -228,7 +228,6 @@ def test_database_setup():
                 logger.info("⚠️  Database tables will be created on application start")
             
             cursor.close()
-            conn.close()
         except Exception as e:
             logger.warning(f"⚠️  Could not connect to database: {e}")
         
