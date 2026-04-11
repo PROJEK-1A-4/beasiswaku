@@ -124,3 +124,69 @@ def scrape_beasiswa_data() -> Dict[str, List[Dict]]:
         "beasiswa": all_beasiswa,
         "penyelenggara": penyelenggara_list
     }
+
+def scrape_category(category_slug: str, category_name: str) -> List[Dict]:
+    """
+    Scrape satu kategori beasiswa dari indbeasiswa.com dengan PAGINATION
+    
+    Args:
+        category_slug: URL slug kategori (e.g., "beasiswa-s1")
+        category_name: Nama kategori untuk jenjang field (e.g., "s1", "diploma")
+    
+    Return:
+        List of beasiswa dicts (termasuk duplikasi - penting untuk UI filtering per jenjang)
+        NOTE: Duplikasi di-keep karena beasiswa bisa berlaku di multiple jenjang
+    """
+    beasiswa_list = []
+    max_pages = MAX_PAGES_CONFIG.get(category_name, 1)
+    
+    for page_num in range(1, max_pages + 1):
+        try:
+            # Construct URL dengan pagination
+            if page_num == 1:
+                url = f"{BASE_URL}/{category_slug}"
+            else:
+                url = f"{BASE_URL}/{category_slug}/page/{page_num}/"
+            
+            logger.debug(f"    Fetching page {page_num}/{max_pages}: {url}")
+            
+            response = requests.get(url, headers=HEADERS, timeout=10)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, "html.parser")  # Built-in parser
+            
+            # Parse beasiswa items dari halaman
+            beasiswa_items = soup.select(".type-post")
+            
+            if not beasiswa_items and page_num == 1:
+                logger.warning(f"  ⚠️  Tidak ada item ditemukan untuk {category_slug} page 1. Cek selector HTML.")
+            
+            # Extract beasiswa dari tiap item
+            page_beasiswa_count = 0
+            for item in beasiswa_items:
+                try:
+                    beasiswa = extract_beasiswa_info(item, category_name)
+                    if beasiswa:
+                        beasiswa_list.append(beasiswa)
+                        page_beasiswa_count += 1
+                except Exception as e:
+                    logger.warning(f"  ⚠️  Error extract item: {str(e)}")
+                    continue
+            
+            logger.debug(f"    Page {page_num}: {page_beasiswa_count} items, total so far: {len(beasiswa_list)}")
+            
+            # Rate limiting: delay sebelum request berikutnya (kecuali last page)
+            if page_num < max_pages:
+                time.sleep(REQUEST_DELAY)
+        
+        except requests.exceptions.Timeout:
+            logger.warning(f"  ⚠️  Timeout page {page_num}: {url}")
+            continue
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"  ⚠️  Error page {page_num}: {url} - {str(e)}")
+            continue
+        except Exception as e:
+            logger.warning(f"  ⚠️  Unexpected error page {page_num}: {str(e)}")
+            continue
+    
+    return beasiswa_list
