@@ -158,6 +158,15 @@ class BeasiswaTab(QWidget):
         if crud_layout:
             main_layout.addLayout(crud_layout)
         
+        # ===== TASK 20: CONNECT TAMBAH BUTTON SIGNAL =====
+        # Will be implemented in Task 20 (connect to on_tambah_clicked)
+        
+        # ===== TASK 21: CONNECT EDIT BUTTON SIGNAL =====
+        # Will be implemented in Task 21 (connect to on_edit_clicked)
+        
+        # ===== TASK 23: CONNECT HAPUS BUTTON SIGNAL =====
+        # Will be implemented in Task 23 (connect to on_hapus_clicked)
+        
         # ===== FINALIZE LAYOUT =====
         self.setLayout(main_layout)
         logger.info("✅ BeasiswaTab UI initialized with all sections")
@@ -382,12 +391,14 @@ class BeasiswaTab(QWidget):
         """
         Create CRUD buttons section (Task 9-10).
         
-        Buttons:
-        - Tambah (Task 9)
-        - Edit (Task 9)
-        - Hapus (Task 9)
-        - Refresh (Task 10)
-        - Export CSV (Task 10)
+        Buttons (Task 9):
+        - Tambah (green) - Add new beasiswa
+        - Edit (blue) - Edit selected beasiswa
+        - Hapus (red) - Delete selected beasiswa
+        
+        Additional (Task 10):
+        - Refresh (gray) - Reload data from database
+        - Export CSV (orange) - Export filtered data
         
         Returns:
             QHBoxLayout: Layout containing all CRUD buttons
@@ -396,9 +407,105 @@ class BeasiswaTab(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
         
-        # Will be populated with buttons in Tasks 9-10
+        # ===== TASK 9: TAMBAH BUTTON (Green) =====
+        self.btn_tambah = QPushButton("➕ Tambah")
+        self.btn_tambah.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        self.btn_tambah.setMinimumHeight(35)
+        self.btn_tambah.setMinimumWidth(100)
+        self.btn_tambah.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 15px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """)
+        layout.addWidget(self.btn_tambah)
+        logger.debug("✅ Tambah button created (green, #4CAF50)")
+        
+        # ===== TASK 9: EDIT BUTTON (Blue) =====
+        self.btn_edit = QPushButton("✏️ Edit")
+        self.btn_edit.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        self.btn_edit.setMinimumHeight(35)
+        self.btn_edit.setMinimumWidth(100)
+        self.btn_edit.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 15px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #0b7dda;
+            }
+            QPushButton:pressed {
+                background-color: #0a66c2;
+            }
+        """)
+        layout.addWidget(self.btn_edit)
+        logger.debug("✅ Edit button created (blue, #2196F3)")
+        
+        # ===== TASK 9: HAPUS BUTTON (Red) =====
+        self.btn_hapus = QPushButton("🗑️ Hapus")
+        self.btn_hapus.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        self.btn_hapus.setMinimumHeight(35)
+        self.btn_hapus.setMinimumWidth(100)
+        self.btn_hapus.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 15px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #da190b;
+            }
+            QPushButton:pressed {
+                background-color: #ba0000;
+            }
+        """)
+        layout.addWidget(self.btn_hapus)
+        logger.debug("✅ Hapus button created (red, #f44336)")
+        
+        # ===== TASK 10: REFRESH BUTTON (will be added in Task 10) =====
+        # Placeholder untuk Refresh button di Task 10
+        
+        # ===== TASK 10: EXPORT CSV BUTTON (will be added in Task 10) =====
+        # Placeholder untuk Export CSV button di Task 10
+        
+        # ===== SPACER =====
+        layout.addStretch()
         
         return layout
+    
+    def _get_selected_row_index(self) -> Optional[int]:
+        """
+        Get index of selected row in table (Helper for Task 9).
+        
+        Returns:
+            Optional[int]: Row index if selected, None otherwise
+        """
+        if not self.tbl_beasiswa:
+            return None
+        
+        selected_rows = self.tbl_beasiswa.selectedIndexes()
+        if not selected_rows:
+            return None
+        
+        # Get the row from first selected index
+        return selected_rows[0].row()
     
     # =====================================================================
     # SECTION 2: DATA LOADING (Tasks 11-13)
@@ -542,12 +649,24 @@ class BeasiswaTab(QWidget):
     # =====================================================================
     
     def on_tambah_clicked(self):
-        """Handle Tambah button click (Task 20) -> open AddBeasiswaDialog"""
+        """
+        Handle Tambah button click (Task 20) -> open AddBeasiswaDialog.
+        
+        Called when user clicks Tambah button.
+        Will open dialog to add new beasiswa (implemented in Task 20).
+        """
+        logger.info("Tambah button clicked - will open AddBeasiswaDialog in Task 20")
         # Will be implemented in Task 20
         pass
     
     def on_edit_clicked(self):
-        """Handle Edit button click (Task 21) -> get selected row and open EditBeasiswaDialog"""
+        """
+        Handle Edit button click (Task 21) -> get selected row and open EditBeasiswaDialog.
+        
+        Called when user clicks Edit button.
+        Validates row selection, retrieves data, opens edit dialog (Task 21).
+        """
+        logger.info("Edit button clicked - will open EditBeasiswaDialog in Task 21")
         # Will be implemented in Task 21
         pass
     
@@ -562,7 +681,13 @@ class BeasiswaTab(QWidget):
         pass
     
     def on_hapus_clicked(self):
-        """Handle Hapus button click (Task 23) -> get selected row and open DeleteConfirmationDialog"""
+        """
+        Handle Hapus button click (Task 23) -> get selected row and open DeleteConfirmationDialog.
+        
+        Called when user clicks Hapus button.
+        Validates row selection, shows confirmation dialog, deletes if confirmed (Task 23).
+        """
+        logger.info("Hapus button clicked - will open DeleteConfirmationDialog in Task 23")
         # Will be implemented in Task 23
         pass
     
