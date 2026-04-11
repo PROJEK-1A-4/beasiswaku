@@ -464,3 +464,61 @@ if PYQT_AVAILABLE:
                 error_msg = f"Background scraper error: {str(e)}"
                 logger.error(f"❌ {error_msg}")
                 self.error.emit(error_msg)
+
+def get_scraper_thread():
+    """
+    Factory function untuk create ScraperThread
+    
+    Return:
+        ScraperThread instance jika PyQt6 tersedia
+        None jika PyQt6 tidak tersedia
+    
+    Usage:
+        thread = get_scraper_thread()
+        if thread:
+            thread.start()
+    """
+    if PYQT_AVAILABLE:
+        return ScraperThread()
+    else:
+        logger.warning("⚠️ PyQt6 not available - QThread not supported")
+        return None
+    
+# ============================================================================
+# TESTING & STANDALONE EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+    """
+    Test scraper standalone
+    
+    Jalankan: python scraper.py
+    
+    Expected output:
+    - Log messages menunjukkan progress scraping
+    - 3 file JSON di folder backup/
+    - Total beasiswa yang berhasil di-scrape
+    """
+    print("=" * 70)
+    print("🔍 BeasiswaKu Web Scraper — Standalone Test")
+    print("=" * 70)
+    
+    try:
+        result = scrape_beasiswa_data()
+        
+        print("\n" + "=" * 70)
+        print("📊 HASIL SCRAPING")
+        print("=" * 70)
+        print(f"Total beasiswa: {len(result['beasiswa'])}")
+        print(f"Total penyelenggara: {len(result['penyelenggara'])}")
+        
+        if result['beasiswa']:
+            print("\n📄 Sample beasiswa pertama:")
+            print(json.dumps(result['beasiswa'][0], ensure_ascii=False, indent=2))
+        
+        print("\n✅ Scraping selesai! Lihat folder backup/ untuk JSON files.")
+    
+    except Exception as e:
+        print(f"\n❌ Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
