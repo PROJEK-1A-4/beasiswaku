@@ -250,3 +250,15 @@ def extract_beasiswa_info(item, category_name: str) -> Optional[Dict]:
     except Exception as e:
         logger.debug(f"Error extracting beasiswa: {str(e)}")
         return None
+    
+def determine_status(deadline_text: str) -> str:
+    """
+    menentukan status beasiswa (Buka / Segera Tutup / Tutup)
+    
+    Kriteria:
+    - Buka: ≥ 8 hari lagi
+    - Segera Tutup: 1-7 hari lagi
+    - Tutup: sudah kedaluwarsa
+    """
+    # PLACEHOLDER — implementasi logic tahap lanjut
+    return "Buka"
