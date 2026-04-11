@@ -332,3 +332,28 @@ def parse_deadline(deadline_text: str) -> str:
 
 
     return "0000-00-00"
+
+def get_max_pages_for_category(category_name: str) -> int:
+    """
+    Get maximum pages untuk kategori tertentu (dari MAX_PAGES_CONFIG)
+    """
+    return MAX_PAGES_CONFIG.get(category_name, 1)
+
+
+def detect_penyelenggara_type(penyelenggara_name: str) -> str:
+    """
+    Tentukan jenis penyelenggara: Pemerintah / Swasta / Internasional
+    
+    Heuristic simple:
+    - Jika contains "LPDP", "Kementerian", "Pemerintah" → Pemerintah
+    - Jika contains "Bank", "Perusahaan", "Yayasan" → Swasta
+    - Jika contains "British", "German", "American", "USAID" → Internasional
+    """
+    name_lower = penyelenggara_name.lower()
+    
+    if any(x in name_lower for x in ["lpdp", "kementerian", "pemerintah", "kemendikbudristek"]):
+        return "Pemerintah"
+    elif any(x in name_lower for x in ["british", "german", "american", "usaid", "erasmus", "embassay"]):
+        return "Internasional"
+    else:
+        return "Swasta"
