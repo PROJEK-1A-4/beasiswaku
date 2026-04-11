@@ -96,40 +96,147 @@ class BeasiswaTab(QWidget):
     # =====================================================================
     
     def init_ui(self):
-        """Initialize Beasiswa Tab UI"""
+        """
+        Initialize Beasiswa Tab UI with complete layout hierarchy.
+        
+        Layout Structure:
+        ├── Top Bar (Title + Timestamp)
+        ├── Filter Section (Jenjang + Status Dropdowns)
+        ├── Search Section (Real-time search entry)
+        ├── Table Widget (Beasiswa data display)
+        ├── Row Count Label
+        └── CRUD Buttons (Tambah, Edit, Hapus, Refresh, Export)
+        
+        Each section will be implemented in Tasks 4-10.
+        """
         logger.info("Initializing BeasiswaTab UI...")
+        
+        # ===== MAIN LAYOUT =====
         main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(10, 10, 10, 10)  # Padding around edges
+        main_layout.setSpacing(10)  # Space between sections
         
-        # Will be populated by:
-        # Task 3: Create main VBox layout structure
-        # Task 4: Create top bar
-        # Task 5-6: Create filters
-        # Task 7: Create search
-        # Task 8: Create table
-        # Task 9-10: Create CRUD buttons
+        # ===== SECTION 1: TOP BAR (Task 4) =====
+        # Display title and last scraping timestamp
+        top_bar_layout = self._create_top_bar_layout()
+        if top_bar_layout:
+            main_layout.addLayout(top_bar_layout)
+            main_layout.addSpacing(5)
         
+        # ===== SECTION 2: FILTER SECTION (Tasks 5-6) =====
+        # Filter by jenjang and status
+        filter_layout = self._create_filter_layout()
+        if filter_layout:
+            main_layout.addLayout(filter_layout)
+            main_layout.addSpacing(5)
+        
+        # ===== SECTION 3: TABLE WIDGET (Task 8) =====
+        # Display beasiswa data in table format
+        self.tbl_beasiswa = self._create_table_widget()
+        if self.tbl_beasiswa:
+            main_layout.addWidget(self.tbl_beasiswa)
+            main_layout.addSpacing(5)
+        
+        # ===== SECTION 4: ROW COUNT LABEL (Task 13) =====
+        # Display total number of rows displayed
+        self.lbl_row_count = QLabel("Total: 0 Beasiswa")
+        self.lbl_row_count.setFont(QFont("Arial", 9))
+        self.lbl_row_count.setStyleSheet("color: #666; font-style: italic;")
+        main_layout.addWidget(self.lbl_row_count)
+        main_layout.addSpacing(5)
+        
+        # ===== SECTION 5: CRUD BUTTONS (Tasks 9-10) =====
+        # Action buttons for CRUD operations
+        crud_layout = self._create_crud_buttons_layout()
+        if crud_layout:
+            main_layout.addLayout(crud_layout)
+        
+        # ===== FINALIZE LAYOUT =====
         self.setLayout(main_layout)
-        logger.info("✅ BeasiswaTab UI initialized")
+        logger.info("✅ BeasiswaTab UI initialized with all sections")
     
     def _create_top_bar_layout(self) -> QHBoxLayout:
-        """Create top bar with title and timestamp (Task 4)"""
-        # Will be implemented in Task 4
-        pass
+        """
+        Create top bar with title and timestamp (Task 4).
+        
+        Returns:
+            QHBoxLayout: Layout containing title label and timestamp label
+        """
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+        
+        # Will be populated with widgets in Task 4
+        
+        return layout
     
     def _create_filter_layout(self) -> QHBoxLayout:
-        """Create filter section (Task 5-7)"""
-        # Will be implemented in Tasks 5-7
-        pass
+        """
+        Create filter section (Task 5-7).
+        
+        Contains:
+        - Dropdown for jenjang filter (Task 5)
+        - Dropdown for status filter (Task 6)
+        - Search entry (Task 7)
+        
+        Returns:
+            QHBoxLayout: Layout containing all filter widgets
+        """
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+        
+        # Will be populated with widgets in Tasks 5-7
+        
+        return layout
     
     def _create_table_widget(self) -> QTableWidget:
-        """Create and configure QTableWidget (Task 8)"""
-        # Will be implemented in Task 8
-        pass
+        """
+        Create and configure QTableWidget (Task 8).
+        
+        Columns:
+        1. No (index)
+        2. Nama (judul)
+        3. Penyelenggara
+        4. Jenjang
+        5. Deadline
+        6. Status
+        
+        Returns:
+            QTableWidget: Configured table widget
+        """
+        table = QTableWidget()
+        table.setColumnCount(6)
+        table.setHorizontalHeaderLabels([
+            "No", "Nama", "Penyelenggara", 
+            "Jenjang", "Deadline", "Status"
+        ])
+        
+        # Will be populated with configuration in Task 8
+        
+        return table
     
     def _create_crud_buttons_layout(self) -> QHBoxLayout:
-        """Create CRUD buttons section (Task 9-10)"""
-        # Will be implemented in Tasks 9-10
-        pass
+        """
+        Create CRUD buttons section (Task 9-10).
+        
+        Buttons:
+        - Tambah (Task 9)
+        - Edit (Task 9)
+        - Hapus (Task 9)
+        - Refresh (Task 10)
+        - Export CSV (Task 10)
+        
+        Returns:
+            QHBoxLayout: Layout containing all CRUD buttons
+        """
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+        
+        # Will be populated with buttons in Tasks 9-10
+        
+        return layout
     
     # =====================================================================
     # SECTION 2: DATA LOADING (Tasks 11-13)
@@ -140,21 +247,30 @@ class BeasiswaTab(QWidget):
         Load beasiswa data dari database (Task 11).
         Called saat tab dibuka atau refresh button diklik.
         
+        Retrieves:
+        - List of beasiswa from database using get_beasiswa_list()
+        - Total count of records
+        - Last scraping timestamp from first record
+        
         Returns:
             bool: True if successful, False otherwise
         """
         try:
             self.beasiswa_list, total_count = get_beasiswa_list()
-            logger.info(f"✅ Loaded {len(self.beasiswa_list)} beasiswa from database")
+            logger.info(f"✅ Loaded {len(self.beasiswa_list)} beasiswa from database (Total: {total_count})")
             
             # Update last scrape time from first record
             if self.beasiswa_list and 'scrape_date' in self.beasiswa_list[0]:
                 self.last_scrape_time = self.beasiswa_list[0]['scrape_date']
+                logger.debug(f"Last scrape time: {self.last_scrape_time}")
+            else:
+                self.last_scrape_time = None
             
             return True
         except Exception as e:
             logger.error(f"❌ Error loading beasiswa data: {e}")
             self.beasiswa_list = []
+            self.last_scrape_time = None
             return False
     
     def populate_table(self):
