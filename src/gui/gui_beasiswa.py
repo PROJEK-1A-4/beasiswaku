@@ -248,8 +248,25 @@ class BeasiswaTab(QWidget):
         
         logger.debug("✅ Jenjang dropdown created with options: Semua, D3, D4, S1, S2")
         
-        # ===== TASK 6: STATUS DROPDOWN (akan diisi kemudian) =====
-        # Placeholder untuk status dropdown (akan diimplementasi di Task 6)
+        # ===== TASK 6: STATUS DROPDOWN =====
+        # Filter dropdown untuk status ketersediaan beasiswa
+        lbl_status = QLabel("Status:")
+        lbl_status.setFont(QFont("Arial", 10))
+        layout.addWidget(lbl_status)
+        
+        self.combo_status = QComboBox()
+        self.combo_status.setFont(QFont("Arial", 10))
+        self.combo_status.setMinimumWidth(120)
+        self.combo_status.addItems([
+            "Semua",           # Default: show all
+            "Buka",
+            "Segera Tutup",
+            "Tutup"
+        ])
+        self.combo_status.setCurrentIndex(0)  # Default to "Semua"
+        layout.addWidget(self.combo_status)
+        
+        logger.debug("✅ Status dropdown created with options: Semua, Buka, Segera Tutup, Tutup")
         
         # ===== TASK 7: SEARCH ENTRY (akan diisi kemudian) =====
         # Placeholder untuk search entry (akan diimplementasi di Task 7)
@@ -388,9 +405,22 @@ class BeasiswaTab(QWidget):
         return selected
     
     def _get_filter_status(self) -> Optional[str]:
-        """Get selected status filter value"""
-        # Helper method for Task 14
-        pass
+        """
+        Get selected status filter value (Helper method for Task 6).
+        
+        Returns:
+            Optional[str]: Selected value ("Buka", "Segera Tutup", "Tutup") or None if "Semua" is selected
+        """
+        if not self.combo_status:
+            return None
+        
+        selected = self.combo_status.currentText()
+        
+        # Return None if "Semua" is selected (means no filter)
+        if selected == "Semua":
+            return None
+        
+        return selected
     
     def _get_search_text(self) -> str:
         """Get search entry text"""
