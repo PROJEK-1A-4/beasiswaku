@@ -919,11 +919,36 @@ class BeasiswaTab(QWidget):
         Handle Edit button click (Task 21) -> get selected row and open EditBeasiswaDialog.
         
         Called when user clicks Edit button.
-        Validates row selection, retrieves data, opens edit dialog (Task 21).
+        Validates row selection, retrieves data, opens edit dialog.
         """
-        logger.info("Edit button clicked - will open EditBeasiswaDialog in Task 21")
-        # Will be implemented in Task 21
-        pass
+        logger.info("Edit button clicked - validating row selection")
+        
+        # Check if a row is selected
+        selected_rows = self.tbl_beasiswa.selectedIndexes()
+        if not selected_rows:
+            logger.warning("No row selected for edit")
+            QMessageBox.warning(self, "⚠️ Peringatan", "Silakan pilih beasiswa yang ingin diedit!")
+            return
+        
+        try:
+            # Get selected row index
+            row_index = selected_rows[0].row()
+            
+            # Get beasiswa data from filtered list
+            if row_index >= len(self.filtered_list):
+                logger.error(f"Row index {row_index} out of range")
+                QMessageBox.critical(self, "❌ Error", "Data beasiswa tidak ditemukan!")
+                return
+            
+            beasiswa_data = self.filtered_list[row_index]
+            logger.info(f"Selected beasiswa for edit: {beasiswa_data.get('judul')}")
+            
+            # Open EditBeasiswaDialog with selected data (Task 22)
+            self.on_edit(beasiswa_data)
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting selected row: {e}")
+            QMessageBox.critical(self, "❌ Error", f"Gagal memilih baris untuk diedit:\n{str(e)}")
     
     def on_edit(self, beasiswa_data: Dict):
         """
