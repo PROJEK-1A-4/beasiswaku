@@ -357,3 +357,16 @@ def detect_penyelenggara_type(penyelenggara_name: str) -> str:
         return "Internasional"
     else:
         return "Swasta"
+    
+def clean_text(text: str) -> str:
+    """Strip whitespace dan normalisasi text"""
+    return " ".join(text.split()) if text else ""
+
+
+def normalize_url(url: str) -> str:
+    """Normalisasi URL (absolute atau relative)"""
+    if not url:
+        return ""
+    if url.startswith("http"):
+        return url
+    return f"{BASE_URL}{url}" if url.startswith("/") else f"{BASE_URL}/{url}"
