@@ -597,10 +597,58 @@ class BeasiswaTab(QWidget):
     def populate_table(self):
         """
         Populate QTableWidget dengan data dari beasiswa_list (Task 12).
-        Will fill rows dengan beasiswa data and apply formatting.
+        Fills rows dengan beasiswa data dan apply formatting.
         """
-        # Will be implemented in Task 12
-        pass
+        if not self.tbl_beasiswa:
+            logger.warning("❌ Table widget not initialized")
+            return
+        
+        self._clear_table()
+        
+        if not self.beasiswa_list:
+            self.update_row_count(0)
+            logger.info("No beasiswa data to populate")
+            return
+        
+        for row_num, beasiswa in enumerate(self.beasiswa_list, 1):
+            # Insert new row at end of table
+            row_position = self.tbl_beasiswa.rowCount()
+            self.tbl_beasiswa.insertRow(row_position)
+            
+            # Column 0: No (Row number)
+            no_item = QTableWidgetItem(str(row_num))
+            no_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.tbl_beasiswa.setItem(row_position, 0, no_item)
+            
+            # Column 1: Nama (judul beasiswa)
+            nama_item = QTableWidgetItem(beasiswa.get('judul', ''))
+            self.tbl_beasiswa.setItem(row_position, 1, nama_item)
+            
+            # Column 2: Penyelenggara (dari penyelenggara_name atau penyelenggara_id)
+            penyelenggara = beasiswa.get('penyelenggara_name', str(beasiswa.get('penyelenggara_id', '')))
+            penyelenggara_item = QTableWidgetItem(penyelenggara)
+            self.tbl_beasiswa.setItem(row_position, 2, penyelenggara_item)
+            
+            # Column 3: Jenjang
+            jenjang_item = QTableWidgetItem(beasiswa.get('jenjang', ''))
+            jenjang_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.tbl_beasiswa.setItem(row_position, 3, jenjang_item)
+            
+            # Column 4: Deadline
+            deadline_str = beasiswa.get('deadline', '')
+            deadline_item = QTableWidgetItem(deadline_str)
+            deadline_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.tbl_beasiswa.setItem(row_position, 4, deadline_item)
+            
+            # Column 5: Status
+            status = beasiswa.get('status', '')
+            status_item = QTableWidgetItem(status)
+            status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.tbl_beasiswa.setItem(row_position, 5, status_item)
+        
+        # Update row count label
+        self.update_row_count(len(self.beasiswa_list))
+        logger.info(f"✅ Table populated with {len(self.beasiswa_list)} rows")
     
     def update_row_count(self, count: int):
         """
@@ -609,8 +657,16 @@ class BeasiswaTab(QWidget):
         Args:
             count: Number of rows displayed
         """
-        # Will be implemented in Task 13
-        pass
+        if not self.lbl_row_count:
+            logger.warning("❌ Row count label not initialized")
+            return
+        
+        # Format: "Total: X Beasiswa" (pluralize)
+        beasiswa_text = "Beasiswa" if count == 1 else "Beasiswa"
+        total_text = f"Total: {count} {beasiswa_text}"
+        
+        self.lbl_row_count.setText(total_text)
+        logger.debug(f"Row count updated: {total_text}")
     
     # =====================================================================
     # SECTION 3: FILTERING & SEARCH (Tasks 14-16)

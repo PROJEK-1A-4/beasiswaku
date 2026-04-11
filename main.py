@@ -26,6 +26,7 @@ from PyQt6.QtCore import pyqtSignal
 from src.database.crud import (
     init_db, login_user, register_user, get_connection
 )
+from src.gui.gui_beasiswa import BeasiswaTab
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -386,34 +387,6 @@ class MainWindow(QMainWindow):
 
 
 # ==================== PLACEHOLDER TABS ====================
-
-class BeasiswaTab(QWidget):
-    """Tab untuk daftar beasiswa - akan diimplement di gui_beasiswa.py"""
-    
-    def __init__(self, user_id: int):
-        super().__init__()
-        self.user_id = user_id
-        self.init_ui()
-    
-    def init_ui(self):
-        """Initialize beasiswa tab UI"""
-        layout = QVBoxLayout()
-        
-        # Placeholder content
-        label = QLabel("📚 Daftar Beasiswa\n\n" + 
-                      "Fitur ini akan menampilkan:\n" +
-                      "• Tabel beasiswa dengan filter & search\n" +
-                      "• Highlight deadline (merah/kuning)\n" +
-                      "• CRUD beasiswa (tambah, edit, hapus)\n" +
-                      "• Export CSV\n" +
-                      "• Refresh data")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setFont(QFont("Arial", 11))
-        label.setStyleSheet("padding: 50px; background-color: #f0f0f0; border-radius: 5px;")
-        
-        layout.addWidget(label)
-        self.setLayout(layout)
-
 
 class TrackerTab(QWidget):
     """Tab untuk tracking lamaran - akan diimplement di crud.py"""
