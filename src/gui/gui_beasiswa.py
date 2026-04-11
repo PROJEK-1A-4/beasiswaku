@@ -123,12 +123,24 @@ class BeasiswaTab(QWidget):
             main_layout.addLayout(top_bar_layout)
             main_layout.addSpacing(5)
         
-        # ===== SECTION 2: FILTER SECTION (Tasks 5-6) =====
+        # ===== SECTION 2: FILTER SECTION (Tasks 5-7, 15) =====
         # Filter by jenjang and status
         filter_layout = self._create_filter_layout()
         if filter_layout:
             main_layout.addLayout(filter_layout)
-            main_layout.addSpacing(5)        
+            main_layout.addSpacing(5)
+        
+        # ===== TASK 15: CONNECT FILTER DROPDOWN SIGNALS =====
+        # Connect jenjang dropdown currentTextChanged to apply_filters
+        if self.combo_jenjang:
+            self.combo_jenjang.currentTextChanged.connect(self.apply_filters)
+            logger.debug("✅ Jenjang dropdown signal connected to apply_filters()")
+        
+        # Connect status dropdown currentTextChanged to apply_filters
+        if self.combo_status:
+            self.combo_status.currentTextChanged.connect(self.apply_filters)
+            logger.debug("✅ Status dropdown signal connected to apply_filters()")
+        
         # ===== TASK 7: CONNECT SEARCH KEYRELEASE SIGNAL =====
         # Connect search entry KeyRelease event to apply filters
         if self.entry_search:
@@ -676,9 +688,82 @@ class BeasiswaTab(QWidget):
         """
         Apply filters (jenjang, status, search) to beasiswa list (Task 14).
         Combines all active filters and updates table display.
+        
+        Process:
+        1. Get filter values from dropdowns and search entry
+        2. Call get_beasiswa_list() with filter parameters for server-side filtering
+        3. Update filtered_list with results
+        4. Refresh table display with filtered data
+        5. Update row count label
         """
-        # Will be implemented in Task 14
-        pass
+        try:
+            # Get filter values
+            filter_jenjang = self._get_filter_jenjang()
+            filter_status = self._get_filter_status()
+            search_text = self._get_search_text()
+            
+            logger.debug(f"Applying filters - Jenjang: {filter_jenjang}, Status: {filter_status}, Search: {search_text}")
+            
+            # Call get_beasiswa_list with filter parameters for server-side filtering
+            self.filtered_list, total_filtered = get_beasiswa_list(
+                filter_jenjang=filter_jenjang,
+                filter_status=filter_status,
+                search_judul=search_text if search_text else None
+            )
+            
+            logger.info(f"✅ Filters applied: {len(self.filtered_list)} beasiswa matched")
+            
+            # Clear and repopulate table with filtered data
+            self._clear_table()
+            
+            if not self.filtered_list:
+                self.update_row_count(0)
+                logger.info("No beasiswa matches applied filters")
+                return
+            
+            # Populate table with filtered data
+            for row_num, beasiswa in enumerate(self.filtered_list, 1):
+                row_position = self.tbl_beasiswa.rowCount()
+                self.tbl_beasiswa.insertRow(row_position)
+                
+                # Column 0: No
+                no_item = QTableWidgetItem(str(row_num))
+                no_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.tbl_beasiswa.setItem(row_position, 0, no_item)
+                
+                # Column 1: Nama (judul)
+                nama_item = QTableWidgetItem(beasiswa.get('judul', ''))
+                self.tbl_beasiswa.setItem(row_position, 1, nama_item)
+                
+                # Column 2: Penyelenggara
+                penyelenggara = beasiswa.get('penyelenggara_name', str(beasiswa.get('penyelenggara_id', '')))
+                penyelenggara_item = QTableWidgetItem(penyelenggara)
+                self.tbl_beasiswa.setItem(row_position, 2, penyelenggara_item)
+                
+                # Column 3: Jenjang
+                jenjang_item = QTableWidgetItem(beasiswa.get('jenjang', ''))
+                jenjang_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.tbl_beasiswa.setItem(row_position, 3, jenjang_item)
+                
+                # Column 4: Deadline
+                deadline_str = beasiswa.get('deadline', '')
+                deadline_item = QTableWidgetItem(deadline_str)
+                deadline_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.tbl_beasiswa.setItem(row_position, 4, deadline_item)
+                
+                # Column 5: Status
+                status = beasiswa.get('status', '')
+                status_item = QTableWidgetItem(status)
+                status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.tbl_beasiswa.setItem(row_position, 5, status_item)
+            
+            # Update row count with filtered result count
+            self.update_row_count(len(self.filtered_list))
+            
+        except Exception as e:
+            logger.error(f"❌ Error applying filters: {e}")
+            self._clear_table()
+            self.update_row_count(0)
     
     def _on_search_key_release(self, event):
         """
