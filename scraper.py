@@ -190,3 +190,63 @@ def scrape_category(category_slug: str, category_name: str) -> List[Dict]:
             continue
     
     return beasiswa_list
+
+def extract_beasiswa_info(item, category_name: str) -> Optional[Dict]:
+    """
+    Extract informasi beasiswa dari HTML element
+    
+    """
+    try:
+        # Verifikasi selector - SUDAH TESTED dengan HTML asli
+        nama = item.select_one(".entry-title")  # VERIFIED: WordPress entry-title
+        link = item.select_one("a")  # VERIFIED: First <a> tag contains link
+        deskripsi = item.select_one(".entry-content")  # VERIFIED: Full description di sini
+        
+        # Deadline & Penyelenggara: extract dari title attribute dengan regex
+        link_title = link.get("title") if link else ""
+        
+        # Ekstrak text
+        nama_text = nama.get_text(strip=True) if nama else "Unknown"
+        link_href = link.get("href") if link else ""
+        deskripsi_text = deskripsi.get_text(strip=True) if deskripsi else ""
+        
+        # Extract deadline dari title attribute
+        deadline_match = re.search(r'DEADLINE[:\s]+([^)]+)', link_title, re.IGNORECASE) if link_title else None
+        deadline_text = deadline_match.group(1).strip() if deadline_match else "Tidak Diketahui"
+        
+        # TASK KEMAL: Extract penyelenggara dari deskripsi atau gunakan heuristic
+        # Untuk sekarang: default "Unknown" — bisa di-improve dengan regex/heuristic
+        penyelenggara_text = extract_penyelenggara(nama_text, deskripsi_text)
+        
+        # Normalisasi jenjang
+        jenjang_map = {
+            "s1": "S1",
+            "s2": "S2",
+            "diploma": "Diploma",
+            "dalam_negeri": "Dalam Negeri",
+            "luar_negeri": "Luar Negeri"
+        }
+        jenjang = jenjang_map.get(category_name, "Dalam Negeri")
+        
+        # Tentukan status (TASK KEMAL: adjust logic sesuai kebutuhan)
+        status = determine_status(deadline_text)
+        
+        # Normalisasi deadline ke format YYYY-MM-DD (TASK KEMAL: adjust parsing)
+        deadline_normalized = parse_deadline(deadline_text)
+        
+        beasiswa = {
+            "nama": clean_text(nama_text),
+            "penyelenggara": clean_text(penyelenggara_text),
+            "jenjang": jenjang,
+            "deadline": deadline_normalized,
+            "status": status,
+            "link": normalize_url(link_href),
+            "deskripsi": clean_text(deskripsi_text),
+            "timestamp_scraping": datetime.now().isoformat()
+        }
+        
+        return beasiswa
+    
+    except Exception as e:
+        logger.debug(f"Error extracting beasiswa: {str(e)}")
+        return None
