@@ -534,7 +534,7 @@ def save_beasiswa_to_database(beasiswa_list, crud_module):
             link_aplikasi=beasiswa['link'],
             status=determine_status(beasiswa['deadline'])
         )
-
+#untuk auto scraping
 def auto_scrape_on_startup(crud_module):
     """Check database kosong → scrape → save"""
     # Check if database empty
