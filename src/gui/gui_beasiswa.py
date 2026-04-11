@@ -57,47 +57,213 @@ class BeasiswaTab(QWidget):
     def __init__(self, user_id: int):
         super().__init__()
         self.user_id = user_id
-        self.beasiswa_list = []
-        self.filtered_list = []
+        
+        # ===== DATA VARIABLES =====
+        self.beasiswa_list: List[Dict] = []
+        self.filtered_list: List[Dict] = []
+        self.last_scrape_time: Optional[str] = None
+        
+        # ===== UI WIDGETS (akan diinisialisasi di init_ui) =====
+        # Top bar widgets
+        self.lbl_title: Optional[QLabel] = None
+        self.lbl_timestamp: Optional[QLabel] = None
+        
+        # Filter widgets
+        self.combo_jenjang: Optional[QComboBox] = None
+        self.combo_status: Optional[QComboBox] = None
+        self.entry_search: Optional[QLineEdit] = None
+        
+        # Table widget
+        self.tbl_beasiswa: Optional[QTableWidget] = None
+        self.lbl_row_count: Optional[QLabel] = None
+        
+        # CRUD buttons
+        self.btn_tambah: Optional[QPushButton] = None
+        self.btn_edit: Optional[QPushButton] = None
+        self.btn_hapus: Optional[QPushButton] = None
+        self.btn_refresh: Optional[QPushButton] = None
+        self.btn_export_csv: Optional[QPushButton] = None
         
         # Initialize UI
         self.init_ui()
         
         # Load initial data
         self.load_beasiswa_data()
+        self.populate_table()
+    
+    # =====================================================================
+    # SECTION 1: UI INITIALIZATION (Tasks 3-10)
+    # =====================================================================
     
     def init_ui(self):
         """Initialize Beasiswa Tab UI"""
         logger.info("Initializing BeasiswaTab UI...")
         main_layout = QVBoxLayout()
         
-        # Placeholder - akan diganti di task-task berikutnya
+        # Will be populated by:
+        # Task 3: Create main VBox layout structure
+        # Task 4: Create top bar
+        # Task 5-6: Create filters
+        # Task 7: Create search
+        # Task 8: Create table
+        # Task 9-10: Create CRUD buttons
         
         self.setLayout(main_layout)
         logger.info("✅ BeasiswaTab UI initialized")
     
+    def _create_top_bar_layout(self) -> QHBoxLayout:
+        """Create top bar with title and timestamp (Task 4)"""
+        # Will be implemented in Task 4
+        pass
+    
+    def _create_filter_layout(self) -> QHBoxLayout:
+        """Create filter section (Task 5-7)"""
+        # Will be implemented in Tasks 5-7
+        pass
+    
+    def _create_table_widget(self) -> QTableWidget:
+        """Create and configure QTableWidget (Task 8)"""
+        # Will be implemented in Task 8
+        pass
+    
+    def _create_crud_buttons_layout(self) -> QHBoxLayout:
+        """Create CRUD buttons section (Task 9-10)"""
+        # Will be implemented in Tasks 9-10
+        pass
+    
+    # =====================================================================
+    # SECTION 2: DATA LOADING (Tasks 11-13)
+    # =====================================================================
+    
     def load_beasiswa_data(self):
         """
-        Load beasiswa data dari database.
+        Load beasiswa data dari database (Task 11).
         Called saat tab dibuka atau refresh button diklik.
+        
+        Returns:
+            bool: True if successful, False otherwise
         """
         try:
             self.beasiswa_list, total_count = get_beasiswa_list()
             logger.info(f"✅ Loaded {len(self.beasiswa_list)} beasiswa from database")
+            
+            # Update last scrape time from first record
+            if self.beasiswa_list and 'scrape_date' in self.beasiswa_list[0]:
+                self.last_scrape_time = self.beasiswa_list[0]['scrape_date']
+            
+            return True
         except Exception as e:
             logger.error(f"❌ Error loading beasiswa data: {e}")
             self.beasiswa_list = []
+            return False
+    
+    def populate_table(self):
+        """
+        Populate QTableWidget dengan data dari beasiswa_list (Task 12).
+        Will fill rows dengan beasiswa data and apply formatting.
+        """
+        # Will be implemented in Task 12
+        pass
+    
+    def update_row_count(self, count: int):
+        """
+        Update row count label (Task 13).
+        
+        Args:
+            count: Number of rows displayed
+        """
+        # Will be implemented in Task 13
+        pass
+    
+    # =====================================================================
+    # SECTION 3: FILTERING & SEARCH (Tasks 14-16)
+    # =====================================================================
     
     def apply_filters(self):
         """
-        Apply filters (jenjang, status, search) to beasiswa list.
+        Apply filters (jenjang, status, search) to beasiswa list (Task 14).
+        Combines all active filters and updates table display.
         """
         # Will be implemented in Task 14
         pass
     
+    def _get_filter_jenjang(self) -> Optional[str]:
+        """Get selected jenjang filter value"""
+        # Helper method for Task 14
+        pass
+    
+    def _get_filter_status(self) -> Optional[str]:
+        """Get selected status filter value"""
+        # Helper method for Task 14
+        pass
+    
+    def _get_search_text(self) -> str:
+        """Get search entry text"""
+        # Helper method for Task 14
+        pass
+    
+    def on_refresh_clicked(self):
+        """
+        Handle Refresh button click (Task 16).
+        Reload data from database and refresh table.
+        """
+        # Will be implemented in Task 16
+        pass
+    
+    # =====================================================================
+    # SECTION 4: CRUD OPERATIONS (Tasks 17-24)
+    # =====================================================================
+    
+    def on_tambah_clicked(self):
+        """Handle Tambah button click (Task 20) -> open AddBeasiswaDialog"""
+        # Will be implemented in Task 20
+        pass
+    
+    def on_edit_clicked(self):
+        """Handle Edit button click (Task 21) -> get selected row and open EditBeasiswaDialog"""
+        # Will be implemented in Task 21
+        pass
+    
+    def on_edit(self, beasiswa_data: Dict):
+        """
+        Get selected row data for editing (Task 22).
+        
+        Args:
+            beasiswa_data: Dictionary with beasiswa details
+        """
+        # Will be implemented in Task 22
+        pass
+    
+    def on_hapus_clicked(self):
+        """Handle Hapus button click (Task 23) -> get selected row and open DeleteConfirmationDialog"""
+        # Will be implemented in Task 23
+        pass
+    
+    def on_delete(self, beasiswa_id: int):
+        """
+        Delete beasiswa dengan confirmation (Task 24).
+        
+        Args:
+            beasiswa_id: ID beasiswa yang akan didelete
+        """
+        # Will be implemented in Task 24
+        pass
+    
+    def refresh_after_crud(self):
+        """
+        Refresh table after add/edit/delete operation.
+        Helper method untuk Tasks 20-24.
+        """
+        self.load_beasiswa_data()
+        self.apply_filters()
+    
+    # =====================================================================
+    # SECTION 5: FORMATTING & DISPLAY (Tasks 25-28)
+    # =====================================================================
+    
     def highlight_deadline(self, deadline_str: str) -> Tuple[QColor, str]:
         """
-        Determine deadline color based on days remaining.
+        Determine deadline color based on days remaining (Task 25).
         
         Args:
             deadline_str: Date string (YYYY-MM-DD format)
@@ -124,9 +290,50 @@ class BeasiswaTab(QWidget):
         except ValueError:
             return QColor("#FFFFFF"), "?"
     
+    def apply_row_formatting(self):
+        """
+        Apply deadline highlight to all table rows (Task 26).
+        Called setelah table di-populate.
+        """
+        # Will be implemented in Task 26
+        pass
+    
+    def on_table_double_click(self, row: int, column: int):
+        """
+        Handle table double-click to show detail popup (Task 28).
+        
+        Args:
+            row: Row index clicked
+            column: Column index clicked
+        """
+        # Will be implemented in Task 28
+        pass
+    
+    def show_detail_dialog(self, beasiswa_data: Dict):
+        """
+        Show detail popup dialog (Task 27).
+        
+        Args:
+            beasiswa_data: Dictionary with beasiswa details
+        """
+        # Will be implemented in Task 27
+        pass
+    
+    # =====================================================================
+    # SECTION 6: EXPORT (Tasks 29-30)
+    # =====================================================================
+    
+    def on_export_csv_clicked(self):
+        """Handle Export CSV button click (Task 30)"""
+        # Will be implemented in Task 30
+        pass
+    
     def export_to_csv(self):
         """
-        Export filtered beasiswa data to CSV file.
+        Export filtered beasiswa data to CSV file (Task 29).
+        
+        Returns:
+            bool: True if successful, False otherwise
         """
         # Will be implemented in Task 29
         pass
