@@ -19,7 +19,7 @@ try:
 except ImportError:
     PYQT_AVAILABLE = False
 
-# Konfigurasi logging
+# Konfigurasi logging untuk debugging dan monitoring
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
