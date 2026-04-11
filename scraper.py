@@ -560,7 +560,36 @@ def save_beasiswa_to_database(beasiswa_list, crud_module):
         )
 #untuk auto scraping
 def auto_scrape_on_startup(crud_module):
-    """Check database kosong → scrape → save"""
-    # Check if database empty
-    # If empty → scrape → save
-    # Return status
+    """
+    Check database kosong → scrape → save.
+    Dijalankan saat aplikasi pertama kali dibuka.
+    """
+    try:
+        # 1. Cek apakah database kosong menggunakan fungsi dari crud.py milik Darva
+        # Asumsi: Darva memiliki fungsi get_beasiswa_list() yang mengembalikan list
+        existing_data = crud_module.get_beasiswa_list()
+        
+        # 2. Jika kosong (panjang list = 0), jalankan scraping
+        if not existing_data:
+            logger.info("⚠️ Database beasiswa masih kosong. Memulai proses auto-scraping...")
+            
+            # Jalankan proses scraping utamamu
+            hasil_scrape = scrape_beasiswa_data()
+            
+            # Jika berhasil mendapat data, simpan ke database
+            if hasil_scrape and "beasiswa" in hasil_scrape:
+                logger.info("📥 Menyimpan hasil auto-scrape ke database...")
+                save_beasiswa_to_database(hasil_scrape["beasiswa"], crud_module)
+                logger.info("✅ Auto-scraping dan penyimpanan selesai!")
+                return True
+            else:
+                logger.warning("⚠️ Auto-scrape selesai tapi tidak mendapat data beasiswa.")
+                return False
+                
+        else:
+            logger.info(f"✅ Database sudah terisi ({len(existing_data)} data). Melewati auto-scraping.")
+            return False
+            
+    except Exception as e:
+        logger.error(f"❌ Terjadi kesalahan saat auto-scrape on startup: {str(e)}")
+        return False
