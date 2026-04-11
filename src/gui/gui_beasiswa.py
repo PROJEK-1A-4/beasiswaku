@@ -1206,7 +1206,7 @@ class AddBeasiswaDialog(QDialog):
 
 class EditBeasiswaDialog(QDialog):
     """
-    Dialog untuk edit beasiswa existing.
+    Dialog untuk edit beasiswa existing (Task 17).
     Form fields pre-filled dengan data existing.
     """
     
@@ -1216,24 +1216,202 @@ class EditBeasiswaDialog(QDialog):
         self.init_ui()
     
     def init_ui(self):
-        """Initialize Edit Beasiswa Dialog UI"""
-        self.setWindowTitle(f"Edit Beasiswa - {self.beasiswa_data.get('judul', '')}")
-        self.setGeometry(200, 200, 600, 700)
+        """Initialize Edit Beasiswa Dialog UI with pre-filled data"""
+        judul = self.beasiswa_data.get('judul', 'Beasiswa')
+        self.setWindowTitle(f"✏️ Edit - {judul}")
+        self.setGeometry(200, 200, 700, 850)
         self.setModal(True)
         
-        # Placeholder - akan diisi di Task 18
         layout = QVBoxLayout()
+        
+        # ===== REQUIRED FIELDS SECTION =====
+        form_layout = QFormLayout()
+        
+        # Field 1: Judul Beasiswa (required) - Pre-filled
+        self.entry_judul = QLineEdit()
+        self.entry_judul.setText(self.beasiswa_data.get('judul', ''))
+        form_layout.addRow("Judul Beasiswa *:", self.entry_judul)
+        
+        # Field 2: Jenjang (required) - Dropdown pre-filled
+        self.combo_jenjang = QComboBox()
+        self.combo_jenjang.addItems(["D3", "D4", "S1", "S2"])
+        current_jenjang = self.beasiswa_data.get('jenjang', 'S1')
+        if current_jenjang in ["D3", "D4", "S1", "S2"]:
+            self.combo_jenjang.setCurrentText(current_jenjang)
+        form_layout.addRow("Jenjang *:", self.combo_jenjang)
+        
+        # Field 3: Deadline (required) - Pre-filled
+        self.entry_deadline = QLineEdit()
+        self.entry_deadline.setText(self.beasiswa_data.get('deadline', ''))
+        self.entry_deadline.setPlaceholderText("YYYY-MM-DD (e.g., 2026-12-31)")
+        form_layout.addRow("Deadline *:", self.entry_deadline)
+        
+        # ===== OPTIONAL FIELDS SECTION =====
+        
+        # Field 4: Penyelenggara ID (optional) - Pre-filled
+        self.entry_penyelenggara = QLineEdit()
+        penyelenggara_id = self.beasiswa_data.get('penyelenggara_id')
+        if penyelenggara_id:
+            self.entry_penyelenggara.setText(str(penyelenggara_id))
+        form_layout.addRow("Penyelenggara ID:", self.entry_penyelenggara)
+        
+        # Field 5: Status (optional) - Dropdown pre-filled
+        self.combo_status = QComboBox()
+        self.combo_status.addItems(["Buka", "Segera Tutup", "Tutup"])
+        current_status = self.beasiswa_data.get('status', 'Buka')
+        if current_status in ["Buka", "Segera Tutup", "Tutup"]:
+            self.combo_status.setCurrentText(current_status)
+        form_layout.addRow("Status:", self.combo_status)
+        
+        # Field 6: Minimal IPK (optional) - Pre-filled
+        self.entry_ipk = QLineEdit()
+        minimal_ipk = self.beasiswa_data.get('minimal_ipk')
+        if minimal_ipk:
+            self.entry_ipk.setText(str(minimal_ipk))
+        form_layout.addRow("Minimal IPK:", self.entry_ipk)
+        
+        # Field 7: Deskripsi (optional) - Multi-line pre-filled
+        self.text_deskripsi = QTextEdit()
+        self.text_deskripsi.setPlainText(self.beasiswa_data.get('deskripsi', ''))
+        self.text_deskripsi.setMaximumHeight(80)
+        form_layout.addRow("Deskripsi:", self.text_deskripsi)
+        
+        # Field 8: Benefit (optional) - Multi-line pre-filled
+        self.text_benefit = QTextEdit()
+        self.text_benefit.setPlainText(self.beasiswa_data.get('benefit', ''))
+        self.text_benefit.setMaximumHeight(80)
+        form_layout.addRow("Benefit:", self.text_benefit)
+        
+        # Field 9: Persyaratan (optional) - Multi-line pre-filled
+        self.text_persyaratan = QTextEdit()
+        self.text_persyaratan.setPlainText(self.beasiswa_data.get('persyaratan', ''))
+        self.text_persyaratan.setMaximumHeight(80)
+        form_layout.addRow("Persyaratan:", self.text_persyaratan)
+        
+        # Field 10: Coverage (optional) - Pre-filled
+        self.entry_coverage = QLineEdit()
+        self.entry_coverage.setText(self.beasiswa_data.get('coverage', ''))
+        form_layout.addRow("Coverage:", self.entry_coverage)
+        
+        # Field 11: Link Aplikasi (optional) - Pre-filled
+        self.entry_link = QLineEdit()
+        self.entry_link.setText(self.beasiswa_data.get('link_aplikasi', ''))
+        form_layout.addRow("Link Aplikasi:", self.entry_link)
+        
+        layout.addLayout(form_layout)
+        
+        # ===== BUTTON SECTION =====
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        btn_ok = QPushButton("✅ Simpan")
+        btn_ok.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 20px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #0b7dda; }
+            QPushButton:pressed { background-color: #0966cc; }
+        """)
+        btn_ok.clicked.connect(self.accept)
+        button_layout.addWidget(btn_ok)
+        
+        btn_cancel = QPushButton("❌ Batal")
+        btn_cancel.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 20px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #da190b; }
+            QPushButton:pressed { background-color: #ba0a0a; }
+        """)
+        btn_cancel.clicked.connect(self.reject)
+        button_layout.addWidget(btn_cancel)
+        
+        layout.addLayout(button_layout)
+        
         self.setLayout(layout)
+        logger.debug(f"✅ EditBeasiswaDialog UI initialized for: {judul}")
     
     def get_form_data(self) -> Dict:
-        """Get form data and validate"""
-        # Will be implemented in Task 18
-        pass
+        """
+        Get form data and validate (Task 17).
+        
+        Returns:
+            Dict: Form data with all beasiswa fields (same as AddBeasiswaDialog)
+        """
+        # Get required fields
+        judul = self.entry_judul.text().strip()
+        if not judul:
+            raise ValueError("Judul beasiswa tidak boleh kosong")
+        
+        jenjang = self.combo_jenjang.currentText()
+        
+        deadline = self.entry_deadline.text().strip()
+        if not deadline:
+            raise ValueError("Deadline tidak boleh kosong")
+        
+        # Validate deadline format (YYYY-MM-DD)
+        try:
+            from datetime import datetime
+            datetime.strptime(deadline, '%Y-%m-%d')
+        except ValueError:
+            raise ValueError("Format deadline harus YYYY-MM-DD (e.g., 2026-12-31)")
+        
+        # Get optional fields
+        penyelenggara_id = None
+        penyelenggara_str = self.entry_penyelenggara.text().strip()
+        if penyelenggara_str:
+            try:
+                penyelenggara_id = int(penyelenggara_str)
+            except ValueError:
+                raise ValueError("Penyelenggara ID harus berupa angka")
+        
+        deskripsi = self.text_deskripsi.toPlainText().strip()
+        benefit = self.text_benefit.toPlainText().strip()
+        persyaratan = self.text_persyaratan.toPlainText().strip()
+        coverage = self.entry_coverage.text().strip()
+        status = self.combo_status.currentText()
+        link_aplikasi = self.entry_link.text().strip()
+        
+        # Validate IPK if provided
+        minimal_ipk = None
+        ipk_str = self.entry_ipk.text().strip()
+        if ipk_str:
+            try:
+                minimal_ipk = float(ipk_str)
+                if not (0.0 <= minimal_ipk <= 4.0):
+                    raise ValueError("IPK harus antara 0.0 dan 4.0")
+            except ValueError:
+                raise ValueError("Minimal IPK harus berupa angka desimal (0.0 - 4.0)")
+        
+        return {
+            'id': self.beasiswa_data.get('id'),  # Preserve original ID
+            'judul': judul,
+            'jenjang': jenjang,
+            'deadline': deadline,
+            'penyelenggara_id': penyelenggara_id,
+            'deskripsi': deskripsi,
+            'benefit': benefit,
+            'persyaratan': persyaratan,
+            'minimal_ipk': minimal_ipk,
+            'coverage': coverage,
+            'status': status,
+            'link_aplikasi': link_aplikasi
+        }
 
 
 class DeleteConfirmationDialog(QDialog):
     """
-    Dialog untuk konfirmasi penghapusan beasiswa.
+    Dialog untuk konfirmasi penghapusan beasiswa (Task 18).
     Menampilkan warning dan tombol Yes/No.
     """
     
@@ -1244,13 +1422,84 @@ class DeleteConfirmationDialog(QDialog):
     
     def init_ui(self):
         """Initialize Delete Confirmation Dialog UI"""
-        self.setWindowTitle("Konfirmasi Hapus")
-        self.setGeometry(300, 300, 400, 200)
+        self.setWindowTitle("⚠️ Konfirmasi Hapus")
+        self.setGeometry(300, 300, 500, 250)
         self.setModal(True)
         
-        # Placeholder - akan diisi di Task 19
         layout = QVBoxLayout()
+        layout.setSpacing(15)
+        
+        # ===== WARNING ICON & MESSAGE =====
+        message_layout = QHBoxLayout()
+        
+        # Warning icon/emoji
+        icon_label = QLabel("⚠️")
+        icon_label.setFont(QFont("Arial", 32))
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        message_layout.addWidget(icon_label)
+        
+        # Warning message
+        message_text = f"""Apakah Anda yakin ingin menghapus beasiswa:
+
+"{self.beasiswa_judul}"
+
+Tindakan ini TIDAK DAPAT DIBATALKAN dan akan menghapus semua data terkait."""
+        
+        msg_label = QLabel(message_text)
+        msg_label.setFont(QFont("Arial", 10))
+        msg_label.setWordWrap(True)
+        msg_label.setStyleSheet("color: #d32f2f; font-weight: bold;")
+        msg_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        message_layout.addWidget(msg_label, 1)
+        
+        layout.addLayout(message_layout)
+        layout.addSpacing(10)
+        
+        # ===== BUTTON SECTION =====
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        # Yes button (Delete) - Red
+        btn_yes = QPushButton("🗑️ Ya, Hapus")
+        btn_yes.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 10px 25px;
+                font-weight: bold;
+                font-size: 11px;
+            }
+            QPushButton:hover { background-color: #da190b; }
+            QPushButton:pressed { background-color: #ba0a0a; }
+        """)
+        btn_yes.clicked.connect(self.accept)
+        button_layout.addWidget(btn_yes)
+        
+        # No button (Cancel) - Gray
+        btn_no = QPushButton("❌ Batal")
+        btn_no.setStyleSheet("""
+            QPushButton {
+                background-color: #757575;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 10px 25px;
+                font-weight: bold;
+                font-size: 11px;
+            }
+            QPushButton:hover { background-color: #616161; }
+            QPushButton:pressed { background-color: #424242; }
+        """)
+        btn_no.clicked.connect(self.reject)
+        button_layout.addWidget(btn_no)
+        
+        layout.addLayout(button_layout)
+        layout.addSpacing(10)
+        
         self.setLayout(layout)
+        logger.debug(f"✅ DeleteConfirmationDialog UI initialized for: {self.beasiswa_judul}")
 
 
 class BeasiswaDetailDialog(QDialog):
