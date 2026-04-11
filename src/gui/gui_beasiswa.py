@@ -952,34 +952,153 @@ class BeasiswaTab(QWidget):
     
     def on_edit(self, beasiswa_data: Dict):
         """
-        Get selected row data for editing (Task 22).
+        Open EditBeasiswaDialog and handle edit confirmation (Task 22).
         
         Args:
-            beasiswa_data: Dictionary with beasiswa details
+            beasiswa_data: Dictionary with beasiswa details to edit
         """
-        # Will be implemented in Task 22
-        pass
+        logger.info(f"Opening EditBeasiswaDialog for: {beasiswa_data.get('judul')}")
+        
+        try:
+            # Create and show EditBeasiswaDialog with current data
+            dialog = EditBeasiswaDialog(beasiswa_data=beasiswa_data, parent=self)
+            
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                # User clicked OK button
+                logger.info("EditBeasiswaDialog accepted - updating beasiswa")
+                
+                try:
+                    # Get updated form data from dialog
+                    updated_data = dialog.get_form_data()
+                    
+                    # Get beasiswa ID from original data
+                    beasiswa_id = beasiswa_data.get('id')
+                    if not beasiswa_id:
+                        raise ValueError("Beasiswa ID tidak ditemukan")
+                    
+                    # Call edit_beasiswa() from CRUD
+                    result = edit_beasiswa(
+                        beasiswa_id=beasiswa_id,
+                        judul=updated_data['judul'],
+                        jenjang=updated_data['jenjang'],
+                        deadline=updated_data['deadline'],
+                        penyelenggara_id=updated_data['penyelenggara_id'],
+                        deskripsi=updated_data['deskripsi'],
+                        benefit=updated_data['benefit'],
+                        persyaratan=updated_data['persyaratan'],
+                        minimal_ipk=updated_data['minimal_ipk'],
+                        coverage=updated_data['coverage'],
+                        status=updated_data['status'],
+                        link_aplikasi=updated_data['link_aplikasi']
+                    )
+                    
+                    logger.info(f"✅ Beasiswa berhasil diperbarui: {updated_data['judul']}")
+                    
+                    # Show success message
+                    QMessageBox.information(
+                        self, 
+                        "Sukses", 
+                        f"✅ Beasiswa '{updated_data['judul']}' berhasil diperbarui!"
+                    )
+                    
+                    # Refresh table with updated data
+                    self.refresh_after_crud()
+                    
+                except ValueError as ve:
+                    # Validation error from get_form_data()
+                    logger.error(f"❌ Form validation error: {ve}")
+                    QMessageBox.warning(self, "⚠️ Error", f"Input tidak valid:\n{str(ve)}")
+                    
+                except Exception as e:
+                    # Database or other error
+                    logger.error(f"❌ Error updating beasiswa: {e}")
+                    QMessageBox.critical(self, "❌ Error", f"Gagal memperbarui beasiswa:\n{str(e)}")
+            else:
+                # User clicked Cancel
+                logger.info("EditBeasiswaDialog cancelled")
+                
+        except Exception as e:
+            logger.error(f"❌ Error opening EditBeasiswaDialog: {e}")
+            QMessageBox.critical(self, "❌ Error", f"Gagal membuka dialog edit:\n{str(e)}")
     
     def on_hapus_clicked(self):
         """
         Handle Hapus button click (Task 23) -> get selected row and open DeleteConfirmationDialog.
         
         Called when user clicks Hapus button.
-        Validates row selection, shows confirmation dialog, deletes if confirmed (Task 23).
+        Validates row selection, shows confirmation dialog, deletes if confirmed.
         """
-        logger.info("Hapus button clicked - will open DeleteConfirmationDialog in Task 23")
-        # Will be implemented in Task 23
-        pass
+        logger.info("Hapus button clicked - validating row selection")
+        
+        # Check if a row is selected
+        selected_rows = self.tbl_beasiswa.selectedIndexes()
+        if not selected_rows:
+            logger.warning("No row selected for delete")
+            QMessageBox.warning(self, "⚠️ Peringatan", "Silakan pilih beasiswa yang ingin dihapus!")
+            return
+        
+        try:
+            # Get selected row index
+            row_index = selected_rows[0].row()
+            
+            # Get beasiswa data from filtered list
+            if row_index >= len(self.filtered_list):
+                logger.error(f"Row index {row_index} out of range")
+                QMessageBox.critical(self, "❌ Error", "Data beasiswa tidak ditemukan!")
+                return
+            
+            beasiswa_data = self.filtered_list[row_index]
+            judul = beasiswa_data.get('judul', 'N/A')
+            logger.info(f"Selected beasiswa for delete: {judul}")
+            
+            # Open DeleteConfirmationDialog
+            dialog = DeleteConfirmationDialog(beasiswa_judul=judul, parent=self)
+            
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                # User confirmed deletion
+                logger.info("DeleteConfirmationDialog accepted - deleting beasiswa")
+                beasiswa_id = beasiswa_data.get('id')
+                if beasiswa_id:
+                    self.on_delete(beasiswa_id)
+                else:
+                    logger.error("Beasiswa ID not found in data")
+                    QMessageBox.critical(self, "❌ Error", "ID beasiswa tidak ditemukan!")
+            else:
+                # User cancelled deletion
+                logger.info("DeleteConfirmationDialog cancelled")
+                
+        except Exception as e:
+            logger.error(f"❌ Error on delete dialog: {e}")
+            QMessageBox.critical(self, "❌ Error", f"Gagal membuka dialog hapus:\n{str(e)}")
     
     def on_delete(self, beasiswa_id: int):
         """
-        Delete beasiswa dengan confirmation (Task 24).
+        Delete beasiswa from database (Task 24).
         
         Args:
             beasiswa_id: ID beasiswa yang akan didelete
         """
-        # Will be implemented in Task 24
-        pass
+        logger.info(f"Deleting beasiswa with ID: {beasiswa_id}")
+        
+        try:
+            # Call delete_beasiswa() from CRUD
+            result = delete_beasiswa(beasiswa_id=beasiswa_id)
+            
+            logger.info(f"✅ Beasiswa berhasil dihapus (ID: {beasiswa_id})")
+            
+            # Show success message
+            QMessageBox.information(
+                self, 
+                "Sukses", 
+                "✅ Beasiswa berhasil dihapus!"
+            )
+            
+            # Refresh table with updated data
+            self.refresh_after_crud()
+            
+        except Exception as e:
+            logger.error(f"❌ Error deleting beasiswa: {e}")
+            QMessageBox.critical(self, "❌ Error", f"Gagal menghapus beasiswa:\n{str(e)}")
     
     def refresh_after_crud(self):
         """
