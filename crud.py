@@ -1249,6 +1249,241 @@ def delete_lamaran(lamaran_id: int) -> Tuple[bool, str]:
         conn.close()
 
 
+# =====================================================================
+# PHASE 3.2: CRUD FAVORIT FUNCTIONS
+# =====================================================================
+
+def add_favorit(user_id: int, beasiswa_id: int) -> Tuple[bool, str, Optional[int]]:
+    """
+    Menambahkan beasiswa ke daftar favorit user.
+    
+    Args:
+        user_id (int): ID user yang menambah favorit
+        beasiswa_id (int): ID beasiswa yang akan difavoritkan
+    
+    Returns:
+        Tuple[bool, str, Optional[int]]:
+            - (True, "Success message", favorit_id) jika berhasil
+            - (False, "Error message", None) jika gagal
+    
+    Error cases:
+        - User ID tidak valid
+        - Beasiswa ID tidak valid
+        - Sudah di-favorite sebelumnya (UNIQUE constraint)
+        - Database error
+    
+    Example:
+        >>> success, msg, id = add_favorit(user_id=1, beasiswa_id=5)
+        >>> if success:
+        ...     print(f"Beasiswa added to favorites! ID: {id}")
+    """
+    if not user_id or not isinstance(user_id, int):
+        return False, "User ID harus berupa angka integer", None
+    
+    if not beasiswa_id or not isinstance(beasiswa_id, int):
+        return False, "Beasiswa ID harus berupa angka integer", None
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Enable foreign key checking
+        cursor.execute("PRAGMA foreign_keys = ON")
+        
+        # Check if user exists
+        cursor.execute("SELECT id, username FROM akun WHERE id = ?", (user_id,))
+        user = cursor.fetchone()
+        if not user:
+            return False, f"User dengan ID {user_id} tidak ditemukan", None
+        
+        # Check if beasiswa exists
+        cursor.execute("SELECT id, judul FROM beasiswa WHERE id = ?", (beasiswa_id,))
+        beasiswa = cursor.fetchone()
+        if not beasiswa:
+            return False, f"Beasiswa dengan ID {beasiswa_id} tidak ditemukan", None
+        
+        # Insert favorit
+        cursor.execute("""
+            INSERT INTO favorit (user_id, beasiswa_id)
+            VALUES (?, ?)
+        """, (user_id, beasiswa_id))
+        
+        conn.commit()
+        favorit_id = cursor.lastrowid
+        
+        logger.info(f"✅ Beasiswa '{beasiswa['judul']}' added to favorites for user {user['username']} (ID: {favorit_id})")
+        return True, f"Beasiswa '{beasiswa['judul']}' ditambahkan ke favorit!", favorit_id
+        
+    except sqlite3.IntegrityError as e:
+        conn.rollback()
+        if "UNIQUE" in str(e):
+            error_msg = "Beasiswa ini sudah ada di daftar favorit Anda"
+        elif "FOREIGN KEY" in str(e):
+            error_msg = "User atau Beasiswa tidak ditemukan"
+        else:
+            error_msg = f"Data constraint violation: {str(e)}"
+        logger.warning(f"⚠️ Favorit add failed: {error_msg}")
+        return False, error_msg, None
+        
+    except sqlite3.Error as e:
+        conn.rollback()
+        logger.error(f"❌ Database error saat menambah favorit: {e}")
+        return False, f"Terjadi error database: {str(e)}", None
+        
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def get_favorit_list(user_id: int, sort_by: str = 'created_at',
+                     sort_order: str = 'DESC') -> Tuple[List[Dict], int]:
+    """
+    Mengambil list favorit dari database untuk user tertentu.
+    
+    Args:
+        user_id (int): ID user
+        sort_by (str, optional): Column to sort by (created_at, judul, jenjang, deadline)
+            - default: 'created_at'
+        sort_order (str, optional): Sort order (ASC, DESC) - default: 'DESC'
+    
+    Returns:
+        Tuple[List[Dict], int]:
+            - (favorit_list, total_count) - list of favorite beasiswa records and total count
+            - Each record contains: id, user_id, beasiswa_id, created_at, plus joined fields:
+              judul, jenjang, deadline, benefit, status, penyelenggara_id
+    
+    Example:
+        >>> favorit_list, total = get_favorit_list(user_id=1)
+        >>> print(f"Found {total} favorite scholarships")
+        >>> for fav in favorit_list:
+        ...     print(f"{fav['judul']} - {fav['jenjang']}")
+    """
+    if not user_id or not isinstance(user_id, int):
+        return [], 0
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Validate sort_by
+        valid_sort_columns = ['created_at', 'judul', 'jenjang', 'deadline', 'status']
+        sort_by = sort_by.strip().lower() if sort_by else 'created_at'
+        if sort_by not in valid_sort_columns:
+            sort_by = 'created_at'
+        
+        # For joined sort columns
+        if sort_by in ['judul', 'jenjang', 'deadline', 'status']:
+            sort_column = f"b.{sort_by}"
+        else:
+            sort_column = f"f.{sort_by}"
+        
+        # Validate sort_order
+        sort_order = sort_order.strip().upper() if sort_order else 'DESC'
+        if sort_order not in ['ASC', 'DESC']:
+            sort_order = 'DESC'
+        
+        # Get total count
+        count_query = """
+            SELECT COUNT(*) as count 
+            FROM favorit f
+            WHERE f.user_id = ?
+        """
+        cursor.execute(count_query, (user_id,))
+        total_count = cursor.fetchone()['count']
+        
+        # Get data with sorting and joined fields
+        query = f"""
+            SELECT 
+                f.id, f.user_id, f.beasiswa_id, f.created_at,
+                b.judul, b.jenjang, b.deadline, b.benefit, b.status,
+                b.penyelenggara_id, b.minimal_ipk, b.coverage
+            FROM favorit f
+            JOIN beasiswa b ON f.beasiswa_id = b.id
+            WHERE f.user_id = ?
+            ORDER BY {sort_column} {sort_order}
+        """
+        
+        cursor.execute(query, (user_id,))
+        results = cursor.fetchall()
+        
+        # Convert to list of dictionaries
+        favorit_list = [dict(row) for row in results]
+        
+        logger.info(f"✅ Retrieved {len(favorit_list)} favorites for user {user_id} (Total: {total_count})")
+        
+        cursor.close()
+        conn.close()
+        
+        return favorit_list, total_count
+        
+    except sqlite3.Error as e:
+        logger.error(f"❌ Database error saat retrieve favorit: {e}")
+        return [], 0
+
+
+def delete_favorit(user_id: int, beasiswa_id: int) -> Tuple[bool, str]:
+    """
+    Menghapus beasiswa dari daftar favorit user.
+    
+    Args:
+        user_id (int): ID user
+        beasiswa_id (int): ID beasiswa yang akan dihapus dari favorit
+    
+    Returns:
+        Tuple[bool, str]:
+            - (True, "Success message") jika berhasil
+            - (False, "Error message") jika gagal
+    
+    Example:
+        >>> success, msg = delete_favorit(user_id=1, beasiswa_id=5)
+        >>> if success:
+        ...     print("Beasiswa removed from favorites")
+    """
+    if not user_id or not isinstance(user_id, int):
+        return False, "User ID harus berupa angka integer"
+    
+    if not beasiswa_id or not isinstance(beasiswa_id, int):
+        return False, "Beasiswa ID harus berupa angka integer"
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Check if favorit exists
+        cursor.execute("""
+            SELECT f.id, b.judul 
+            FROM favorit f
+            JOIN beasiswa b ON f.beasiswa_id = b.id
+            WHERE f.user_id = ? AND f.beasiswa_id = ?
+        """, (user_id, beasiswa_id))
+        existing = cursor.fetchone()
+        
+        if not existing:
+            return False, f"Beasiswa tidak ada di daftar favorit Anda"
+        
+        existing_judul = existing['judul']
+        
+        # Delete favorit
+        cursor.execute("""
+            DELETE FROM favorit 
+            WHERE user_id = ? AND beasiswa_id = ?
+        """, (user_id, beasiswa_id))
+        
+        conn.commit()
+        
+        logger.info(f"✅ Beasiswa '{existing_judul}' removed from favorites for user {user_id}")
+        return True, f"Beasiswa '{existing_judul}' dihapus dari favorit!"
+        
+    except sqlite3.Error as e:
+        conn.rollback()
+        logger.error(f"❌ Database error saat delete favorit: {e}")
+        return False, f"Terjadi error database: {str(e)}"
+        
+    finally:
+        cursor.close()
+        conn.close()
+
+
 if __name__ == "__main__":
     # Script untuk testing
     init_db()
