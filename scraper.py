@@ -262,3 +262,26 @@ def determine_status(deadline_text: str) -> str:
     """
     # PLACEHOLDER — implementasi logic tahap lanjut
     return "Buka"
+
+def extract_penyelenggara(nama_beasiswa: str, deskripsi: str) -> str:
+    """
+    Extract penyelenggara dari nama beasiswa atau deskripsi
+    
+    Heuristic:
+    1. Cari kata kunci institusi di awal judul (sebelum 'BEASISWA')
+    2. Cari di kalimat pertama deskripsi
+    3. Default: "Tidak Diketahui"
+    
+    Contoh:
+    - "BEASISWA DJARUM PLUS..." → "DJARUM"
+    - "PROGRAM BSI SCHOLARSHIP..." → "BSI"
+    """
+    # Cari kata pertama yang bukan common words (case-insensitive)
+    common_words = {'beasiswa', 'program', 'tahun', 'untuk', 'mahasiswa', 'the', 'a', 'an'}
+    
+    words = nama_beasiswa.lower().split()  # FIXED: lowercase untuk case-insensitive comparison
+    for word in words:
+        if len(word) > 3 and word not in common_words:
+            return word.upper()  # Return uppercase hasil
+    
+    return "Tidak Diketahui"
