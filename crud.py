@@ -133,6 +133,21 @@ def init_db():
             )
         """)
         
+        # Tabel 6: CATATAN (Personal Notes per Beasiswa)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS catatan (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                beasiswa_id INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES akun(id),
+                FOREIGN KEY (beasiswa_id) REFERENCES beasiswa(id),
+                UNIQUE(user_id, beasiswa_id)
+            )
+        """)
+        
         conn.commit()
         logger.info(f"✅ Database schema initialized successfully at {DB_PATH}")
         
@@ -1773,6 +1788,327 @@ def get_beasiswa_list_for_user(user_id: int,
     except Exception as e:
         logger.error(f"❌ Error saat get beasiswa list for user: {e}")
         return [], 0
+
+
+# ==================== PHASE 5.4: CATATAN PRIBADI (NOTES) ====================
+
+def add_catatan(user_id: int, beasiswa_id: int, content: str) -> Tuple[bool, str, Optional[int]]:
+    """
+    Menambahkan catatan pribadi untuk beasiswa tertentu.
+    
+    Setiap user hanya bisa memiliki 1 catatan per beasiswa.
+    Jika sudah ada, akan mengembalikan error (gunakan edit_catatan untuk update).
+    
+    Args:
+        user_id (int): ID user
+        beasiswa_id (int): ID beasiswa
+        content (str): Isi catatan (minimal 1 karakter, maksimal 2000)
+    
+    Returns:
+        Tuple[bool, str, Optional[int]]:
+            - (True, "Success message", catatan_id) jika berhasil
+            - (False, "Error message", None) jika ada error
+    
+    Raises:
+        ValueError: Jika content kosong
+        sqlite3.IntegrityError: Jika sudah ada catatan untuk user-beasiswa ini
+    """
+    if not user_id or not isinstance(user_id, int):
+        return False, "User ID tidak valid", None
+    
+    if not beasiswa_id or not isinstance(beasiswa_id, int):
+        return False, "Beasiswa ID tidak valid", None
+    
+    if not content or not isinstance(content, str) or len(content.strip()) == 0:
+        return False, "Catatan tidak boleh kosong", None
+    
+    if len(content) > 2000:
+        return False, "Catatan maksimal 2000 karakter", None
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Check if user exists
+        cursor.execute("SELECT id FROM akun WHERE id = ?", (user_id,))
+        if not cursor.fetchone():
+            logger.error(f"❌ User dengan ID {user_id} tidak ditemukan")
+            return False, f"User dengan ID {user_id} tidak ditemukan", None
+        
+        # Check if beasiswa exists
+        cursor.execute("SELECT id FROM beasiswa WHERE id = ?", (beasiswa_id,))
+        if not cursor.fetchone():
+            logger.error(f"❌ Beasiswa dengan ID {beasiswa_id} tidak ditemukan")
+            return False, f"Beasiswa dengan ID {beasiswa_id} tidak ditemukan", None
+        
+        # Insert catatan
+        cursor.execute(
+            "INSERT INTO catatan (user_id, beasiswa_id, content) VALUES (?, ?, ?)",
+            (user_id, beasiswa_id, content.strip())
+        )
+        conn.commit()
+        catatan_id = cursor.lastrowid
+        
+        logger.info(f"✅ Catatan untuk beasiswa {beasiswa_id} ditambahkan user {user_id} "
+                   f"(ID: {catatan_id})")
+        return True, f"Catatan berhasil ditambahkan", catatan_id
+        
+    except sqlite3.IntegrityError as e:
+        logger.error(f"❌ Catatan untuk beasiswa ini sudah ada: {e}")
+        return False, "Catatan untuk beasiswa ini sudah ada. Gunakan edit untuk mengupdate.", None
+    except Exception as e:
+        logger.error(f"❌ Error saat tambah catatan: {e}")
+        return False, f"Error: {str(e)}", None
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def get_catatan(user_id: int, beasiswa_id: int) -> Tuple[Optional[Dict], str]:
+    """
+    Mengambil catatan pribadi untuk beasiswa tertentu dari user.
+    
+    Args:
+        user_id (int): ID user
+        beasiswa_id (int): ID beasiswa
+    
+    Returns:
+        Tuple[Optional[Dict], str]:
+            - (Dict dengan fields: id, user_id, beasiswa_id, content, created_at, updated_at, atau None)
+            - Message string
+    
+    Dict fields jika catatan ditemukan:
+        - id: int - ID catatan
+        - user_id: int - ID user
+        - beasiswa_id: int - ID beasiswa
+        - content: str - Isi catatan
+        - created_at: str - Waktu buat
+        - updated_at: str - Waktu update terakhir
+    """
+    if not user_id or not isinstance(user_id, int):
+        return None, "User ID tidak valid"
+    
+    if not beasiswa_id or not isinstance(beasiswa_id, int):
+        return None, "Beasiswa ID tidak valid"
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute(
+            """SELECT id, user_id, beasiswa_id, content, created_at, updated_at 
+               FROM catatan WHERE user_id = ? AND beasiswa_id = ?""",
+            (user_id, beasiswa_id)
+        )
+        
+        result = cursor.fetchone()
+        
+        if result:
+            catatan = dict(result)
+            logger.info(f"✅ Catatan ditemukan untuk user {user_id}, beasiswa {beasiswa_id}")
+            return catatan, "Catatan ditemukan"
+        else:
+            logger.info(f"⚠️  Tidak ada catatan untuk user {user_id}, beasiswa {beasiswa_id}")
+            return None, "Belum ada catatan untuk beasiswa ini"
+        
+    except Exception as e:
+        logger.error(f"❌ Error saat ambil catatan: {e}")
+        return None, f"Error: {str(e)}"
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def edit_catatan(user_id: int, beasiswa_id: int, content: str) -> Tuple[bool, str]:
+    """
+    Mengupdate catatan pribadi untuk beasiswa tertentu.
+    
+    Args:
+        user_id (int): ID user
+        beasiswa_id (int): ID beasiswa
+        content (str): Isi catatan baru (minimal 1 karakter, maksimal 2000)
+    
+    Returns:
+        Tuple[bool, str]:
+            - (True, "Success message") jika berhasil
+            - (False, "Error message") jika ada error
+    """
+    if not user_id or not isinstance(user_id, int):
+        return False, "User ID tidak valid"
+    
+    if not beasiswa_id or not isinstance(beasiswa_id, int):
+        return False, "Beasiswa ID tidak valid"
+    
+    if not content or not isinstance(content, str) or len(content.strip()) == 0:
+        return False, "Catatan tidak boleh kosong"
+    
+    if len(content) > 2000:
+        return False, "Catatan maksimal 2000 karakter"
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Check if catatan exists
+        cursor.execute(
+            "SELECT id FROM catatan WHERE user_id = ? AND beasiswa_id = ?",
+            (user_id, beasiswa_id)
+        )
+        
+        if not cursor.fetchone():
+            logger.error(f"❌ Catatan untuk user {user_id}, beasiswa {beasiswa_id} tidak ditemukan")
+            return False, "Catatan tidak ditemukan"
+        
+        # Update catatan
+        cursor.execute(
+            """UPDATE catatan SET content = ?, updated_at = CURRENT_TIMESTAMP 
+               WHERE user_id = ? AND beasiswa_id = ?""",
+            (content.strip(), user_id, beasiswa_id)
+        )
+        conn.commit()
+        
+        logger.info(f"✅ Catatan untuk user {user_id}, beasiswa {beasiswa_id} diupdate")
+        return True, "Catatan berhasil diupdate"
+        
+    except Exception as e:
+        logger.error(f"❌ Error saat edit catatan: {e}")
+        return False, f"Error: {str(e)}"
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def delete_catatan(user_id: int, beasiswa_id: int) -> Tuple[bool, str]:
+    """
+    Menghapus catatan pribadi untuk beasiswa tertentu.
+    
+    Args:
+        user_id (int): ID user
+        beasiswa_id (int): ID beasiswa
+    
+    Returns:
+        Tuple[bool, str]:
+            - (True, "Success message") jika berhasil
+            - (False, "Error message") jika ada error atau catatan tidak ditemukan
+    """
+    if not user_id or not isinstance(user_id, int):
+        return False, "User ID tidak valid"
+    
+    if not beasiswa_id or not isinstance(beasiswa_id, int):
+        return False, "Beasiswa ID tidak valid"
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Check if catatan exists
+        cursor.execute(
+            "SELECT id FROM catatan WHERE user_id = ? AND beasiswa_id = ?",
+            (user_id, beasiswa_id)
+        )
+        
+        if not cursor.fetchone():
+            logger.error(f"❌ Catatan untuk user {user_id}, beasiswa {beasiswa_id} tidak ditemukan")
+            return False, "Catatan tidak ditemukan"
+        
+        # Delete catatan
+        cursor.execute(
+            "DELETE FROM catatan WHERE user_id = ? AND beasiswa_id = ?",
+            (user_id, beasiswa_id)
+        )
+        conn.commit()
+        
+        logger.info(f"✅ Catatan untuk user {user_id}, beasiswa {beasiswa_id} dihapus")
+        return True, "Catatan berhasil dihapus"
+        
+    except Exception as e:
+        logger.error(f"❌ Error saat delete catatan: {e}")
+        return False, f"Error: {str(e)}"
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def get_catatan_list(user_id: int, filter_jenjang: Optional[str] = None,
+                     search_judul: Optional[str] = None) -> Tuple[List[Dict], int]:
+    """
+    Mengambil daftar semua catatan user dengan informasi beasiswa.
+    
+    Berguna untuk melihat semua catatan dalam satu list dengan detail beasiswa.
+    
+    Args:
+        user_id (int): ID user
+        filter_jenjang (str, optional): Filter by jenjang (D3, D4, S1, S2)
+        search_judul (str, optional): Search beasiswa by judul (case-insensitive)
+    
+    Returns:
+        Tuple[List[Dict], int]:
+            - List of catatan dengan fields:
+              * catatan_id: int
+              * user_id: int
+              * beasiswa_id: int
+              * content: str - Isi catatan
+              * created_at: str
+              * updated_at: str
+              * beasiswa_judul: str
+              * beasiswa_jenjang: str
+              * beasiswa_deadline: str
+              * beasiswa_status: str
+            - Total count
+    """
+    if not user_id or not isinstance(user_id, int):
+        return [], 0
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Base query dengan join ke beasiswa table
+        query = """
+            SELECT 
+                c.id as catatan_id,
+                c.user_id,
+                c.beasiswa_id,
+                c.content,
+                c.created_at,
+                c.updated_at,
+                b.judul as beasiswa_judul,
+                b.jenjang as beasiswa_jenjang,
+                b.deadline as beasiswa_deadline,
+                b.status as beasiswa_status
+            FROM catatan c
+            JOIN beasiswa b ON c.beasiswa_id = b.id
+            WHERE c.user_id = ?
+        """
+        params = [user_id]
+        
+        # Add filters
+        if filter_jenjang:
+            query += " AND b.jenjang = ?"
+            params.append(filter_jenjang)
+        
+        if search_judul:
+            query += " AND b.judul LIKE ?"
+            params.append(f"%{search_judul}%")
+        
+        # Order by created_at descending (newest first)
+        query += " ORDER BY c.created_at DESC"
+        
+        cursor.execute(query, params)
+        results = cursor.fetchall()
+        
+        catatan_list = [dict(row) for row in results]
+        total = len(catatan_list)
+        
+        logger.info(f"✅ Retrieved {total} catatan for user {user_id}")
+        return catatan_list, total
+        
+    except Exception as e:
+        logger.error(f"❌ Error saat ambil catatan list: {e}")
+        return [], 0
+    finally:
+        cursor.close()
+        conn.close()
 
 
 if __name__ == "__main__":
