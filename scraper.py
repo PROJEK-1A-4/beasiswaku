@@ -522,3 +522,21 @@ if __name__ == "__main__":
         print(f"\n❌ Error: {str(e)}")
         import traceback
         traceback.print_exc()
+
+def save_beasiswa_to_database(beasiswa_list, crud_module):
+    """Convert scraper output → Darva's CRUD"""
+    for beasiswa in beasiswa_list:
+        status = crud_module.add_beasiswa(
+            judul=beasiswa['nama'],
+            jenjang=beasiswa['jenjang'],
+            deadline=beasiswa['deadline'],
+            deskripsi=beasiswa['deskripsi'],
+            link_aplikasi=beasiswa['link'],
+            status=determine_status(beasiswa['deadline'])
+        )
+
+def auto_scrape_on_startup(crud_module):
+    """Check database kosong → scrape → save"""
+    # Check if database empty
+    # If empty → scrape → save
+    # Return status
