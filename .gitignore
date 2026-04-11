@@ -28,6 +28,8 @@ debug.log
 # Database
 database/*.db
 database/*.db-journal
+tests/unit/database/*.db
+tests/unit/database/*.db-journal
 
 # Backups
 backup/
@@ -55,3 +57,4 @@ dist/
 
 # OS-specific
 .vscode/settings.json.local
+tests/unit/database/beasiswaku.db
