@@ -19,7 +19,7 @@ try:
 except ImportError:
     PYQT_AVAILABLE = False
 
-# Konfigurasi logging
+# Konfigurasi logging untuk debugging dan monitoring
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,6 @@ def scrape_beasiswa_data() -> Dict[str, List[Dict]]:
         "penyelenggara": penyelenggara_list
     }
 
-
 def scrape_category(category_slug: str, category_name: str) -> List[Dict]:
     """
     Scrape satu kategori beasiswa dari indbeasiswa.com dengan PAGINATION
@@ -192,7 +191,6 @@ def scrape_category(category_slug: str, category_name: str) -> List[Dict]:
     
     return beasiswa_list
 
-
 def extract_beasiswa_info(item, category_name: str) -> Optional[Dict]:
     """
     Extract informasi beasiswa dari HTML element
@@ -252,8 +250,7 @@ def extract_beasiswa_info(item, category_name: str) -> Optional[Dict]:
     except Exception as e:
         logger.debug(f"Error extracting beasiswa: {str(e)}")
         return None
-
-
+    
 def determine_status(deadline_text: str) -> str:
     """
     menentukan status beasiswa (Buka / Segera Tutup / Tutup)
@@ -263,9 +260,32 @@ def determine_status(deadline_text: str) -> str:
     - Segera Tutup: 1-7 hari lagi
     - Tutup: sudah kedaluwarsa
     """
-    # PLACEHOLDER — implementasi logic tahap lanjut
-    return "Buka"
+    deadline_normalized = parse_deadline(deadline_text)
 
+    if deadline_normalized == "0000-00-00":
+        return "Buka"
+    
+    try:
+        deadline_date = datetime.strptime(deadline_normalized, "%Y-%m-%d")
+        
+        # Ambil waktu hari ini
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Hitung selisih harinya
+        selisih_hari = (deadline_date - today).days
+        
+        # Tentukan status berdasarkan kriteria
+        if selisih_hari >= 8:
+            return "Buka"
+        elif 0 <= selisih_hari <= 7:
+            return "Segera Tutup"
+        else:
+            return "Tutup"
+            
+    except Exception as e:
+        logger.debug(f"Error saat menentukan status dari deadline {deadline_text}: {e}")
+        # Jika ada error parsing (misal format aneh), kembalikan default "Buka"
+        return "Buka"
 
 def extract_penyelenggara(nama_beasiswa: str, deskripsi: str) -> str:
     """
@@ -289,7 +309,6 @@ def extract_penyelenggara(nama_beasiswa: str, deskripsi: str) -> str:
             return word.upper()  # Return uppercase hasil
     
     return "Tidak Diketahui"
-
 
 def parse_deadline(deadline_text: str) -> str:
     
@@ -338,7 +357,6 @@ def parse_deadline(deadline_text: str) -> str:
 
     return "0000-00-00"
 
-
 def get_max_pages_for_category(category_name: str) -> int:
     """
     Get maximum pages untuk kategori tertentu (dari MAX_PAGES_CONFIG)
@@ -363,8 +381,7 @@ def detect_penyelenggara_type(penyelenggara_name: str) -> str:
         return "Internasional"
     else:
         return "Swasta"
-
-
+    
 def clean_text(text: str) -> str:
     """Strip whitespace dan normalisasi text"""
     return " ".join(text.split()) if text else ""
@@ -377,7 +394,6 @@ def normalize_url(url: str) -> str:
     if url.startswith("http"):
         return url
     return f"{BASE_URL}{url}" if url.startswith("/") else f"{BASE_URL}/{url}"
-
 
 def save_backup(data: Dict) -> Dict[str, str]:
     
@@ -422,8 +438,7 @@ def save_backup(data: Dict) -> Dict[str, str]:
     except IOError as e:
         logger.error(f"❌ Error saving backup: {str(e)}")
         return {file: "❌" for file in backup_files}
-
-
+    
 # ============================================================================
 # BACKGROUND THREADING (untuk GUI integration)
 # ============================================================================
@@ -474,7 +489,6 @@ if PYQT_AVAILABLE:
                 logger.error(f"❌ {error_msg}")
                 self.error.emit(error_msg)
 
-
 def get_scraper_thread():
     """
     Factory function untuk create ScraperThread
@@ -493,8 +507,7 @@ def get_scraper_thread():
     else:
         logger.warning("⚠️ PyQt6 not available - QThread not supported")
         return None
-
-
+    
 # ============================================================================
 # TESTING & STANDALONE EXECUTION
 # ============================================================================
@@ -533,3 +546,50 @@ if __name__ == "__main__":
         print(f"\n❌ Error: {str(e)}")
         import traceback
         traceback.print_exc()
+
+def save_beasiswa_to_database(beasiswa_list, crud_module):
+    """Convert scraper output → Darva's CRUD"""
+    for beasiswa in beasiswa_list:
+        status = crud_module.add_beasiswa(
+            judul=beasiswa['nama'],
+            jenjang=beasiswa['jenjang'],
+            deadline=beasiswa['deadline'],
+            deskripsi=beasiswa['deskripsi'],
+            link_aplikasi=beasiswa['link'],
+            status=determine_status(beasiswa['deadline'])
+        )
+#untuk auto scraping
+def auto_scrape_on_startup(crud_module):
+    """
+    Check database kosong → scrape → save.
+    Dijalankan saat aplikasi pertama kali dibuka.
+    """
+    try:
+        # 1. Cek apakah database kosong menggunakan fungsi dari crud.py milik Darva
+        # Asumsi: Darva memiliki fungsi get_beasiswa_list() yang mengembalikan list
+        existing_data = crud_module.get_beasiswa_list()
+        
+        # 2. Jika kosong (panjang list = 0), jalankan scraping
+        if not existing_data:
+            logger.info("⚠️ Database beasiswa masih kosong. Memulai proses auto-scraping...")
+            
+            # Jalankan proses scraping utamamu
+            hasil_scrape = scrape_beasiswa_data()
+            
+            # Jika berhasil mendapat data, simpan ke database
+            if hasil_scrape and "beasiswa" in hasil_scrape:
+                logger.info("📥 Menyimpan hasil auto-scrape ke database...")
+                save_beasiswa_to_database(hasil_scrape["beasiswa"], crud_module)
+                logger.info("✅ Auto-scraping dan penyimpanan selesai!")
+                return True
+            else:
+                logger.warning("⚠️ Auto-scrape selesai tapi tidak mendapat data beasiswa.")
+                return False
+                
+        else:
+            logger.info(f"✅ Database sudah terisi ({len(existing_data)} data). Melewati auto-scraping.")
+            return False
+            
+    except Exception as e:
+        logger.error(f"❌ Terjadi kesalahan saat auto-scrape on startup: {str(e)}")
+        return False
