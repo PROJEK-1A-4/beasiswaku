@@ -227,7 +227,32 @@ class BeasiswaTab(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
         
-        # Will be populated with widgets in Tasks 5-7
+        # ===== TASK 5: JENJANG DROPDOWN =====
+        # Filter dropdown untuk education level
+        lbl_jenjang = QLabel("Jenjang:")
+        lbl_jenjang.setFont(QFont("Arial", 10))
+        layout.addWidget(lbl_jenjang)
+        
+        self.combo_jenjang = QComboBox()
+        self.combo_jenjang.setFont(QFont("Arial", 10))
+        self.combo_jenjang.setMinimumWidth(100)
+        self.combo_jenjang.addItems([
+            "Semua",      # Default: show all
+            "D3",
+            "D4",
+            "S1",
+            "S2"
+        ])
+        self.combo_jenjang.setCurrentIndex(0)  # Default to "Semua"
+        layout.addWidget(self.combo_jenjang)
+        
+        logger.debug("✅ Jenjang dropdown created with options: Semua, D3, D4, S1, S2")
+        
+        # ===== TASK 6: STATUS DROPDOWN (akan diisi kemudian) =====
+        # Placeholder untuk status dropdown (akan diimplementasi di Task 6)
+        
+        # ===== TASK 7: SEARCH ENTRY (akan diisi kemudian) =====
+        # Placeholder untuk search entry (akan diimplementasi di Task 7)
         
         return layout
     
@@ -345,9 +370,22 @@ class BeasiswaTab(QWidget):
         pass
     
     def _get_filter_jenjang(self) -> Optional[str]:
-        """Get selected jenjang filter value"""
-        # Helper method for Task 14
-        pass
+        """
+        Get selected jenjang filter value (Helper method for Task 5).
+        
+        Returns:
+            Optional[str]: Selected value ("D3", "D4", "S1", "S2") or None if "Semua" is selected
+        """
+        if not self.combo_jenjang:
+            return None
+        
+        selected = self.combo_jenjang.currentText()
+        
+        # Return None if "Semua" is selected (means no filter)
+        if selected == "Semua":
+            return None
+        
+        return selected
     
     def _get_filter_status(self) -> Optional[str]:
         """Get selected status filter value"""
@@ -410,8 +448,14 @@ class BeasiswaTab(QWidget):
         """
         Refresh table after add/edit/delete operation.
         Helper method untuk Tasks 20-24.
+        
+        Steps:
+        1. Reload data from database
+        2. Update timestamp label
+        3. Apply current filters
         """
         self.load_beasiswa_data()
+        self.update_timestamp_label()
         self.apply_filters()
     
     # =====================================================================
