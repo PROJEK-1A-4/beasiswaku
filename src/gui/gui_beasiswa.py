@@ -854,11 +854,65 @@ class BeasiswaTab(QWidget):
         Handle Tambah button click (Task 20) -> open AddBeasiswaDialog.
         
         Called when user clicks Tambah button.
-        Will open dialog to add new beasiswa (implemented in Task 20).
+        Opens dialog to add new beasiswa and saves if confirmed.
         """
-        logger.info("Tambah button clicked - will open AddBeasiswaDialog in Task 20")
-        # Will be implemented in Task 20
-        pass
+        logger.info("Tambah button clicked - opening AddBeasiswaDialog")
+        
+        try:
+            # Create and show AddBeasiswaDialog
+            dialog = AddBeasiswaDialog(parent=self)
+            
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                # User clicked OK button
+                logger.info("AddBeasiswaDialog accepted - saving new beasiswa")
+                
+                try:
+                    # Get form data from dialog
+                    form_data = dialog.get_form_data()
+                    
+                    # Call add_beasiswa() from CRUD
+                    result = add_beasiswa(
+                        judul=form_data['judul'],
+                        jenjang=form_data['jenjang'],
+                        deadline=form_data['deadline'],
+                        penyelenggara_id=form_data['penyelenggara_id'],
+                        deskripsi=form_data['deskripsi'],
+                        benefit=form_data['benefit'],
+                        persyaratan=form_data['persyaratan'],
+                        minimal_ipk=form_data['minimal_ipk'],
+                        coverage=form_data['coverage'],
+                        status=form_data['status'],
+                        link_aplikasi=form_data['link_aplikasi']
+                    )
+                    
+                    logger.info(f"✅ Beasiswa berhasil ditambahkan: {form_data['judul']}")
+                    
+                    # Show success message
+                    QMessageBox.information(
+                        self, 
+                        "Sukses", 
+                        f"✅ Beasiswa '{form_data['judul']}' berhasil ditambahkan!"
+                    )
+                    
+                    # Refresh table with new data
+                    self.refresh_after_crud()
+                    
+                except ValueError as ve:
+                    # Validation error from get_form_data()
+                    logger.error(f"❌ Form validation error: {ve}")
+                    QMessageBox.warning(self, "⚠️ Error", f"Input tidak valid:\n{str(ve)}")
+                    
+                except Exception as e:
+                    # Database or other error
+                    logger.error(f"❌ Error adding beasiswa: {e}")
+                    QMessageBox.critical(self, "❌ Error", f"Gagal menambahkan beasiswa:\n{str(e)}")
+            else:
+                # User clicked Cancel
+                logger.info("AddBeasiswaDialog cancelled")
+                
+        except Exception as e:
+            logger.error(f"❌ Error opening AddBeasiswaDialog: {e}")
+            QMessageBox.critical(self, "❌ Error", f"Gagal membuka dialog tambah:\n{str(e)}")
     
     def on_edit_clicked(self):
         """
