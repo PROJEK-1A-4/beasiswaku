@@ -23,7 +23,7 @@ from PyQt6.QtCore import Qt, QSize, QTimer
 from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap
 from PyQt6.QtCore import pyqtSignal
 
-from crud import (
+from src.database.crud import (
     init_db, login_user, register_user, get_connection
 )
 
