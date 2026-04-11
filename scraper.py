@@ -260,8 +260,32 @@ def determine_status(deadline_text: str) -> str:
     - Segera Tutup: 1-7 hari lagi
     - Tutup: sudah kedaluwarsa
     """
-    # PLACEHOLDER — implementasi logic tahap lanjut
-    return "Buka"
+    deadline_normalized = parse_deadline(deadline_text)
+
+    if deadline_normalized == "0000-00-00":
+        return "Buka"
+    
+    try:
+        deadline_date = datetime.strptime(deadline_normalized, "%Y-%m-%d")
+        
+        # Ambil waktu hari ini
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Hitung selisih harinya
+        selisih_hari = (deadline_date - today).days
+        
+        # Tentukan status berdasarkan kriteria
+        if selisih_hari >= 8:
+            return "Buka"
+        elif 0 <= selisih_hari <= 7:
+            return "Segera Tutup"
+        else:
+            return "Tutup"
+            
+    except Exception as e:
+        logger.debug(f"Error saat menentukan status dari deadline {deadline_text}: {e}")
+        # Jika ada error parsing (misal format aneh), kembalikan default "Buka"
+        return "Buka"
 
 def extract_penyelenggara(nama_beasiswa: str, deskripsi: str) -> str:
     """
