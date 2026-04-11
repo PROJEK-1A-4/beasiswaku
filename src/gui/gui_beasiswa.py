@@ -141,6 +141,9 @@ class BeasiswaTab(QWidget):
             main_layout.addWidget(self.tbl_beasiswa)
             main_layout.addSpacing(5)
         
+        # ===== TASK 28: CONNECT TABLE DOUBLE-CLICK EVENT =====
+        # Will be implemented in Task 28 (connect itemDoubleClicked signal)
+        
         # ===== SECTION 4: ROW COUNT LABEL (Task 13) =====
         # Display total number of rows displayed
         self.lbl_row_count = QLabel("Total: 0 Beasiswa")
@@ -296,26 +299,84 @@ class BeasiswaTab(QWidget):
         Create and configure QTableWidget (Task 8).
         
         Columns:
-        1. No (index)
-        2. Nama (judul)
-        3. Penyelenggara
-        4. Jenjang
-        5. Deadline
-        6. Status
+        1. No (index) - width: 50px
+        2. Nama (judul) - width: 250px
+        3. Penyelenggara - width: 150px
+        4. Jenjang - width: 80px
+        5. Deadline - width: 120px
+        6. Status - width: 100px
+        
+        Features:
+        - Single row selection
+        - Alternating row colors
+        - Read-only cells (editing via dialog)
+        - Double-click event (Task 28)
         
         Returns:
             QTableWidget: Configured table widget
         """
         table = QTableWidget()
+        
+        # ===== SETUP COLUMNS =====
         table.setColumnCount(6)
         table.setHorizontalHeaderLabels([
             "No", "Nama", "Penyelenggara", 
             "Jenjang", "Deadline", "Status"
         ])
         
-        # Will be populated with configuration in Task 8
+        # ===== COLUMN WIDTH SETTINGS =====
+        table.setColumnWidth(0, 50)      # No
+        table.setColumnWidth(1, 250)     # Nama (widest)
+        table.setColumnWidth(2, 150)     # Penyelenggara
+        table.setColumnWidth(3, 80)      # Jenjang
+        table.setColumnWidth(4, 120)     # Deadline
+        table.setColumnWidth(5, 100)     # Status
+        
+        # ===== HEADER CONFIGURATION =====
+        header = table.horizontalHeader()
+        header.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        header.setStyleSheet("background-color: #E8EAF6; color: #1976D2;")
+        header.setStretchLastSection(False)
+        
+        # ===== SELECTION BEHAVIOR =====
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        
+        # ===== ROW APPEARANCE =====
+        table.setAlternatingRowColors(True)
+        table.setStyleSheet("""
+            QTableWidget {
+                background-color: white;
+                alternate-background-color: #F5F5F5;
+                gridline-color: #E0E0E0;
+            }
+            QTableWidget::item {
+                padding: 5px;
+                border: none;
+            }
+        """)
+        
+        # ===== RESIZE BEHAVIOR =====
+        table.setSortingEnabled(False)  # Will be enabled in Task 8 extension
+        table.setColumnCount(6)
+        
+        # ===== READ-ONLY CELLS =====
+        # Cells will be set as read-only in Task 12 during population
+        
+        logger.debug("✅ QTableWidget created with 6 columns: No, Nama, Penyelenggara, Jenjang, Deadline, Status")
         
         return table
+    
+    def _clear_table(self):
+        """
+        Clear all rows from table (Helper for Task 12).
+        Used before populating with new data.
+        """
+        if not self.tbl_beasiswa:
+            return
+        
+        self.tbl_beasiswa.setRowCount(0)
+        logger.debug("Table cleared (all rows removed)")
     
     def _create_crud_buttons_layout(self) -> QHBoxLayout:
         """
