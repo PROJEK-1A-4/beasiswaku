@@ -1665,6 +1665,116 @@ def get_status_availability() -> Dict[str, int]:
         return {}
 
 
+# ========================== PHASE 5 ENHANCEMENT ==========================
+
+def check_user_applied(user_id: int, beasiswa_id: int) -> bool:
+    """
+    Cek apakah user sudah mendaftar beasiswa tertentu.
+    
+    Melihat di tabel riwayat_lamaran apakah ada record (user_id, beasiswa_id).
+    
+    Args:
+        user_id (int): ID user yang dicek
+        beasiswa_id (int): ID beasiswa yang dicek
+    
+    Returns:
+        bool: True jika user sudah mendaftar, False jika belum
+    
+    Example:
+        >>> if check_user_applied(user_id=1, beasiswa_id=5):
+        ...     print("User sudah mendaftar beasiswa ini")
+    """
+    if not user_id or not isinstance(user_id, int):
+        return False
+    
+    if not beasiswa_id or not isinstance(beasiswa_id, int):
+        return False
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Check if record exists
+        cursor.execute("""
+            SELECT id FROM riwayat_lamaran
+            WHERE user_id = ? AND beasiswa_id = ?
+            LIMIT 1
+        """, (user_id, beasiswa_id))
+        
+        result = cursor.fetchone()
+        
+        cursor.close()
+        conn.close()
+        
+        return result is not None
+        
+    except sqlite3.Error as e:
+        logger.error(f"❌ Database error saat check user applied: {e}")
+        return False
+
+
+def get_beasiswa_list_for_user(user_id: int,
+                              filter_jenjang: Optional[str] = None,
+                              filter_status: Optional[str] = None,
+                              search_judul: Optional[str] = None,
+                              sort_by: str = 'deadline',
+                              sort_order: str = 'ASC') -> Tuple[List[Dict], int]:
+    """
+    Mengambil list beasiswa dengan informasi sudah daftar user.
+    
+    Sama seperti get_beasiswa_list() tapi menambahkan kolom 'sudah_daftar' 
+    yang menunjukkan apakah user sudah mendaftar beasiswa tersebut.
+    
+    Args:
+        user_id (int): ID user yang ingin lihat data beasiswa
+        filter_jenjang (str, optional): Filter by jenjang (D3, D4, S1, S2)
+        filter_status (str, optional): Filter by status (Buka, Segera Tutup, Tutup)
+        search_judul (str, optional): Search by judul (case-insensitive LIKE)
+        sort_by (str, optional): Column to sort by (deadline, judul, created_at, status)
+        sort_order (str, optional): Sort order (ASC, DESC)
+    
+    Returns:
+        Tuple[List[Dict], int]:
+            - List of beasiswa with added 'sudah_daftar' field (True/False)
+            - Total count of beasiswa
+    
+    Example:
+        >>> beasiswa_list, total = get_beasiswa_list_for_user(
+        ...     user_id=1,
+        ...     filter_jenjang='S1',
+        ...     filter_status='Buka'
+        ... )
+        >>> for b in beasiswa_list:
+        ...     status = "✅ Sudah daftar" if b['sudah_daftar'] else "❌ Belum daftar"
+        ...     print(f"{b['judul']} - {status}")
+    """
+    if not user_id or not isinstance(user_id, int):
+        return [], 0
+    
+    try:
+        # First get the beasiswa list (existing function)
+        beasiswa_list, total_count = get_beasiswa_list(
+            filter_jenjang=filter_jenjang,
+            filter_status=filter_status,
+            search_judul=search_judul,
+            sort_by=sort_by,
+            sort_order=sort_order
+        )
+        
+        # Add sudah_daftar field for each beasiswa
+        for beasiswa in beasiswa_list:
+            beasiswa['sudah_daftar'] = check_user_applied(user_id, beasiswa['id'])
+        
+        logger.info(f"✅ Retrieved {len(beasiswa_list)} beasiswa for user {user_id} "
+                   f"with 'sudah_daftar' status")
+        
+        return beasiswa_list, total_count
+        
+    except Exception as e:
+        logger.error(f"❌ Error saat get beasiswa list for user: {e}")
+        return [], 0
+
+
 if __name__ == "__main__":
     # Script untuk testing
     init_db()
