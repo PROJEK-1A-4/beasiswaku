@@ -12,6 +12,13 @@ from datetime import datetime
 from typing import List, Dict, Optional
 import logging
 
+# PyQt6 untuk background threading
+try:
+    from PyQt6.QtCore import QThread, pyqtSignal
+    PYQT_AVAILABLE = True
+except ImportError:
+    PYQT_AVAILABLE = False
+
 # Konfigurasi logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -415,6 +422,77 @@ def save_backup(data: Dict) -> Dict[str, str]:
     except IOError as e:
         logger.error(f"❌ Error saving backup: {str(e)}")
         return {file: "❌" for file in backup_files}
+
+
+# ============================================================================
+# BACKGROUND THREADING (untuk GUI integration)
+# ============================================================================
+
+if PYQT_AVAILABLE:
+    class ScraperThread(QThread):
+        """
+        Background scraper thread untuk PyQt6 GUI
+        
+        Signals:
+            progress (int): Progress 0-100
+            finished (list): List of beasiswa saat selesai
+            error (str): Error message jika terjadi error
+        
+        Usage:
+            thread = ScraperThread()
+            thread.progress.connect(on_progress_update)
+            thread.finished.connect(on_scraping_done)
+            thread.error.connect(on_scraping_error)
+            thread.start()  # Jalan di background
+        """
+        
+        # Define signals
+        progress = pyqtSignal(int)      # Progress 0-100
+        finished = pyqtSignal(list)     # Result: list of beasiswa
+        error = pyqtSignal(str)         # Error message
+        
+        def run(self):
+            """
+            Background scraping (jalan di thread terpisah)
+            Emit signals ke GUI saat progress berubah
+            """
+            try:
+                logger.info("🔄 Background scraper started...")
+                self.progress.emit(10)  # 10% - initiate
+                
+                # Main scraping logic
+                beasiswa_data = scrape_beasiswa_data()
+                
+                self.progress.emit(100)  # 100% - complete
+                logger.info(f"✅ Background scraping done: {len(beasiswa_data)} beasiswa")
+                
+                # Emit hasil ke main thread
+                self.finished.emit(beasiswa_data)
+                
+            except Exception as e:
+                error_msg = f"Background scraper error: {str(e)}"
+                logger.error(f"❌ {error_msg}")
+                self.error.emit(error_msg)
+
+
+def get_scraper_thread():
+    """
+    Factory function untuk create ScraperThread
+    
+    Return:
+        ScraperThread instance jika PyQt6 tersedia
+        None jika PyQt6 tidak tersedia
+    
+    Usage:
+        thread = get_scraper_thread()
+        if thread:
+            thread.start()
+    """
+    if PYQT_AVAILABLE:
+        return ScraperThread()
+    else:
+        logger.warning("⚠️ PyQt6 not available - QThread not supported")
+        return None
 
 
 # ============================================================================
