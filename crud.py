@@ -1535,6 +1535,76 @@ def get_beasiswa_per_jenjang() -> Dict[str, int]:
         return {}
 
 
+def get_top_penyelenggara(limit: int = 10) -> List[Dict[str, any]]:
+    """
+    Mengambil daftar penyelenggara dengan jumlah beasiswa terbanyak.
+    
+    Mengagregasi jumlah beasiswa per penyelenggara dan mengembalikan
+    top N penyelenggara berdasarkan jumlah beasiswa yang disediakan.
+    
+    Args:
+        limit (int, optional): Jumlah top penyelenggara yang dicari (default: 10)
+    
+    Returns:
+        List[Dict[str, any]]: List of dictionaries dengan struktur:
+            [{
+                'penyelenggara_id': int,
+                'nama_penyelenggara': str,
+                'total_beasiswa': int,
+                'website': str,
+                'contact_email': str
+            }, ...]
+            List akan terurut dari jumlah beasiswa terbanyak ke paling sedikit.
+            Jika tidak ada data, return list kosong.
+    
+    Example:
+        >>> top_orgs = get_top_penyelenggara(limit=5)
+        >>> for org in top_orgs:
+        ...     print(f"{org['nama_penyelenggara']}: {org['total_beasiswa']} beasiswa")
+    """
+    if limit <= 0:
+        return []
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Query untuk count beasiswa per penyelenggara
+        # Menggunakan LEFT JOIN karena ada beasiswa yang belum memiliki penyelenggara
+        query = """
+            SELECT 
+                p.id as penyelenggara_id,
+                COALESCE(p.nama, '(Tidak Ada)') as nama_penyelenggara,
+                COUNT(b.id) as total_beasiswa,
+                COALESCE(p.website, '-') as website,
+                COALESCE(p.contact_email, '-') as contact_email
+            FROM beasiswa b
+            LEFT JOIN penyelenggara p ON b.penyelenggara_id = p.id
+            GROUP BY b.penyelenggara_id
+            ORDER BY total_beasiswa DESC, nama_penyelenggara ASC
+            LIMIT ?
+        """
+        
+        cursor.execute(query, (limit,))
+        results = cursor.fetchall()
+        
+        # Convert ke list of dictionaries
+        penyelenggara_list = [dict(row) for row in results]
+        
+        total_count = len(penyelenggara_list)
+        logger.info(f"✅ Retrieved top {total_count} penyelenggara")
+        
+        cursor.close()
+        conn.close()
+        
+        return penyelenggara_list
+        
+    except sqlite3.Error as e:
+        logger.error(f"❌ Database error saat get top penyelenggara: {e}")
+        return []
+
+
+
 if __name__ == "__main__":
     # Script untuk testing
     init_db()
