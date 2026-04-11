@@ -20,7 +20,7 @@ from typing import List, Dict
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from crud import (
+from src.database.crud import (
     init_db, register_user, add_beasiswa, add_lamaran,
     add_catatan, get_catatan, edit_catatan, delete_catatan, get_catatan_list,
     get_connection

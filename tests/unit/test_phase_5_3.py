@@ -19,7 +19,7 @@ from typing import List, Dict
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from crud import (
+from src.database.crud import (
     init_db, register_user, add_beasiswa, add_lamaran,
     add_favorit, delete_favorit, get_favorit_list,
     check_user_applied, get_connection

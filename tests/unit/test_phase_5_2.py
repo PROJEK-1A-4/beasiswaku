@@ -1,4 +1,8 @@
 """
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 test_phase_5_2.py - PHASE 5.2 Testing: Kolom 'Sudah Daftar?' Logic
 Comprehensive testing of application tracking visibility
 
@@ -9,7 +13,7 @@ Tests:
 """
 
 import logging
-from crud import (
+from src.database.crud import (
     init_db, register_user, add_beasiswa, add_lamaran,
     check_user_applied, get_beasiswa_list_for_user
 )

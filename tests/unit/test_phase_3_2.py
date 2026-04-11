@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 """
 TEST PHASE 3.2: CRUD Favorit functions
 ======================================
 Comprehensive test for favorite management
 """
 
-from crud import init_db, add_beasiswa, register_user, login_user, add_favorit, get_favorit_list, delete_favorit, get_connection
+from src.database.crud import init_db, add_beasiswa, register_user, login_user, add_favorit, get_favorit_list, delete_favorit, get_connection
 import sqlite3
 
 def print_header(text):

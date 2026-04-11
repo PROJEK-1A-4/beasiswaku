@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 """
 TEST PHASE 1.1: Database Schema Validation
 ============================================
@@ -20,7 +24,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 # Import from crud module
-from crud import init_db, get_connection, hash_password
+from src.database.crud import init_db, get_connection, hash_password
 
 def print_header(text):
     """Print formatted header"""

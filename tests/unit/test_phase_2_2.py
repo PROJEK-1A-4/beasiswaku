@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 """
 TEST PHASE 2.2: CRUD Beasiswa - add_beasiswa() & get_beasiswa_list() & edit_beasiswa() & delete_beasiswa()
 =======================================================================================================
 Comprehensive test for beasiswa creation, retrieval, update, and deletion with filtering
 """
 
-from crud import init_db, add_beasiswa, get_beasiswa_list, edit_beasiswa, delete_beasiswa, get_connection
+from src.database.crud import init_db, add_beasiswa, get_beasiswa_list, edit_beasiswa, delete_beasiswa, get_connection
 import sqlite3
 
 def print_header(text):

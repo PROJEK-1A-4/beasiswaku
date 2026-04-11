@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 """
 TEST: Authentication & Database Connection
 ===========================================
@@ -7,7 +11,7 @@ Demo: Register user, Login, dan lihat data tersimpan di database
 Ini menunjukkan database connection bekerja dengan sempurna!
 """
 
-from crud import init_db, register_user, login_user, get_connection
+from src.database.crud import init_db, register_user, login_user, get_connection
 import sqlite3
 
 def print_header(text):
@@ -27,7 +31,7 @@ def main():
     
     # Step 1: Initialize Database
     print_header("STEP 1: Initialize Database")
-    print("\nCommand: from crud import init_db; init_db()")
+    print("\nCommand: from src.database.crud import init_db; init_db()")
     print("\nExecution:")
     try:
         init_db()

@@ -1,4 +1,8 @@
 """
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 test_phase_1_3.py - GUI Testing & Demonstration
 PHASE 1.3: Main Window Layout GUI
 
@@ -116,7 +120,7 @@ def test_backend_integration():
     print("-" * 80)
     
     try:
-        from crud import (
+        from src.database.crud import (
             init_db, login_user, register_user,
             add_beasiswa, get_beasiswa_list, edit_beasiswa, delete_beasiswa,
             add_lamaran, get_lamaran_list, edit_lamaran, delete_lamaran,
@@ -194,7 +198,7 @@ def test_database_setup():
     print("-" * 80)
     
     try:
-        from crud import init_db, get_connection
+        from src.database.crud import init_db, get_connection
         import sqlite3
         from pathlib import Path
         

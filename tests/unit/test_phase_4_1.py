@@ -1,4 +1,8 @@
 """
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 test_phase_4_1.py - Comprehensive Testing for Phase 4.1 Aggregation Queries
 Testing all three aggregation query functions with various scenarios.
 
@@ -11,7 +15,7 @@ Functions tested:
 import sqlite3
 import logging
 from pathlib import Path
-from crud import (
+from src.database.crud import (
     init_db, register_user, add_beasiswa,
     get_beasiswa_per_jenjang, get_top_penyelenggara, get_status_availability
 )

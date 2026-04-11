@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 """
 TEST PHASE 3.1: CRUD Lamaran (Applications) functions
 =======================================================
 Comprehensive test for application/lamaran management
 """
 
-from crud import init_db, add_beasiswa, register_user, login_user, add_lamaran, get_lamaran_list, edit_lamaran, delete_lamaran, get_connection
+from src.database.crud import init_db, add_beasiswa, register_user, login_user, add_lamaran, get_lamaran_list, edit_lamaran, delete_lamaran, get_connection
 import sqlite3
 
 def print_header(text):
