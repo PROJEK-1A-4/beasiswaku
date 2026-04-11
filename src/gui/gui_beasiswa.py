@@ -128,8 +128,12 @@ class BeasiswaTab(QWidget):
         filter_layout = self._create_filter_layout()
         if filter_layout:
             main_layout.addLayout(filter_layout)
-            main_layout.addSpacing(5)
-        
+            main_layout.addSpacing(5)        
+        # ===== TASK 7: CONNECT SEARCH KEYRELEASE SIGNAL =====
+        # Connect search entry KeyRelease event to apply filters
+        if self.entry_search:
+            self.entry_search.keyReleaseEvent = self._on_search_key_release
+            logger.debug("✅ Search entry KeyRelease signal connected to apply_filters()")        
         # ===== SECTION 3: TABLE WIDGET (Task 8) =====
         # Display beasiswa data in table format
         self.tbl_beasiswa = self._create_table_widget()
@@ -268,8 +272,22 @@ class BeasiswaTab(QWidget):
         
         logger.debug("✅ Status dropdown created with options: Semua, Buka, Segera Tutup, Tutup")
         
-        # ===== TASK 7: SEARCH ENTRY (akan diisi kemudian) =====
-        # Placeholder untuk search entry (akan diimplementasi di Task 7)
+        # ===== TASK 7: SEARCH ENTRY =====
+        # Real-time search entry untuk filter by judul
+        lbl_search = QLabel("Cari:")
+        lbl_search.setFont(QFont("Arial", 10))
+        layout.addWidget(lbl_search)
+        
+        self.entry_search = QLineEdit()
+        self.entry_search.setFont(QFont("Arial", 10))
+        self.entry_search.setPlaceholderText("Cari beasiswa...")
+        self.entry_search.setMinimumWidth(200)
+        layout.addWidget(self.entry_search)
+        
+        logger.debug("✅ Search entry created with placeholder 'Cari beasiswa...'")
+        
+        # Add stretch to push remaining space to the right
+        layout.addStretch()
         
         return layout
     
@@ -386,6 +404,21 @@ class BeasiswaTab(QWidget):
         # Will be implemented in Task 14
         pass
     
+    def _on_search_key_release(self, event):
+        """
+        Handle search entry KeyRelease event (Helper for Task 7).
+        Triggered when user types in search box.
+        
+        Args:
+            event: QKeyEvent object
+        """
+        # Call parent's keyReleaseEvent first
+        super(QLineEdit, self.entry_search).keyReleaseEvent(event)
+        
+        # Trigger apply_filters() on key release
+        self.apply_filters()
+        logger.debug(f"Search key released: '{self._get_search_text()}'")
+    
     def _get_filter_jenjang(self) -> Optional[str]:
         """
         Get selected jenjang filter value (Helper method for Task 5).
@@ -423,9 +456,17 @@ class BeasiswaTab(QWidget):
         return selected
     
     def _get_search_text(self) -> str:
-        """Get search entry text"""
-        # Helper method for Task 14
-        pass
+        """
+        Get search entry text (Helper method for Task 7).
+        
+        Returns:
+            str: Text from search entry (empty string if no text)
+        """
+        if not self.entry_search:
+            return ""
+        
+        search_text = self.entry_search.text().strip()
+        return search_text
     
     def on_refresh_clicked(self):
         """
