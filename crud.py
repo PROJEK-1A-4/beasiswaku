@@ -1604,6 +1604,66 @@ def get_top_penyelenggara(limit: int = 10) -> List[Dict[str, any]]:
         return []
 
 
+def get_status_availability() -> Dict[str, int]:
+    """
+    Mengambil status ketersediaan beasiswa.
+    
+    Mengagregasi jumlah beasiswa berdasarkan status:
+    - 'Buka': Beasiswa masih membuka pendaftaran
+    - 'Segera Tutup': Deadline pendaftaran sudah dekat
+    - 'Tutup': Beasiswa sudah ditutup
+    
+    Returns:
+        Dict[str, int]: Dictionary dengan status sebagai key dan count sebagai value
+            Contoh: {'Buka': 15, 'Segera Tutup': 5, 'Tutup': 3}
+            Status yang tidak memiliki beasiswa tidak akan muncul dalam dict.
+    
+    Example:
+        >>> availability = get_status_availability()
+        >>> print(f"Total Buka: {availability.get('Buka', 0)}")
+        Total Buka: 15
+        >>> if availability.get('Tutup', 0) > 0:
+        ...     print(f"Hati-hati! {availability['Tutup']} beasiswa sudah tutup")
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Query untuk count beasiswa per status
+        query = """
+            SELECT 
+                status,
+                COUNT(*) as total
+            FROM beasiswa
+            WHERE status IS NOT NULL
+            GROUP BY status
+            ORDER BY 
+                CASE status
+                    WHEN 'Buka' THEN 1
+                    WHEN 'Segera Tutup' THEN 2
+                    WHEN 'Tutup' THEN 3
+                    ELSE 4
+                END
+        """
+        
+        cursor.execute(query)
+        results = cursor.fetchall()
+        
+        # Convert ke dictionary
+        status_dict = {row['status']: row['total'] for row in results}
+        
+        total_beasiswa = sum(status_dict.values())
+        logger.info(f"✅ Retrieved status availability: {status_dict} (Total: {total_beasiswa})")
+        
+        cursor.close()
+        conn.close()
+        
+        return status_dict
+        
+    except sqlite3.Error as e:
+        logger.error(f"❌ Database error saat get status availability: {e}")
+        return {}
+
 
 if __name__ == "__main__":
     # Script untuk testing
