@@ -159,6 +159,10 @@ class BeasiswaTab(QWidget):
         """
         Create top bar with title and timestamp (Task 4).
         
+        Display:
+        - Left: Title label with emoji (📚 Beasiswa Tab)
+        - Right: Last scraping timestamp
+        
         Returns:
             QHBoxLayout: Layout containing title label and timestamp label
         """
@@ -166,9 +170,46 @@ class BeasiswaTab(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
         
-        # Will be populated with widgets in Task 4
+        # ===== TITLE LABEL (Left side) =====
+        self.lbl_title = QLabel("📚 Daftar Beasiswa")
+        self.lbl_title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        self.lbl_title.setStyleSheet("color: #1976D2; padding: 5px 0px;")
+        layout.addWidget(self.lbl_title)
+        
+        # ===== SPACER (Center) =====
+        layout.addStretch()
+        
+        # ===== TIMESTAMP LABEL (Right side) =====
+        # Display "Scraping terakhir: [timestamp]" or "Belum ada data"
+        timestamp_text = "Scraping terakhir: -"
+        if self.last_scrape_time:
+            timestamp_text = f"Scraping terakhir: {self.last_scrape_time}"
+        
+        self.lbl_timestamp = QLabel(timestamp_text)
+        self.lbl_timestamp.setFont(QFont("Arial", 9))
+        self.lbl_timestamp.setStyleSheet("color: #666; font-style: italic;")
+        self.lbl_timestamp.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(self.lbl_timestamp)
+        
+        logger.debug("✅ Top bar layout created (title + timestamp)")
         
         return layout
+    
+    def update_timestamp_label(self):
+        """
+        Update timestamp label dengan last scrape time (Helper untuk Task 4).
+        Called setelah load_beasiswa_data() untuk refresh timestamp display.
+        """
+        if not self.lbl_timestamp:
+            return
+        
+        if self.last_scrape_time:
+            timestamp_text = f"Scraping terakhir: {self.last_scrape_time}"
+        else:
+            timestamp_text = "Scraping terakhir: -"
+        
+        self.lbl_timestamp.setText(timestamp_text)
+        logger.debug(f"Timestamp label updated: {timestamp_text}")
     
     def _create_filter_layout(self) -> QHBoxLayout:
         """
