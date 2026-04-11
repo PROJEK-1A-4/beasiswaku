@@ -30,6 +30,7 @@ database/*.db
 database/*.db-journal
 
 # Backups
+backup/
 backup/*.db
 *.bak
 *.tmp
