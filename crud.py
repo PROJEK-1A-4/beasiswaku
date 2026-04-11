@@ -1484,6 +1484,57 @@ def delete_favorit(user_id: int, beasiswa_id: int) -> Tuple[bool, str]:
         conn.close()
 
 
+# ========================== PHASE 4.1 AGGREGATION QUERIES ==========================
+
+def get_beasiswa_per_jenjang() -> Dict[str, int]:
+    """
+    Mengambil jumlah beasiswa per jenjang pendidikan.
+    
+    Mengagregasi data beasiswa berdasarkan jenjang (D3, D4, S1, S2)
+    dan mengembalikan count untuk masing-masing level.
+    
+    Returns:
+        Dict[str, int]: Dictionary dengan format {jenjang: count}
+            Contoh: {'D3': 5, 'D4': 8, 'S1': 15, 'S2': 3}
+            Jenjang yang tidak memiliki beasiswa tidak akan muncul dalam dict.
+    
+    Example:
+        >>> stats = get_beasiswa_per_jenjang()
+        >>> print(f"Total S1: {stats.get('S1', 0)}")
+        Total S1: 15
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Query untuk count beasiswa per jenjang
+        query = """
+            SELECT jenjang, COUNT(*) as total
+            FROM beasiswa
+            WHERE jenjang IS NOT NULL
+            GROUP BY jenjang
+            ORDER BY jenjang ASC
+        """
+        
+        cursor.execute(query)
+        results = cursor.fetchall()
+        
+        # Convert ke dictionary
+        jenjang_dict = {row['jenjang']: row['total'] for row in results}
+        
+        total_beasiswa = sum(jenjang_dict.values())
+        logger.info(f"✅ Retrieved beasiswa per jenjang: {jenjang_dict} (Total: {total_beasiswa})")
+        
+        cursor.close()
+        conn.close()
+        
+        return jenjang_dict
+        
+    except sqlite3.Error as e:
+        logger.error(f"❌ Database error saat get beasiswa per jenjang: {e}")
+        return {}
+
+
 if __name__ == "__main__":
     # Script untuk testing
     init_db()
