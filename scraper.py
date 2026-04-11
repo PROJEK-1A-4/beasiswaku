@@ -370,3 +370,47 @@ def normalize_url(url: str) -> str:
     if url.startswith("http"):
         return url
     return f"{BASE_URL}{url}" if url.startswith("/") else f"{BASE_URL}/{url}"
+
+def save_backup(data: Dict) -> Dict[str, str]:
+    
+    backup_files = {}
+    
+    try:
+        # Backup beasiswa.json
+        beasiswa_file = os.path.join(BACKUP_DIR, "beasiswa.json")
+        with open(beasiswa_file, "w", encoding="utf-8") as f:
+            json.dump(data["beasiswa"], f, ensure_ascii=False, indent=2)
+        backup_files["beasiswa.json"] = "✅"
+        logger.info(f"✅ Backup: {beasiswa_file}")
+        
+        # Backup penyelenggara.json
+        penyelenggara_file = os.path.join(BACKUP_DIR, "penyelenggara.json")
+        with open(penyelenggara_file, "w", encoding="utf-8") as f:
+            json.dump(data["penyelenggara"], f, ensure_ascii=False, indent=2)
+        backup_files["penyelenggara.json"] = "✅"
+        logger.info(f"✅ Backup: {penyelenggara_file}")
+        
+        # Backup riwayat_lamaran.json (template kosong untuk fase awal)
+        riwayat_file = os.path.join(BACKUP_DIR, "riwayat_lamaran.json")
+        with open(riwayat_file, "w", encoding="utf-8") as f:
+            json.dump([], f, ensure_ascii=False, indent=2)
+        backup_files["riwayat_lamaran.json"] = "✅"
+        logger.info(f"✅ Backup: {riwayat_file}")
+        
+        # Backup metadata scraping
+        metadata_file = os.path.join(BACKUP_DIR, "_metadata.json")
+        metadata = {
+            "timestamp": data.get("timestamp"),
+            "total_beasiswa": data.get("total_beasiswa"),
+            "total_penyelenggara": data.get("total_penyelenggara"),
+            "categories": list(CATEGORIES.keys())
+        }
+        with open(metadata_file, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, ensure_ascii=False, indent=2)
+        logger.info(f"✅ Metadata: {metadata_file}")
+        
+        return backup_files
+    
+    except IOError as e:
+        logger.error(f"❌ Error saving backup: {str(e)}")
+        return {file: "❌" for file in backup_files}
