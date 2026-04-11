@@ -154,7 +154,10 @@ class BeasiswaTab(QWidget):
             main_layout.addSpacing(5)
         
         # ===== TASK 28: CONNECT TABLE DOUBLE-CLICK EVENT =====
-        # Will be implemented in Task 28 (connect itemDoubleClicked signal)
+        # Connect double-click to show detail dialog
+        if self.tbl_beasiswa:
+            self.tbl_beasiswa.itemDoubleClicked.connect(self.on_table_double_click)
+            logger.debug("✅ Table double-click signal connected to on_table_double_click()")
         
         # ===== SECTION 4: ROW COUNT LABEL (Task 13) =====
         # Display total number of rows displayed
@@ -660,6 +663,10 @@ class BeasiswaTab(QWidget):
         
         # Update row count label
         self.update_row_count(len(self.beasiswa_list))
+        
+        # Apply deadline highlighting to all rows (Task 25)
+        self.apply_row_formatting()
+        
         logger.info(f"✅ Table populated with {len(self.beasiswa_list)} rows")
     
     def update_row_count(self, count: int):
@@ -759,6 +766,9 @@ class BeasiswaTab(QWidget):
             
             # Update row count with filtered result count
             self.update_row_count(len(self.filtered_list))
+            
+            # Apply deadline highlighting to all rows (Task 25)
+            self.apply_row_formatting()
             
         except Exception as e:
             logger.error(f"❌ Error applying filters: {e}")
@@ -1150,10 +1160,44 @@ class BeasiswaTab(QWidget):
     def apply_row_formatting(self):
         """
         Apply deadline highlight to all table rows (Task 26).
-        Called setelah table di-populate.
+        Called setelah table di-populate dengan data.
+        Apply colors: Red (≤3 hari), Yellow (≤7 hari), Green (>7 hari)
         """
-        # Will be implemented in Task 26
-        pass
+        if not self.tbl_beasiswa:
+            logger.warning("Table widget not initialized for formatting")
+            return
+        
+        try:
+            # Iterate through all rows
+            for row in range(self.tbl_beasiswa.rowCount()):
+                # Get deadline from column 4
+                deadline_item = self.tbl_beasiswa.item(row, 4)
+                if not deadline_item:
+                    continue
+                
+                deadline_str = deadline_item.text()
+                
+                # Get color and status text based on deadline
+                color, status_text = self.highlight_deadline(deadline_str)
+                
+                # Apply color to deadline cell (column 4)
+                deadline_item.setForeground(QBrush(color))
+                deadline_item.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+                
+                # Also apply color to entire row for visibility
+                for col in range(self.tbl_beasiswa.columnCount()):
+                    cell_item = self.tbl_beasiswa.item(row, col)
+                    if cell_item:
+                        if color == QColor("#FF6B6B"):  # Red - urgent/overdue
+                            cell_item.setBackground(QBrush(QColor("#FFEBEE")))  # Light red background
+                        elif color == QColor("#FFA500"):  # Yellow - soon
+                            cell_item.setBackground(QBrush(QColor("#FFFDE7")))  # Light yellow background
+                        # Green doesn't need special background, keep default
+            
+            logger.info(f"✅ Row formatting applied to {self.tbl_beasiswa.rowCount()} rows")
+            
+        except Exception as e:
+            logger.error(f"❌ Error applying row formatting: {e}")
     
     def on_table_double_click(self, row: int, column: int):
         """
@@ -1163,18 +1207,39 @@ class BeasiswaTab(QWidget):
             row: Row index clicked
             column: Column index clicked
         """
-        # Will be implemented in Task 28
-        pass
+        logger.info(f"Table double-clicked at row {row}, column {column}")
+        
+        try:
+            # Get beasiswa data from filtered list
+            if row >= len(self.filtered_list):
+                logger.error(f"Row index {row} out of range")
+                return
+            
+            beasiswa_data = self.filtered_list[row]
+            logger.info(f"Opening detail dialog for: {beasiswa_data.get('judul')}")
+            
+            # Show detail dialog (Task 27)
+            self.show_detail_dialog(beasiswa_data)
+            
+        except Exception as e:
+            logger.error(f"❌ Error handling table double-click: {e}")
     
     def show_detail_dialog(self, beasiswa_data: Dict):
         """
-        Show detail popup dialog (Task 27).
+        Show detail popup dialog with all beasiswa information (Task 27).
         
         Args:
             beasiswa_data: Dictionary with beasiswa details
         """
-        # Will be implemented in Task 27
-        pass
+        logger.info(f"Opening detail dialog for: {beasiswa_data.get('judul')}")
+        
+        try:
+            dialog = BeasiswaDetailDialog(beasiswa_data=beasiswa_data, parent=self)
+            dialog.exec()
+            
+        except Exception as e:
+            logger.error(f"❌ Error showing detail dialog: {e}")
+            QMessageBox.critical(self, "❌ Error", f"Gagal membuka detail beasiswa:\n{str(e)}")
     
     # =====================================================================
     # SECTION 6: EXPORT (Tasks 29-30)
@@ -1702,8 +1767,9 @@ Tindakan ini TIDAK DAPAT DIBATALKAN dan akan menghapus semua data terkait."""
 
 class BeasiswaDetailDialog(QDialog):
     """
-    Dialog untuk menampilkan detail lengkap beasiswa.
+    Dialog untuk menampilkan detail lengkap beasiswa (Task 27 & 28).
     Dipanggil saat user double-click row di table.
+    Menampilkan semua field beasiswa dengan format readable.
     """
     
     def __init__(self, beasiswa_data: Dict, parent=None):
@@ -1712,11 +1778,139 @@ class BeasiswaDetailDialog(QDialog):
         self.init_ui()
     
     def init_ui(self):
-        """Initialize Beasiswa Detail Dialog UI"""
-        self.setWindowTitle(f"Detail Beasiswa - {self.beasiswa_data.get('judul', '')}")
-        self.setGeometry(150, 150, 700, 600)
+        """Initialize Beasiswa Detail Dialog UI dengan semua informasi beasiswa"""
+        judul = self.beasiswa_data.get('judul', 'Beasiswa')
+        self.setWindowTitle(f"📚 Detail Beasiswa - {judul}")
+        self.setGeometry(150, 150, 850, 750)
         self.setModal(True)
         
-        # Placeholder - akan diisi di Task 28
-        layout = QVBoxLayout()
-        self.setLayout(layout)
+        # Main layout
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(10)
+        
+        # ===== TITLE SECTION =====
+        title_label = QLabel(f"📚 {judul}")
+        title_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        title_label.setStyleSheet("color: #1976D2; padding: 10px 0px;")
+        main_layout.addWidget(title_label)
+        
+        # ===== SEPARATOR LINE =====
+        separator = QLabel("─" * 80)
+        separator.setStyleSheet("color: #E0E0E0;")
+        main_layout.addWidget(separator)
+        
+        # ===== TEXT AREA FOR CONTENT =====
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setStyleSheet("""
+            QTextEdit {
+                background-color: #FAFAFA;
+                border: 1px solid #E0E0E0;
+                border-radius: 5px;
+                padding: 15px;
+                font-family: 'Courier New', monospace;
+                font-size: 10px;
+                line-height: 1.6;
+            }
+        """)
+        
+        # Build detail content as HTML
+        html_content = self._build_detail_html()
+        text_edit.setHtml(html_content)
+        
+        main_layout.addWidget(text_edit)
+        
+        # ===== BUTTON SECTION =====
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        # Close button
+        btn_close = QPushButton("✅ Tutup")
+        btn_close.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 10px 30px;
+                font-weight: bold;
+                font-size: 11px;
+            }
+            QPushButton:hover { background-color: #0b7dda; }
+            QPushButton:pressed { background-color: #0966cc; }
+        """)
+        btn_close.clicked.connect(self.accept)
+        button_layout.addWidget(btn_close)
+        
+        main_layout.addLayout(button_layout)
+        
+        self.setLayout(main_layout)
+        logger.debug(f"✅ BeasiswaDetailDialog UI initialized for: {judul}")
+    
+    def _build_detail_html(self) -> str:
+        """
+        Build HTML content for detail display (Task 27).
+        Format: Bold label: value with proper line breaks
+        
+        Returns:
+            str: HTML formatted content with all beasiswa fields
+        """
+        try:
+            html_parts = [
+                "<div style='font-family: Arial, sans-serif; line-height: 1.8;'>"
+            ]
+            
+            # Required fields
+            judul = self.beasiswa_data.get('judul', 'N/A')
+            html_parts.append(f"<p><b>Judul Beasiswa:</b><br/>{judul}</p>")
+            
+            jenjang = self.beasiswa_data.get('jenjang', 'N/A')
+            html_parts.append(f"<p><b>Jenjang Pendidikan:</b><br/>{jenjang}</p>")
+            
+            deadline = self.beasiswa_data.get('deadline', 'N/A')
+            html_parts.append(f"<p><b>Deadline Pendaftaran:</b><br/>{deadline}</p>")
+            
+            status = self.beasiswa_data.get('status', 'N/A')
+            html_parts.append(f"<p><b>Status Beasiswa:</b><br/>{status}</p>")
+            
+            # Optional fields - only show if not empty
+            penyelenggara = self.beasiswa_data.get('penyelenggara_name')
+            if not penyelenggara:
+                penyelenggara_id = self.beasiswa_data.get('penyelenggara_id')
+                if penyelenggara_id:
+                    penyelenggara = f"ID: {penyelenggara_id}"
+            if penyelenggara:
+                html_parts.append(f"<p><b>Penyelenggara:</b><br/>{penyelenggara}</p>")
+            
+            minimal_ipk = self.beasiswa_data.get('minimal_ipk')
+            if minimal_ipk:
+                html_parts.append(f"<p><b>Minimal IPK:</b><br/>{minimal_ipk}</p>")
+            
+            coverage = self.beasiswa_data.get('coverage')
+            if coverage:
+                html_parts.append(f"<p><b>Coverage Beasiswa:</b><br/>{coverage}</p>")
+            
+            deskripsi = self.beasiswa_data.get('deskripsi')
+            if deskripsi and deskripsi.strip():
+                html_parts.append(f"<p><b>Deskripsi:</b><br/>{deskripsi}</p>")
+            
+            benefit = self.beasiswa_data.get('benefit')
+            if benefit and benefit.strip():
+                html_parts.append(f"<p><b>Benefit/Keuntungan:</b><br/>{benefit}</p>")
+            
+            persyaratan = self.beasiswa_data.get('persyaratan')
+            if persyaratan and persyaratan.strip():
+                html_parts.append(f"<p><b>Persyaratan & Ketentuan:</b><br/>{persyaratan}</p>")
+            
+            link_aplikasi = self.beasiswa_data.get('link_aplikasi')
+            if link_aplikasi and link_aplikasi.strip():
+                html_parts.append(f"<p><b>Link Aplikasi:</b><br/><a href='{link_aplikasi}' style='color: #1976D2;'>{link_aplikasi}</a></p>")
+            
+            html_parts.append("</div>")
+            
+            return "".join(html_parts)
+            
+        except Exception as e:
+            logger.error(f"❌ Error building detail HTML: {e}")
+            return f"<p style='color: red;'>Error loading detail: {str(e)}</p>"
