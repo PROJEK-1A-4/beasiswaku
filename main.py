@@ -26,6 +26,10 @@ from PyQt6.QtCore import pyqtSignal
 from src.database.crud import (
     init_db, login_user, register_user, get_connection
 )
+from src.visualization.visualisasi import (
+    build_statistik_canvases,
+    build_tracker_canvases,
+)
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -426,19 +430,26 @@ class TrackerTab(QWidget):
     def init_ui(self):
         """Initialize tracker tab UI"""
         layout = QVBoxLayout()
-        
-        # Placeholder content
-        label = QLabel("📋 Tracker Lamaran\n\n" +
-                      "Fitur ini akan menampilkan:\n" +
-                      "• Tabel riwayat lamaran pribadi\n" +
-                      "• CRUD lamaran (tambah, edit, hapus)\n" +
-                      "• Pie chart proporsi status\n" +
-                      "• Bar chart lamaran per bulan")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setFont(QFont("Arial", 11))
-        label.setStyleSheet("padding: 50px; background-color: #f0f0f0; border-radius: 5px;")
-        
-        layout.addWidget(label)
+
+        title = QLabel("📋 Tracker Lamaran")
+        title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        try:
+            tracker_canvases = build_tracker_canvases(self.user_id)
+            layout.addWidget(tracker_canvases["canvas_lamaran_status"])
+            layout.addWidget(tracker_canvases["canvas_lamaran_bulanan"])
+        except Exception as e:
+            logger.error(f"❌ Gagal memuat chart tracker: {e}")
+            error_label = QLabel(
+                "Gagal memuat chart tracker.\n"
+                "Silakan cek data lamaran atau koneksi database."
+            )
+            error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            error_label.setFont(QFont("Arial", 11))
+            error_label.setStyleSheet("padding: 40px; background-color: #f8d7da; border-radius: 5px;")
+            layout.addWidget(error_label)
+
         self.setLayout(layout)
 
 
@@ -453,19 +464,27 @@ class StatistikTab(QWidget):
     def init_ui(self):
         """Initialize statistik tab UI"""
         layout = QVBoxLayout()
-        
-        # Placeholder content
-        label = QLabel("📊 Statistik & Grafik\n\n" +
-                      "Fitur ini akan menampilkan:\n" +
-                      "• Bar chart beasiswa per jenjang\n" +
-                      "• Bar chart top 5 penyelenggara\n" +
-                      "• Pie chart status ketersediaan\n" +
-                      "• Filter dan customization grafik")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setFont(QFont("Arial", 11))
-        label.setStyleSheet("padding: 50px; background-color: #f0f0f0; border-radius: 5px;")
-        
-        layout.addWidget(label)
+
+        title = QLabel("📊 Statistik & Grafik")
+        title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        try:
+            statistik_canvases = build_statistik_canvases()
+            layout.addWidget(statistik_canvases["canvas_jenjang"])
+            layout.addWidget(statistik_canvases["canvas_penyelenggara"])
+            layout.addWidget(statistik_canvases["canvas_status"])
+        except Exception as e:
+            logger.error(f"❌ Gagal memuat chart statistik: {e}")
+            error_label = QLabel(
+                "Gagal memuat chart statistik.\n"
+                "Silakan cek data beasiswa atau koneksi database."
+            )
+            error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            error_label.setFont(QFont("Arial", 11))
+            error_label.setStyleSheet("padding: 40px; background-color: #f8d7da; border-radius: 5px;")
+            layout.addWidget(error_label)
+
         self.setLayout(layout)
 
 
