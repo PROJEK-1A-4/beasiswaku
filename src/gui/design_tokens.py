@@ -29,6 +29,9 @@ COLOR_GRAY_700 = "#374151"
 COLOR_GRAY_800 = "#1f2937"
 COLOR_GRAY_900 = "#111827"  # Very dark gray - text
 
+# Background Colors
+COLOR_GRAY_BACKGROUND = "#f9fafb"  # Main page background color
+
 COLOR_BLACK = "#000000"
 
 # Semantic Colors

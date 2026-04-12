@@ -28,6 +28,8 @@ from src.database.crud import (
 )
 from src.gui.tab_beranda import BerandaTab
 from src.gui.gui_beasiswa import BeasiswaTab
+from src.gui.tab_tracker import TrackerTab
+from src.gui.tab_statistik import StatistikTab
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
