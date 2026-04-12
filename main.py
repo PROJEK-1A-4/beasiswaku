@@ -5,7 +5,7 @@ BeasiswaKu - Personal Scholarship Manager
 Komponen:
 1. LoginWindow - Autentikasi user (login/register)
 2. MainWindow - Window utama dengan tab system
-3. Integrasi dengan backend (crud.py, gui_beasiswa.py, visualisasi.py)
+3. Integrasi dengan backend (crud.py, tab_beasiswa.py, visualisasi.py)
 """
 
 import sys
@@ -28,7 +28,7 @@ from src.database.crud import (
     hash_password, verify_password
 )
 from src.gui.tab_beranda import BerandaTab
-from src.gui.gui_beasiswa import BeasiswaTab
+from src.gui.tab_beasiswa import BeasiswaTab
 from src.gui.tab_tracker import TrackerTab
 from src.gui.tab_statistik import StatistikTab
 from src.gui.tab_profil import ProfileTab

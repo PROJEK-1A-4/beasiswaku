@@ -5,7 +5,6 @@ Track scholarship applications with status visualization and analytics
 
 import logging
 from typing import List, Dict, Any
-from collections import Counter
 from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -21,7 +20,8 @@ from PyQt6.QtGui import QFont, QColor
 
 from src.gui.design_tokens import *
 from src.gui.styles import get_button_solid_stylesheet
-from src.database.crud import get_connection
+from src.services.dashboard_service import get_tracker_snapshot
+from src.services.status_utils import APPLICATION_STATUS_ORDER
 
 logger = logging.getLogger(__name__)
 
@@ -61,105 +61,34 @@ class TrackerTab(QWidget):
     def __init__(self, user_id: int, parent=None):
         super().__init__(parent)
         self.user_id = user_id
+        self._status_counts = {label: 0 for label in APPLICATION_STATUS_ORDER}
+        self._month_counts: Dict[str, int] = {}
         self.applications = self._fetch_applications()
         
         logger.info(f"Initializing TrackerTab for user {user_id}")
         self.init_ui()
         self.populate_table(self.applications)
 
-    def _to_display_status(self, status: str) -> str:
-        """Map backend status ke label UI yang konsisten."""
-        normalized = (status or "").strip().lower()
-        if normalized in {"accepted", "diterima"}:
-            return "Diterima"
-        if normalized in {"rejected", "ditolak", "withdrawn"}:
-            return "Ditolak"
-        return "Pending"
-
     def _fetch_applications(self) -> List[Dict[str, Any]]:
-        """Ambil data lamaran real dari database untuk user aktif."""
-        try:
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT
-                    rl.id,
-                    b.judul AS nama_beasiswa,
-                    rl.tanggal_daftar,
-                    rl.status,
-                    COALESCE(rl.catatan, '') AS catatan
-                FROM riwayat_lamaran rl
-                JOIN beasiswa b ON rl.beasiswa_id = b.id
-                WHERE rl.user_id = ?
-                ORDER BY rl.tanggal_daftar DESC, rl.created_at DESC
-                """,
-                (self.user_id,)
-            )
-            rows = cursor.fetchall()
-            cursor.close()
+        """Ambil data tracker dari service layer."""
+        snapshot = get_tracker_snapshot(self.user_id)
+        self._status_counts = dict(snapshot.get("status_counts", {}))
+        self._month_counts = dict(snapshot.get("month_counts", {}))
+        applications = list(snapshot.get("applications", []))
 
-            applications = []
-            for row in rows:
-                if hasattr(row, "keys"):
-                    row_id = row["id"]
-                    nama_beasiswa = row["nama_beasiswa"]
-                    tanggal_raw = row["tanggal_daftar"]
-                    raw_status = row["status"]
-                    catatan = row["catatan"]
-                else:
-                    row_id = row[0]
-                    nama_beasiswa = row[1]
-                    tanggal_raw = row[2]
-                    raw_status = row[3]
-                    catatan = row[4]
-
-                tanggal_display = "-"
-                month_key = None
-
-                if tanggal_raw:
-                    try:
-                        dt = datetime.strptime(str(tanggal_raw), "%Y-%m-%d")
-                        tanggal_display = dt.strftime("%d %b %Y")
-                        month_key = dt.strftime("%Y-%m")
-                    except ValueError:
-                        tanggal_display = str(tanggal_raw)
-                        month_key = str(tanggal_raw)[:7] if len(str(tanggal_raw)) >= 7 else None
-
-                applications.append(
-                    {
-                        "id": row_id,
-                        "nama": nama_beasiswa,
-                        "tanggal": tanggal_display,
-                        "status": self._to_display_status(raw_status),
-                        "catatan": catatan or "-",
-                        "month_key": month_key,
-                    }
-                )
-
-            logger.info(f"Loaded {len(applications)} application(s) from database")
-            return applications
-        except Exception as e:
-            logger.error(f"Error fetching applications: {e}")
-            return []
+        logger.info(f"Loaded {len(applications)} application(s) from service")
+        return applications
 
     def _get_status_counts(self) -> Dict[str, int]:
         """Ringkas jumlah lamaran per status untuk UI analytics."""
-        counts = Counter(app["status"] for app in self.applications)
         return {
-            "Pending": counts.get("Pending", 0),
-            "Diterima": counts.get("Diterima", 0),
-            "Ditolak": counts.get("Ditolak", 0),
+            label: int(self._status_counts.get(label, 0))
+            for label in APPLICATION_STATUS_ORDER
         }
 
     def _get_month_counts(self) -> Dict[str, int]:
         """Ringkas jumlah lamaran per bulan (format YYYY-MM)."""
-        month_counter = Counter(
-            app["month_key"]
-            for app in self.applications
-            if app.get("month_key")
-        )
-        return dict(sorted(month_counter.items()))
+        return dict(sorted(self._month_counts.items()))
     
     def init_ui(self):
         """Initialize Tracker Tab UI."""
@@ -359,10 +288,14 @@ class TrackerTab(QWidget):
         legend_layout = QHBoxLayout()
         legend_layout.setSpacing(16)
 
+        legend_color_map = {
+            "Pending": CHART_COLORS["blue"],
+            "Diterima": CHART_COLORS["success"],
+            "Ditolak": CHART_COLORS["error"],
+        }
         legend_items = [
-            ("Pending", CHART_COLORS["blue"]),
-            ("Diterima", CHART_COLORS["success"]),
-            ("Ditolak", CHART_COLORS["error"]),
+            (label, legend_color_map[label])
+            for label in APPLICATION_STATUS_ORDER
         ]
 
         for idx, (label, color) in enumerate(legend_items):
@@ -468,9 +401,14 @@ class TrackerTab(QWidget):
         ax = figure.add_subplot(111)
 
         status_counts = self._get_status_counts()
-        sizes = [status_counts["Pending"], status_counts["Diterima"], status_counts["Ditolak"]]
-        labels = ["Pending", "Diterima", "Ditolak"]
-        colors = [CHART_COLORS["blue"], CHART_COLORS["success"], CHART_COLORS["error"]]
+        labels = list(APPLICATION_STATUS_ORDER)
+        sizes = [status_counts[label] for label in labels]
+        color_map = {
+            "Pending": CHART_COLORS["blue"],
+            "Diterima": CHART_COLORS["success"],
+            "Ditolak": CHART_COLORS["error"],
+        }
+        colors = [color_map[label] for label in labels]
         total = sum(sizes)
 
         if total > 0:

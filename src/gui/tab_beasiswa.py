@@ -19,7 +19,8 @@ from PyQt6.QtGui import QFont, QIcon, QColor
 
 from src.gui.design_tokens import *
 from src.gui.styles import get_button_solid_stylesheet, get_input_field_stylesheet
-from src.database.crud import get_connection
+from src.services.beasiswa_service import get_beasiswa_table_data
+from src.services.status_utils import SCHOLARSHIP_STATUS_ORDER
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -109,11 +110,11 @@ class BeasiswaTab(QWidget):
         
         # Filter dropdown 1 - Status
         status_label = QLabel("Status")
-        status_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SMALL))
+        status_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
         status_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
         
         self.status_filter = QComboBox()
-        self.status_filter.addItems(["Semua", "Buka", "Segera Tutup", "Tutup"])
+        self.status_filter.addItems(["Semua", *SCHOLARSHIP_STATUS_ORDER])
         self.status_filter.setMinimumHeight(40)
         self.status_filter.setMaximumWidth(150)
         self.status_filter.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
@@ -137,7 +138,7 @@ class BeasiswaTab(QWidget):
         
         # Filter dropdown 2 - Jenjang
         jenjang_label = QLabel("Jenjang")
-        jenjang_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SMALL))
+        jenjang_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
         jenjang_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
         
         self.jenjang_filter = QComboBox()
@@ -401,34 +402,10 @@ class BeasiswaTab(QWidget):
     def load_beasiswa_data(self):
         """Load beasiswa data dari database."""
         try:
-            conn = get_connection()
-            cursor = conn.cursor()
-            
-            # Query semua beasiswa dari database dengan join penyelenggara
-            cursor.execute("""
-                SELECT b.id, b.judul, p.nama, b.jenjang, b.deadline, b.status 
-                FROM beasiswa b
-                LEFT JOIN penyelenggara p ON b.penyelenggara_id = p.id
-                ORDER BY b.deadline ASC
-            """)
-            
-            rows = cursor.fetchall()
-            self.beasiswa_data = [
-                {
-                    "id": row[0],
-                    "nama": row[1],
-                    "penyelenggara": row[2] or "Tidak Ada",
-                    "jenjang": row[3] or "-",
-                    "deadline": row[4],
-                    "status": row[5] or "Buka"
-                }
-                for row in rows
-            ]
+            self.beasiswa_data = get_beasiswa_table_data()
             
             logger.info(f"Loaded {len(self.beasiswa_data)} beasiswa")
             self.populate_table(self.beasiswa_data)
-
-            # Connection lifecycle is managed by DatabaseManager singleton.
         except Exception as e:
             logger.error(f"Error loading beasiswa data: {e}")
     
@@ -498,9 +475,6 @@ class BeasiswaTab(QWidget):
     
     def filter_by_deadline(self):
         """Filter beasiswa yang deadline-nya dekat (dalam 7 hari)."""
-        from datetime import datetime, timedelta
-        
-        today = datetime.now().date()
         deadline_soon = [
             item for item in self.beasiswa_data
             if item["status"] != "Tutup"  # Only open/closing soon

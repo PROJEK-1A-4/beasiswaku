@@ -5,7 +5,6 @@ Real-time visualization of scholarship data dengan 3 main charts
 
 import logging
 from typing import Optional, Dict, List, Any
-from datetime import datetime
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
@@ -21,7 +20,8 @@ import numpy as np
 
 from src.gui.design_tokens import *
 from src.gui.styles import get_button_solid_stylesheet
-from src.database.crud import get_connection
+from src.services.dashboard_service import get_statistik_snapshot
+from src.services.status_utils import SCHOLARSHIP_STATUS_ORDER
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -94,30 +94,19 @@ class StatistikTab(QWidget):
 
     def _get_status_count_map(self) -> Dict[str, int]:
         """Convert status rows into a normalized dictionary."""
-        status_map = {"Buka": 0, "Segera Tutup": 0, "Tutup": 0}
-        for row in self.stat_data.get("status", []):
-            if hasattr(row, "keys"):
-                key = row["status"]
-                count = row["count"]
-            else:
-                key = row[0]
-                count = row[1]
-            status_map[key] = int(count)
+        status_map = {label: 0 for label in SCHOLARSHIP_STATUS_ORDER}
+        for key, count in self.stat_data.get("status_counts", {}).items():
+            if key in status_map:
+                status_map[key] = int(count or 0)
         return status_map
 
     def _get_jenjang_count_map(self) -> Dict[str, int]:
         """Convert jenjang rows into dictionary."""
-        jenjang_map: Dict[str, int] = {}
-        for row in self.stat_data.get("jenjang", []):
-            if hasattr(row, "keys"):
-                key = row["jenjang"]
-                count = row["count"]
-            else:
-                key = row[0]
-                count = row[1]
-            if key:
-                jenjang_map[str(key)] = int(count)
-        return jenjang_map
+        return {
+            str(key): int(value)
+            for key, value in self.stat_data.get("jenjang_counts", {}).items()
+            if key
+        }
     
     def init_ui(self):
         """Initialize Statistik Tab UI dengan scroll area."""
@@ -482,19 +471,15 @@ class StatistikTab(QWidget):
         ax = figure.add_subplot(111)
 
         # Data dari database
-        penyelenggara_rows = self.stat_data.get("penyelenggara", [])
+        penyelenggara_rows = self.stat_data.get("penyelenggara_counts", [])
         penyelenggara = []
         values = []
 
         for row in penyelenggara_rows:
-            if hasattr(row, "keys"):
-                nama = row["nama_penyelenggara"]
-                count = row["count"]
-            else:
-                nama = row[0]
-                count = row[1]
+            nama = row.get("nama_penyelenggara")
+            count = row.get("count")
             penyelenggara.append(str(nama) if nama else "(Tidak Ada)")
-            values.append(int(count))
+            values.append(int(count or 0))
 
         if not penyelenggara:
             penyelenggara = ["Belum Ada Data"]
@@ -540,54 +525,8 @@ class StatistikTab(QWidget):
     def load_statistics(self):
         """Load statistics data dari database."""
         try:
-            conn = get_connection()
-            cursor = conn.cursor()
-            
-            # Query 1: Total beasiswa
-            cursor.execute("SELECT COUNT(*) as total FROM beasiswa")
-            total = cursor.fetchone()[0]
-            logger.info(f"Total beasiswa: {total}")
-            
-            # Query 2: Beasiswa by status
-            cursor.execute("""
-                SELECT status, COUNT(*) as count 
-                FROM beasiswa 
-                GROUP BY status
-            """)
-            status_data = cursor.fetchall()
-            logger.info(f"Status distribution: {status_data}")
-            
-            # Query 3: Beasiswa by jenjang
-            cursor.execute("""
-                SELECT jenjang, COUNT(*) as count 
-                FROM beasiswa 
-                GROUP BY jenjang
-                ORDER BY count DESC
-            """)
-            jenjang_data = cursor.fetchall()
-            logger.info(f"Jenjang distribution: {jenjang_data}")
-            
-            # Query 4: Top penyelenggara
-            cursor.execute("""
-                SELECT
-                    COALESCE(p.nama, '(Tidak Ada)') as nama_penyelenggara,
-                    COUNT(*) as count
-                FROM beasiswa b
-                LEFT JOIN penyelenggara p ON b.penyelenggara_id = p.id
-                GROUP BY b.penyelenggara_id, p.nama
-                ORDER BY count DESC
-                LIMIT 5
-            """)
-            penyelenggara_data = cursor.fetchall()
-            logger.info(f"Top penyelenggara: {penyelenggara_data}")
-            
-            self.stat_data = {
-                'total': total,
-                'status': status_data,
-                'jenjang': jenjang_data,
-                'penyelenggara': penyelenggara_data
-            }
-            cursor.close()
+            self.stat_data = get_statistik_snapshot(top_limit=5)
+            logger.info("Loaded statistik snapshot from service layer")
             
         except Exception as e:
             logger.error(f"Error loading statistics: {e}")
