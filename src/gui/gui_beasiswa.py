@@ -32,7 +32,7 @@ from src.database.crud import (
     delete_beasiswa, get_connection
 )
 from src.gui.design_tokens import *
-from src.gui.styles import get_stylesheet, get_button_solid_stylesheet, get_button_outlined_stylesheet, get_button_icon_stylesheet
+from src.gui.styles import get_stylesheet, get_button_solid_stylesheet, get_button_outlined_stylesheet, get_button_icon_stylesheet, get_dialog_stylesheet
 from src.gui.components import AlertBanner, StatusBadge, create_alert, create_status_badge
 
 # Setup logging
@@ -66,7 +66,7 @@ class BeasiswaTab(QWidget):
       * Statuses: pending, approved, rejected, draft, open, closing-soon, closed
       * Pill-shaped with emoji support
     
-    UI Enhancements (Tasks 1-9):
+    UI Enhancements (Tasks 1-10):
     - Task 1: Design tokens system (colors, typography, spacing)
     - Task 2: Navy + Orange color scheme applied throughout
     - Task 3: AlertBanner for success/error messages
@@ -83,6 +83,12 @@ class BeasiswaTab(QWidget):
       * Resets filters and shows complete beasiswa list
       * Encourages user exploration
       * One-click action to clear search/filters
+    - Task 10: Dialog styling updates for Navy + Orange scheme
+      * Applied get_dialog_stylesheet() to all 4 dialogs
+      * Proper padding (20px margins) and consistent spacing
+      * Navy labels with medium weight
+      * Rounded input fields with focus borders
+      * Improved visual hierarchy and form clarity
     """
     
     # Signal untuk refresh data
@@ -1961,15 +1967,22 @@ class AddBeasiswaDialog(QDialog):
         self.init_ui()
     
     def init_ui(self):
-        """Initialize Add Beasiswa Dialog UI with form fields"""
+        """Initialize Add Beasiswa Dialog UI with form fields (Task 10: Dialog styling)"""
         self.setWindowTitle("➕ Tambah Beasiswa Baru")
         self.setGeometry(200, 200, 700, 850)
         self.setModal(True)
         
+        # Apply dialog stylesheet (Task 10)
+        self.setStyleSheet(get_dialog_stylesheet())
+        
         layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 20)  # Task 10: Proper padding
+        layout.setSpacing(10)  # Task 10: Consistent spacing
         
         # ===== REQUIRED FIELDS SECTION =====
         form_layout = QFormLayout()
+        form_layout.setRowWrapPolicy(QFormLayout.RowWrapPolicy.DontWrapRows)
+        form_layout.setSpacing(12)  # Task 10: Better spacing between fields
         
         # Field 1: Judul Beasiswa (required)
         self.entry_judul = QLineEdit()
@@ -2134,16 +2147,23 @@ class EditBeasiswaDialog(QDialog):
         self.init_ui()
     
     def init_ui(self):
-        """Initialize Edit Beasiswa Dialog UI with pre-filled data"""
+        """Initialize Edit Beasiswa Dialog UI with pre-filled data (Task 10: Dialog styling)"""
         judul = self.beasiswa_data.get('judul', 'Beasiswa')
         self.setWindowTitle(f"✏️ Edit - {judul}")
         self.setGeometry(200, 200, 700, 850)
         self.setModal(True)
         
+        # Apply dialog stylesheet (Task 10)
+        self.setStyleSheet(get_dialog_stylesheet())
+        
         layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 20)  # Task 10: Proper padding
+        layout.setSpacing(10)  # Task 10: Consistent spacing
         
         # ===== REQUIRED FIELDS SECTION =====
         form_layout = QFormLayout()
+        form_layout.setRowWrapPolicy(QFormLayout.RowWrapPolicy.DontWrapRows)
+        form_layout.setSpacing(12)  # Task 10: Better spacing between fields
         
         # Field 1: Judul Beasiswa (required) - Pre-filled
         self.entry_judul = QLineEdit()
@@ -2317,12 +2337,16 @@ class DeleteConfirmationDialog(QDialog):
         self.init_ui()
     
     def init_ui(self):
-        """Initialize Delete Confirmation Dialog UI"""
+        """Initialize Delete Confirmation Dialog UI (Task 10: Dialog styling)"""
         self.setWindowTitle("⚠️ Konfirmasi Hapus")
         self.setGeometry(300, 300, 500, 250)
         self.setModal(True)
         
+        # Apply dialog stylesheet (Task 10)
+        self.setStyleSheet(get_dialog_stylesheet())
+        
         layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 20)  # Task 10: Proper padding
         layout.setSpacing(15)
         
         # ===== WARNING ICON & MESSAGE =====
@@ -2387,15 +2411,18 @@ class BeasiswaDetailDialog(QDialog):
         self.init_ui()
     
     def init_ui(self):
-        """Initialize Beasiswa Detail Dialog UI dengan semua informasi beasiswa"""
+        """Initialize Beasiswa Detail Dialog UI dengan semua informasi beasiswa (Task 10: Dialog styling)"""
         judul = self.beasiswa_data.get('judul', 'Beasiswa')
         self.setWindowTitle(f"📚 Detail Beasiswa - {judul}")
         self.setGeometry(150, 150, 850, 750)
         self.setModal(True)
         
+        # Apply dialog stylesheet (Task 10)
+        self.setStyleSheet(get_dialog_stylesheet())
+        
         # Main layout
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setContentsMargins(20, 20, 20, 20)  # Task 10: Proper padding
         main_layout.setSpacing(10)
         
         # ===== TITLE SECTION =====

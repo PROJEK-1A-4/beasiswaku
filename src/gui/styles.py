@@ -642,3 +642,90 @@ def get_button_icon_stylesheet(color="navy", has_border=True):
         border: {BORDER_WIDTH_SM} solid {COLOR_GRAY_300};
     }}
     """
+
+
+# ==================== TASK 10: DIALOG STYLING ====================
+
+def get_dialog_stylesheet():
+    """
+    Returns stylesheet for dialog windows and forms (Task 10).
+    
+    Applies consistent Navy + Orange styling to:
+    - Dialog backgrounds
+    - Form labels (Navy text, bold)
+    - Input fields (QLineEdit, QTextEdit, QComboBox)
+    - Dialog borders and spacing
+    
+    Usage:
+        dialog = MyDialog()
+        dialog.setStyleSheet(get_dialog_stylesheet())
+    """
+    
+    stylesheet = f"""
+    /* Dialog container */
+    QDialog {{
+        background-color: {COLOR_WHITE};
+        border: {BORDER_WIDTH_SM} solid {COLOR_GRAY_200};
+    }}
+    
+    /* Dialog field labels (form layout) */
+    QLabel {{
+        color: {COLOR_NAVY};
+        font-weight: {FONT_WEIGHT_MEDIUM};
+        font-size: {FONT_SIZE_BASE}px;
+    }}
+    
+    /* Input fields in dialogs */
+    QDialog QLineEdit, QDialog QTextEdit {{
+        background-color: {COLOR_WHITE};
+        border: {BORDER_WIDTH_SM} solid {COLOR_GRAY_300};
+        border-radius: {BORDER_RADIUS_MD};
+        padding: 8px 12px;
+        font-size: {FONT_SIZE_BASE}px;
+        color: {COLOR_GRAY_900};
+    }}
+    
+    QDialog QLineEdit:focus, QDialog QTextEdit:focus {{
+        border: 2px solid {COLOR_NAVY};
+        outline: none;
+    }}
+    
+    QDialog QLineEdit:hover, QDialog QTextEdit:hover {{
+        border: {BORDER_WIDTH_SM} solid {COLOR_NAVY};
+        background-color: {COLOR_GRAY_50};
+    }}
+    
+    /* Combo boxes in dialogs */
+    QDialog QComboBox {{
+        background-color: {COLOR_WHITE};
+        border: {BORDER_WIDTH_SM} solid {COLOR_GRAY_300};
+        border-radius: {BORDER_RADIUS_MD};
+        padding: 8px 12px;
+        font-size: {FONT_SIZE_BASE}px;
+        color: {COLOR_GRAY_900};
+    }}
+    
+    QDialog QComboBox:focus {{
+        border: 2px solid {COLOR_NAVY};
+        outline: none;
+    }}
+    
+    QDialog QComboBox:hover {{
+        border: {BORDER_WIDTH_SM} solid {COLOR_NAVY};
+        background-color: {COLOR_GRAY_50};
+    }}
+    
+    QDialog QComboBox::drop-down {{
+        border: none;
+        background-color: transparent;
+    }}
+    
+    QDialog QComboBox QAbstractItemView {{
+        background-color: {COLOR_WHITE};
+        selection-background-color: {COLOR_NAVY};
+        color: {COLOR_GRAY_900};
+        border: {BORDER_WIDTH_SM} solid {COLOR_GRAY_200};
+    }}
+    """
+    
+    return stylesheet
