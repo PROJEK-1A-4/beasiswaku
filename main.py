@@ -299,6 +299,41 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"BeasiswaKu - {self.username}")
         self.setGeometry(0, 0, 1200, 700)
         self.center_window()
+        self.setStyleSheet("""
+            QMainWindow {
+                background: #f5f7fb;
+            }
+            QWidget {
+                font-family: Arial;
+            }
+            QTabWidget::pane {
+                border: 1px solid #d7dee8;
+                background: white;
+                top: -1px;
+            }
+            QTabBar::tab {
+                background: #e9eef5;
+                color: #2b2b2b;
+                padding: 8px 14px;
+                margin-right: 4px;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
+            }
+            QTabBar::tab:selected {
+                background: white;
+                border: 1px solid #d7dee8;
+                border-bottom-color: white;
+            }
+            QPushButton {
+                padding: 7px 12px;
+                border-radius: 6px;
+                border: 1px solid #c7d0db;
+                background: #ffffff;
+            }
+            QPushButton:hover {
+                background: #f0f4f8;
+            }
+        """)
         
         # Central widget
         central_widget = QWidget()
@@ -306,13 +341,17 @@ class MainWindow(QMainWindow):
         
         # Main layout
         layout = QVBoxLayout()
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
         
         # ===== TOP BAR =====
         top_bar_layout = QHBoxLayout()
+        top_bar_layout.setContentsMargins(4, 4, 4, 4)
         
         # App logo/title
         app_title = QLabel("🎓 BeasiswaKu - Personal Scholarship Manager")
-        app_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        app_title.setFont(QFont("Arial", 13, QFont.Weight.Bold))
+        app_title.setStyleSheet("color: #203040;")
         top_bar_layout.addWidget(app_title)
         
         # Spacer
@@ -321,18 +360,20 @@ class MainWindow(QMainWindow):
         # User info
         user_label = QLabel(f"👤 {self.username}")
         user_label.setFont(QFont("Arial", 10))
+        user_label.setStyleSheet("color: #4c5a6b;")
         top_bar_layout.addWidget(user_label)
         
         # Settings button (placeholder)
         settings_btn = QPushButton("⚙️ Pengaturan")
         settings_btn.setMaximumWidth(120)
+        settings_btn.setStyleSheet("background: #ffffff; color: #203040;")
         settings_btn.clicked.connect(self.open_settings)
         top_bar_layout.addWidget(settings_btn)
         
         # Logout button
         logout_btn = QPushButton("🚪 Logout")
         logout_btn.setMaximumWidth(100)
-        logout_btn.setStyleSheet("background-color: #f44336; color: white;")
+        logout_btn.setStyleSheet("background-color: #f44336; color: white; border: 1px solid #d32f2f;")
         logout_btn.clicked.connect(self.handle_logout)
         top_bar_layout.addWidget(logout_btn)
         
@@ -352,6 +393,8 @@ class MainWindow(QMainWindow):
         # Tab 3: Statistik
         self.statistik_tab = StatistikTab(self.user_id)
         self.tabs.addTab(self.statistik_tab, "📊 Statistik")
+        self.tabs.setDocumentMode(True)
+        self.tabs.setStyleSheet("QTabBar::tab { min-width: 110px; }")
         
         layout.addWidget(self.tabs)
         
