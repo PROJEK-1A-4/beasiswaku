@@ -214,3 +214,44 @@ def create_pie_chart_status_ketersediaan(
         ax.axis("equal")
         fig.tight_layout()
         return fig, ax
+
+def create_pie_chart_status_lamaran(
+        data: Dict[str, int],
+        title: str = "Distribusi Status Lamaran",
+    ) -> Tuple[plt.Figure, plt.Axes]:
+        """
+        Membuat pie chart status lamaran user.
+
+        Input:
+        - data: dict, contoh {"Pending": 4, "Submitted": 2, "Accepted": 1}
+
+        Return:
+        - (figure, axes)
+
+        Alasan chart ini:
+        - Menjelaskan progres lamaran user secara cepat dalam bentuk proporsi.
+        """
+        fig, ax = plt.subplots(figsize=(6.5, 6.5))
+
+        if not data:
+            _render_empty_state(ax, title)
+            fig.tight_layout()
+            return fig, ax
+
+        labels = list(data.keys())
+        values = [int(v) for v in data.values()]
+        colors = [COLOR_PALETTE.get(label, "#90A4AE") for label in labels]
+
+        ax.pie(
+            values,
+            labels=labels,
+            colors=colors,
+            autopct="%1.1f%%",
+            startangle=90,
+            wedgeprops={"edgecolor": "white", "linewidth": 1.0},
+            textprops={"fontsize": 10},
+        )
+        ax.set_title(title)
+        ax.axis("equal")
+        fig.tight_layout()
+        return fig, ax
