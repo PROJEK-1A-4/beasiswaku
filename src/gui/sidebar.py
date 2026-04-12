@@ -124,16 +124,14 @@ class Sidebar(QWidget):
     
     def init_ui(self):
         """Initialize sidebar UI."""
-        self.setObjectName("sidebarRoot")
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
         # ===== HEADER SECTION =====
         header_frame = QFrame()
-        header_frame.setObjectName("sidebarHeader")
         header_frame.setStyleSheet(f"""
-            QFrame#sidebarHeader {{
+            QFrame {{
                 background-color: qlineargradient(
                     x1:0, y1:0, x2:1, y2:0,
                     stop:0 {COLOR_COBALT_DARK}, stop:1 {COLOR_COBALT}
@@ -141,45 +139,35 @@ class Sidebar(QWidget):
                 border-bottom: 1px solid #0b2a53;
             }}
         """)
-        header_frame.setMinimumHeight(94)
-        header_frame.setMaximumHeight(94)
+        header_frame.setMinimumHeight(86)
+        header_frame.setMaximumHeight(86)
         
         header_layout = QVBoxLayout(header_frame)
-        header_layout.setContentsMargins(14, 10, 14, 10)
-        header_layout.setSpacing(2)
+        header_layout.setContentsMargins(16, 12, 16, 10)
+        header_layout.setSpacing(4)
         
         # Logo
         logo_label = QLabel("🎓 BeasiswaKu")
-        logo_label.setObjectName("sidebarLogo")
         logo_font = QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_XL)
         logo_font.setWeight(QFont.Weight.Bold)
         logo_label.setFont(logo_font)
-        logo_label.setStyleSheet(f"color: {COLOR_WHITE}; letter-spacing: 0.2px;")
+        logo_label.setStyleSheet(f"color: {COLOR_WHITE};")
         header_layout.addWidget(logo_label)
         
         # Tagline
         tagline_label = QLabel("Discover • Track • Apply")
-        tagline_label.setObjectName("sidebarTagline")
         tagline_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_XS))
         tagline_label.setStyleSheet(f"color: #c9d8f0;")
         header_layout.addWidget(tagline_label)
 
-        badge_row = QHBoxLayout()
-        badge_row.setContentsMargins(0, 4, 0, 0)
-        badge_row.setSpacing(0)
         edition_badge = QLabel("Desktop Edition")
-        edition_badge.setObjectName("editionBadge")
         edition_badge.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_XS))
         edition_badge.setStyleSheet(
             f"background-color: {COLOR_AMBER}; color: #3a2a00; "
-            "padding: 2px 10px; border-radius: 9px; font-weight: 700;"
+            "padding: 1px 8px; border-radius: 7px; font-weight: 600;"
         )
         edition_badge.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        edition_badge.setFixedHeight(18)
-        edition_badge.setMaximumWidth(108)
-        badge_row.addWidget(edition_badge, alignment=Qt.AlignmentFlag.AlignLeft)
-        badge_row.addStretch()
-        header_layout.addLayout(badge_row)
+        header_layout.addWidget(edition_badge)
         
         main_layout.addWidget(header_frame)
         
@@ -296,7 +284,7 @@ class Sidebar(QWidget):
         
         # Apply main stylesheet
         self.setStyleSheet(f"""
-            QWidget#sidebarRoot {{
+            QWidget {{
                 background-color: {COLOR_SURFACE_SOFT};
                 border-right: 1px solid #d9e2f0;
             }}
