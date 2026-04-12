@@ -154,3 +154,112 @@ def create_bar_chart_lamaran_per_bulan(user_id: int) -> FigureCanvas:
     except Exception as e:
         logger.error(f"❌ Error generating bar chart lamaran: {e}")
         return create_empty_canvas("Gagal memuat grafik")
+    
+# ============================================================================
+# CHARTS UNTUK TAB STATISTIK
+# ============================================================================
+
+def create_bar_chart_jenjang() -> FigureCanvas:
+    """
+    Bar chart: Jumlah beasiswa berdasarkan jenjang pendidikan (D3, D4, S1, S2).
+    """
+    try:
+        data_jenjang = get_beasiswa_per_jenjang()
+        
+        if not data_jenjang:
+            return create_empty_canvas("Data beasiswa kosong")
+
+        labels = list(data_jenjang.keys())
+        counts = list(data_jenjang.values())
+
+        fig = Figure(figsize=(6, 4), dpi=100)
+        ax = fig.add_subplot(111)
+        
+        bars = ax.bar(labels, counts, color=['#9C27B0', '#673AB7', '#3F51B5', '#009688'])
+        
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height,
+                    f'{int(height)}',
+                    ha='center', va='bottom')
+
+        ax.set_title('Distribusi Beasiswa per Jenjang', fontsize=12, pad=15, fontweight='bold')
+        ax.set_ylabel('Jumlah Ketersediaan')
+        fig.tight_layout()
+
+        return FigureCanvas(fig)
+
+    except Exception as e:
+        logger.error(f"❌ Error generating chart jenjang: {e}")
+        return create_empty_canvas("Gagal memuat grafik")
+
+
+def create_bar_chart_top_penyelenggara(limit: int = 5) -> FigureCanvas:
+    """
+    Horizontal bar chart: Top N penyelenggara beasiswa terbanyak.
+    """
+    try:
+        top_orgs = get_top_penyelenggara(limit=limit)
+        
+        if not top_orgs:
+            return create_empty_canvas("Data penyelenggara kosong")
+
+        # Data datang terurut desc, kita reverse agar yang paling besar ada di paling atas (horizontal bar)
+        top_orgs.reverse()
+        
+        labels = [org['nama_penyelenggara'][:20] + ('...' if len(org['nama_penyelenggara']) > 20 else '') for org in top_orgs]
+        counts = [org['total_beasiswa'] for org in top_orgs]
+
+        fig = Figure(figsize=(6, 4), dpi=100)
+        ax = fig.add_subplot(111)
+        
+        bars = ax.barh(labels, counts, color='#00BCD4')
+        
+        for bar in bars:
+            width = bar.get_width()
+            ax.text(width, bar.get_y() + bar.get_height()/2.,
+                    f' {int(width)}',
+                    ha='left', va='center')
+
+        ax.set_title(f'Top {limit} Penyelenggara Beasiswa', fontsize=12, pad=15, fontweight='bold')
+        ax.set_xlabel('Jumlah Beasiswa')
+        fig.tight_layout()
+
+        return FigureCanvas(fig)
+
+    except Exception as e:
+        logger.error(f"❌ Error generating chart top penyelenggara: {e}")
+        return create_empty_canvas("Gagal memuat grafik")
+
+
+def create_pie_chart_status() -> FigureCanvas:
+    """
+    Pie chart: Proporsi ketersediaan (Buka / Segera Tutup / Tutup).
+    """
+    try:
+        data_status = get_status_availability()
+        
+        if not data_status:
+            return create_empty_canvas("Data beasiswa kosong")
+
+        labels = list(data_status.keys())
+        sizes = list(data_status.values())
+        colors = [COLOR_PALETTE.get(status, '#CCCCCC') for status in labels]
+
+        fig = Figure(figsize=(5, 4), dpi=100)
+        ax = fig.add_subplot(111)
+        
+        ax.pie(
+            sizes, labels=labels, colors=colors, 
+            autopct='%1.1f%%', startangle=140,
+            wedgeprops={'edgecolor': 'white', 'linewidth': 1}
+        )
+        
+        ax.set_title('Status Ketersediaan Beasiswa', fontsize=12, pad=15, fontweight='bold')
+        fig.tight_layout()
+
+        return FigureCanvas(fig)
+
+    except Exception as e:
+        logger.error(f"❌ Error generating chart status ketersediaan: {e}")
+        return create_empty_canvas("Gagal memuat grafik")
