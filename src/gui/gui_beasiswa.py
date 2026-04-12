@@ -33,6 +33,7 @@ from src.database.crud import (
 )
 from src.gui.design_tokens import *
 from src.gui.styles import get_stylesheet
+from src.gui.components import AlertBanner
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -86,6 +87,9 @@ class BeasiswaTab(QWidget):
         self.btn_refresh: Optional[QPushButton] = None
         self.btn_export_csv: Optional[QPushButton] = None
         
+        # Alert banner
+        self.alert_banner: Optional[AlertBanner] = None
+        
         # Initialize UI
         self.init_ui()
         
@@ -124,6 +128,18 @@ class BeasiswaTab(QWidget):
         if top_bar_layout:
             main_layout.addLayout(top_bar_layout)
             main_layout.addSpacing(5)
+        
+        # ===== SECTION 1.5: ALERT BANNER (Task 3) =====
+        # Alert banner untuk info, success, warning, error messages
+        self.alert_banner = AlertBanner(
+            alert_type='info',
+            message='🔄 Memuat data beasiswa...',
+            closable=True
+        )
+        self.alert_banner.closed.connect(self._on_alert_closed)
+        self.alert_banner.hide()  # Hidden by default, show ketika perlu
+        main_layout.addWidget(self.alert_banner)
+        main_layout.addSpacing(5)
         
         # ===== SECTION 2: FILTER SECTION (Tasks 5-7, 15) =====
         # Filter by jenjang and status
@@ -587,6 +603,53 @@ class BeasiswaTab(QWidget):
         return selected_rows[0].row()
     
     # =====================================================================
+    # SECTION 1.5: ALERT BANNER HELPERS (Task 3)
+    # =====================================================================
+    
+    def show_alert(self, alert_type: str, message: str, auto_close: bool = False, duration: int = 3000):
+        """
+        Tampilkan alert banner dengan pesan tertentu (Task 3).
+        
+        Args:
+            alert_type (str): 'info', 'success', 'warning', 'error'
+            message (str): Pesan yang akan ditampilkan
+            auto_close (bool): Apakah alert akan ditutup otomatis
+            duration (int): Durasi dalam milliseconds sebelum auto close (default: 3000ms)
+        """
+        if not self.alert_banner:
+            return
+        
+        # Update banner dengan type dan message baru
+        self.alert_banner.alert_type = alert_type
+        self.alert_banner.message = message
+        
+        # Recreate UI dengan warna yang sesuai
+        # Clear existing layout
+        while self.alert_banner.layout().count():
+            item = self.alert_banner.layout().takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        
+        # Rebuild UI dengan type baru
+        self.alert_banner.init_ui()
+        
+        # Show banner
+        self.alert_banner.show_alert()
+        
+        # Auto close jika diperlukan
+        if auto_close:
+            QTimer.singleShot(duration, lambda: self._close_alert_if_visible())
+    
+    def _close_alert_if_visible(self):
+        """Helper untuk menutup alert jika masih visible"""
+        if self.alert_banner and self.alert_banner.isVisible():
+            self.alert_banner.close_alert()
+    
+    def _on_alert_closed(self):
+        """Callback ketika alert banner ditutup"""
+        logger.debug("Alert banner closed by user")
+    
+    # =====================================================================
     # SECTION 2: DATA LOADING (Tasks 11-13)
     # =====================================================================
     
@@ -909,11 +972,12 @@ class BeasiswaTab(QWidget):
                     
                     logger.info(f"✅ Beasiswa berhasil ditambahkan: {form_data['judul']}")
                     
-                    # Show success message
-                    QMessageBox.information(
-                        self, 
-                        "Sukses", 
-                        f"✅ Beasiswa '{form_data['judul']}' berhasil ditambahkan!"
+                    # Show success alert (Task 3)
+                    self.show_alert(
+                        alert_type='success',
+                        message=f"✅ Beasiswa '{form_data['judul']}' berhasil ditambahkan!",
+                        auto_close=True,
+                        duration=4000
                     )
                     
                     # Refresh table with new data
@@ -922,12 +986,22 @@ class BeasiswaTab(QWidget):
                 except ValueError as ve:
                     # Validation error from get_form_data()
                     logger.error(f"❌ Form validation error: {ve}")
-                    QMessageBox.warning(self, "⚠️ Error", f"Input tidak valid:\n{str(ve)}")
+                    self.show_alert(
+                        alert_type='warning',
+                        message=f"⚠️ Input tidak valid: {str(ve)}",
+                        auto_close=True,
+                        duration=5000
+                    )
                     
                 except Exception as e:
                     # Database or other error
                     logger.error(f"❌ Error adding beasiswa: {e}")
-                    QMessageBox.critical(self, "❌ Error", f"Gagal menambahkan beasiswa:\n{str(e)}")
+                    self.show_alert(
+                        alert_type='error',
+                        message=f"❌ Gagal menambahkan beasiswa: {str(e)}",
+                        auto_close=True,
+                        duration=5000
+                    )
             else:
                 # User clicked Cancel
                 logger.info("AddBeasiswaDialog cancelled")
@@ -1108,11 +1182,12 @@ class BeasiswaTab(QWidget):
             
             logger.info(f"✅ Beasiswa berhasil dihapus (ID: {beasiswa_id})")
             
-            # Show success message
-            QMessageBox.information(
-                self, 
-                "Sukses", 
-                "✅ Beasiswa berhasil dihapus!"
+            # Show success alert (Task 3)
+            self.show_alert(
+                alert_type='success',
+                message='✅ Beasiswa berhasil dihapus!',
+                auto_close=True,
+                duration=4000
             )
             
             # Refresh table with updated data
@@ -1120,7 +1195,12 @@ class BeasiswaTab(QWidget):
             
         except Exception as e:
             logger.error(f"❌ Error deleting beasiswa: {e}")
-            QMessageBox.critical(self, "❌ Error", f"Gagal menghapus beasiswa:\n{str(e)}")
+            self.show_alert(
+                alert_type='error',
+                message=f"❌ Gagal menghapus beasiswa: {str(e)}",
+                auto_close=True,
+                duration=5000
+            )
     
     def refresh_after_crud(self):
         """
