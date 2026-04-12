@@ -59,14 +59,8 @@ def _apply_axis_style(ax) -> None:
 
 
 def _style_chart_title(ax, title: str) -> None:
-    """Membuat judul chart lebih menonjol dan aman dari clipping."""
-    ax.set_title(
-        title,
-        fontsize=13,
-        fontweight="bold",
-        color="#203040",
-        pad=16,
-    )
+    """Disimpan untuk kompatibilitas; judul ditampilkan di UI, bukan di dalam chart."""
+    return None
 
 def _render_empty_state(ax, title: str, message: str = "Data tidak tersedia") -> None:
     """
@@ -79,17 +73,11 @@ def _render_empty_state(ax, title: str, message: str = "Data tidak tersedia") ->
     _style_chart_title(ax, title)
     ax.set_facecolor("#f8fafc")
     ax.text(
-        0.5, 0.58, "📭",
-        ha="center", va="center",
-        fontsize=24,
-        transform=ax.transAxes
-    )
-    ax.text(
-        0.5, 0.42, message,
+        0.5, 0.50, message,
         ha="center", va="center",
         fontsize=11, color="#5f6b7a",
         bbox={
-            "boxstyle": "round,pad=0.45",
+            "boxstyle": "round,pad=0.35",
             "facecolor": "white",
             "edgecolor": "#d7dee8",
             "linewidth": 1.0,
@@ -147,8 +135,7 @@ def create_bar_chart_beasiswa_per_jenjang(
                 fontsize=10,
             )
 
-        fig.subplots_adjust(top=0.88, bottom=0.18)
-        fig.tight_layout()
+        fig.tight_layout(rect=[0, 0.02, 1, 0.92])
         return fig, ax
 
 def create_bar_chart_top_penyelenggara(
@@ -197,8 +184,7 @@ def create_bar_chart_top_penyelenggara(
                 fontsize=10,
             )
 
-        fig.subplots_adjust(top=0.88, bottom=0.18)
-        fig.tight_layout()
+        fig.tight_layout(rect=[0, 0.02, 1, 0.92])
         return fig, ax
 
 def create_pie_chart_status_ketersediaan(
@@ -239,8 +225,7 @@ def create_pie_chart_status_ketersediaan(
         )
         _style_chart_title(ax, title)
         ax.axis("equal")
-        fig.subplots_adjust(top=0.88, bottom=0.08)
-        fig.tight_layout()
+        fig.tight_layout(rect=[0, 0.02, 1, 0.92])
         return fig, ax
 
 def create_pie_chart_status_lamaran(
@@ -281,8 +266,7 @@ def create_pie_chart_status_lamaran(
         )
         _style_chart_title(ax, title)
         ax.axis("equal")
-        fig.subplots_adjust(top=0.88, bottom=0.08)
-        fig.tight_layout()
+        fig.tight_layout(rect=[0, 0.02, 1, 0.92])
         return fig, ax
 
 def create_bar_chart_lamaran_per_bulan(
@@ -328,8 +312,7 @@ def create_bar_chart_lamaran_per_bulan(
             )
 
         plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
-        fig.subplots_adjust(top=0.88, bottom=0.28)
-        fig.tight_layout()
+        fig.tight_layout(rect=[0, 0.02, 1, 0.90])
         return fig, ax
 
 def load_statistik_data() -> Tuple[Dict[str, int], List[Dict], Dict[str, int]]:
