@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTabWidget, QStatusBar,
     QMessageBox, QComboBox, QTableWidget, QHeaderView, QDialog,
-    QFormLayout, QTextEdit
+    QFormLayout, QTextEdit, QScrollArea
 )
 from PyQt6.QtCore import Qt, QSize, QTimer
 from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap
@@ -26,10 +26,41 @@ from PyQt6.QtCore import pyqtSignal
 from src.database.crud import (
     init_db, login_user, register_user, get_connection
 )
+from src.visualization.visualisasi import (
+    build_statistik_canvases,
+    build_tracker_canvases,
+)
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _create_chart_section(section_title: str, canvas, min_height: int) -> QWidget:
+    """Bungkus canvas chart dalam kartu dengan judul yang jelas."""
+    section = QWidget()
+    section.setStyleSheet("""
+        QWidget {
+            background: white;
+            border: 1px solid #d7dee8;
+            border-radius: 12px;
+        }
+    """)
+
+    section_layout = QVBoxLayout(section)
+    section_layout.setContentsMargins(16, 14, 16, 16)
+    section_layout.setSpacing(8)
+
+    heading = QLabel(section_title)
+    heading.setFont(QFont("Arial", 13, QFont.Weight.Bold))
+    heading.setStyleSheet("color: #203040;")
+    section_layout.addWidget(heading)
+
+    canvas.setMinimumHeight(min_height)
+    canvas.setStyleSheet("background: transparent;")
+    section_layout.addWidget(canvas)
+
+    return section
 
 # ==================== LOGIN WINDOW ====================
 
@@ -295,6 +326,41 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"BeasiswaKu - {self.username}")
         self.setGeometry(0, 0, 1200, 700)
         self.center_window()
+        self.setStyleSheet("""
+            QMainWindow {
+                background: #f5f7fb;
+            }
+            QWidget {
+                font-family: Arial;
+            }
+            QTabWidget::pane {
+                border: 1px solid #d7dee8;
+                background: white;
+                top: -1px;
+            }
+            QTabBar::tab {
+                background: #e9eef5;
+                color: #2b2b2b;
+                padding: 8px 14px;
+                margin-right: 4px;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
+            }
+            QTabBar::tab:selected {
+                background: white;
+                border: 1px solid #d7dee8;
+                border-bottom-color: white;
+            }
+            QPushButton {
+                padding: 7px 12px;
+                border-radius: 6px;
+                border: 1px solid #c7d0db;
+                background: #ffffff;
+            }
+            QPushButton:hover {
+                background: #f0f4f8;
+            }
+        """)
         
         # Central widget
         central_widget = QWidget()
@@ -302,13 +368,26 @@ class MainWindow(QMainWindow):
         
         # Main layout
         layout = QVBoxLayout()
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
         
         # ===== TOP BAR =====
-        top_bar_layout = QHBoxLayout()
+        header_bar = QWidget()
+        header_bar.setStyleSheet("""
+            QWidget {
+                background: white;
+                border: 1px solid #d7dee8;
+                border-radius: 12px;
+            }
+        """)
+        top_bar_layout = QHBoxLayout(header_bar)
+        top_bar_layout.setContentsMargins(16, 12, 16, 12)
+        top_bar_layout.setSpacing(10)
         
         # App logo/title
         app_title = QLabel("🎓 BeasiswaKu - Personal Scholarship Manager")
-        app_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        app_title.setFont(QFont("Arial", 13, QFont.Weight.Bold))
+        app_title.setStyleSheet("color: #203040;")
         top_bar_layout.addWidget(app_title)
         
         # Spacer
@@ -317,25 +396,29 @@ class MainWindow(QMainWindow):
         # User info
         user_label = QLabel(f"👤 {self.username}")
         user_label.setFont(QFont("Arial", 10))
+        user_label.setStyleSheet("color: #4c5a6b;")
         top_bar_layout.addWidget(user_label)
         
         # Settings button (placeholder)
         settings_btn = QPushButton("⚙️ Pengaturan")
         settings_btn.setMaximumWidth(120)
+        settings_btn.setStyleSheet("background: #ffffff; color: #203040;")
         settings_btn.clicked.connect(self.open_settings)
         top_bar_layout.addWidget(settings_btn)
         
         # Logout button
         logout_btn = QPushButton("🚪 Logout")
         logout_btn.setMaximumWidth(100)
-        logout_btn.setStyleSheet("background-color: #f44336; color: white;")
+        logout_btn.setStyleSheet("background-color: #f44336; color: white; border: 1px solid #d32f2f;")
         logout_btn.clicked.connect(self.handle_logout)
         top_bar_layout.addWidget(logout_btn)
         
-        layout.addLayout(top_bar_layout)
+        layout.addWidget(header_bar)
         
         # ===== TAB WIDGET =====
         self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)
+        self.tabs.setStyleSheet(self.tabs.styleSheet() + "QTabBar::tab { min-width: 110px; }")
         
         # Tab 1: Beasiswa
         self.beasiswa_tab = BeasiswaTab(self.user_id)
@@ -348,6 +431,8 @@ class MainWindow(QMainWindow):
         # Tab 3: Statistik
         self.statistik_tab = StatistikTab(self.user_id)
         self.tabs.addTab(self.statistik_tab, "📊 Statistik")
+        self.tabs.setDocumentMode(True)
+        self.tabs.setStyleSheet("QTabBar::tab { min-width: 110px; }")
         
         layout.addWidget(self.tabs)
         
@@ -398,20 +483,55 @@ class BeasiswaTab(QWidget):
     def init_ui(self):
         """Initialize beasiswa tab UI"""
         layout = QVBoxLayout()
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(0)
+
+        card = QWidget()
+        card.setStyleSheet("""
+            QWidget {
+                background: #ffffff;
+                border: 1px solid #d7dee8;
+                border-radius: 12px;
+            }
+        """)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(24, 24, 24, 24)
+        card_layout.setSpacing(12)
+
+        title = QLabel("📚 Daftar Beasiswa")
+        title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        title.setStyleSheet("color: #203040;")
+        card_layout.addWidget(title)
+
+        subtitle = QLabel("Area ini akan berisi daftar beasiswa, filter, dan aksi CRUD.")
+        subtitle.setFont(QFont("Arial", 10))
+        subtitle.setStyleSheet("color: #607080;")
+        card_layout.addWidget(subtitle)
         
         # Placeholder content
-        label = QLabel("📚 Daftar Beasiswa\n\n" + 
+        label = QLabel("" + 
                       "Fitur ini akan menampilkan:\n" +
                       "• Tabel beasiswa dengan filter & search\n" +
                       "• Highlight deadline (merah/kuning)\n" +
                       "• CRUD beasiswa (tambah, edit, hapus)\n" +
                       "• Export CSV\n" +
                       "• Refresh data")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         label.setFont(QFont("Arial", 11))
-        label.setStyleSheet("padding: 50px; background-color: #f0f0f0; border-radius: 5px;")
+        label.setStyleSheet("""
+            QLabel {
+                padding: 18px;
+                background: #f7f9fc;
+                color: #243447;
+                border: 1px dashed #c7d0db;
+                border-radius: 10px;
+                line-height: 1.5;
+            }
+        """)
         
-        layout.addWidget(label)
+        card_layout.addWidget(label)
+        card_layout.addStretch()
+        layout.addWidget(card)
         self.setLayout(layout)
 
 
@@ -426,19 +546,45 @@ class TrackerTab(QWidget):
     def init_ui(self):
         """Initialize tracker tab UI"""
         layout = QVBoxLayout()
-        
-        # Placeholder content
-        label = QLabel("📋 Tracker Lamaran\n\n" +
-                      "Fitur ini akan menampilkan:\n" +
-                      "• Tabel riwayat lamaran pribadi\n" +
-                      "• CRUD lamaran (tambah, edit, hapus)\n" +
-                      "• Pie chart proporsi status\n" +
-                      "• Bar chart lamaran per bulan")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setFont(QFont("Arial", 11))
-        label.setStyleSheet("padding: 50px; background-color: #f0f0f0; border-radius: 5px;")
-        
-        layout.addWidget(label)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(16)
+
+        title = QLabel("📋 Tracker Lamaran")
+        title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        content_layout.addWidget(title)
+
+        try:
+            tracker_canvases = build_tracker_canvases(self.user_id)
+            tracker_status_canvas = tracker_canvases["canvas_lamaran_status"]
+            tracker_month_canvas = tracker_canvases["canvas_lamaran_bulanan"]
+            content_layout.addWidget(
+                _create_chart_section("Distribusi Status Lamaran", tracker_status_canvas, 320)
+            )
+            content_layout.addWidget(
+                _create_chart_section("Jumlah Lamaran per Bulan", tracker_month_canvas, 320)
+            )
+        except Exception as e:
+            logger.error(f"❌ Gagal memuat chart tracker: {e}")
+            error_label = QLabel(
+                "Gagal memuat chart tracker.\n"
+                "Silakan cek data lamaran atau koneksi database."
+            )
+            error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            error_label.setFont(QFont("Arial", 11))
+            error_label.setStyleSheet("padding: 40px; background-color: #f8d7da; border-radius: 5px;")
+            content_layout.addWidget(error_label)
+
+        scroll_area.setWidget(content)
+        layout.addWidget(scroll_area)
+
         self.setLayout(layout)
 
 
@@ -453,19 +599,49 @@ class StatistikTab(QWidget):
     def init_ui(self):
         """Initialize statistik tab UI"""
         layout = QVBoxLayout()
-        
-        # Placeholder content
-        label = QLabel("📊 Statistik & Grafik\n\n" +
-                      "Fitur ini akan menampilkan:\n" +
-                      "• Bar chart beasiswa per jenjang\n" +
-                      "• Bar chart top 5 penyelenggara\n" +
-                      "• Pie chart status ketersediaan\n" +
-                      "• Filter dan customization grafik")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setFont(QFont("Arial", 11))
-        label.setStyleSheet("padding: 50px; background-color: #f0f0f0; border-radius: 5px;")
-        
-        layout.addWidget(label)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(16)
+
+        title = QLabel("📊 Statistik & Grafik")
+        title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        content_layout.addWidget(title)
+
+        try:
+            statistik_canvases = build_statistik_canvases()
+            canvas_jenjang = statistik_canvases["canvas_jenjang"]
+            canvas_penyelenggara = statistik_canvases["canvas_penyelenggara"]
+            canvas_status = statistik_canvases["canvas_status"]
+            content_layout.addWidget(
+                _create_chart_section("Jumlah Beasiswa per Jenjang", canvas_jenjang, 300)
+            )
+            content_layout.addWidget(
+                _create_chart_section("Top Penyelenggara Beasiswa", canvas_penyelenggara, 300)
+            )
+            content_layout.addWidget(
+                _create_chart_section("Status Ketersediaan Beasiswa", canvas_status, 300)
+            )
+        except Exception as e:
+            logger.error(f"❌ Gagal memuat chart statistik: {e}")
+            error_label = QLabel(
+                "Gagal memuat chart statistik.\n"
+                "Silakan cek data beasiswa atau koneksi database."
+            )
+            error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            error_label.setFont(QFont("Arial", 11))
+            error_label.setStyleSheet("padding: 40px; background-color: #f8d7da; border-radius: 5px;")
+            content_layout.addWidget(error_label)
+
+        scroll_area.setWidget(content)
+        layout.addWidget(scroll_area)
+
         self.setLayout(layout)
 
 
