@@ -26,6 +26,7 @@ from PyQt6.QtCore import pyqtSignal
 from src.database.crud import (
     init_db, login_user, register_user, get_connection
 )
+from src.gui.tab_beranda import BerandaTab
 from src.gui.gui_beasiswa import BeasiswaTab
 
 # Setup logging
@@ -337,6 +338,10 @@ class MainWindow(QMainWindow):
         
         # ===== TAB WIDGET =====
         self.tabs = QTabWidget()
+        
+        # Tab 0: Beranda (Home/Dashboard)
+        self.beranda_tab = BerandaTab(self.user_id, self.username)
+        self.tabs.addTab(self.beranda_tab, "🏠 Beranda")
         
         # Tab 1: Beasiswa
         self.beasiswa_tab = BeasiswaTab(self.user_id)

@@ -629,7 +629,7 @@ class BeasiswaTab(QWidget):
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         table.setSelectionModel(table.selectionModel())
-        table.setDefaultRowHeight(36)  # Increase row height untuk better readability dan spacing
+        table.verticalHeader().setDefaultSectionSize(36)  # Increase row height untuk better readability dan spacing
         
         # ===== ROW APPEARANCE =====
         table.setAlternatingRowColors(True)
