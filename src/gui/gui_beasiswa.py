@@ -141,12 +141,12 @@ class BeasiswaTab(QWidget):
         main_layout.addWidget(self.alert_banner)
         main_layout.addSpacing(5)
         
-        # ===== SECTION 2: FILTER SECTION (Tasks 5-7, 15) =====
-        # Filter by jenjang and status
+        # ===== SECTION 2: FILTER SECTION (Tasks 5-7, 15, updated Task 4) =====
+        # Filter by jenjang and status with modern styling
         filter_layout = self._create_filter_layout()
         if filter_layout:
             main_layout.addLayout(filter_layout)
-            main_layout.addSpacing(5)
+            main_layout.addSpacing(10)
         
         # ===== TASK 15: CONNECT FILTER DROPDOWN SIGNALS =====
         # Connect jenjang dropdown currentTextChanged to apply_filters
@@ -159,11 +159,50 @@ class BeasiswaTab(QWidget):
             self.combo_status.currentTextChanged.connect(self.apply_filters)
             logger.debug("✅ Status dropdown signal connected to apply_filters()")
         
+        # ===== SECTION 2.5: SEARCH SECTION (Task 7, updated Task 4) =====
+        # Real-time search with modern styling
+        search_layout = QHBoxLayout()
+        search_layout.setContentsMargins(0, 0, 0, 0)
+        search_layout.setSpacing(10)
+        
+        search_label = QLabel("🔎 Cari:")
+        search_label.setFont(QFont("Arial", 10))
+        search_label.setStyleSheet(f"color: {COLOR_GRAY_700}; font-weight: bold;")
+        search_layout.addWidget(search_label)
+        
+        self.entry_search = QLineEdit()
+        self.entry_search.setPlaceholderText("Ketik nama beasiswa, penyelenggara, atau deskripsi...")
+        self.entry_search.setMinimumHeight(36)
+        self.entry_search.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {COLOR_WHITE};
+                color: {COLOR_GRAY_900};
+                border: 1px solid {COLOR_GRAY_300};
+                border-radius: 6px;
+                padding: 8px 12px;
+                font-size: 11px;
+            }}
+            QLineEdit:hover {{
+                border: 1px solid {COLOR_NAVY};
+                background-color: {COLOR_GRAY_50};
+            }}
+            QLineEdit:focus {{
+                border: 2px solid {COLOR_NAVY};
+                outline: none;
+            }}
+            QLineEdit::placeholder {{
+                color: {COLOR_GRAY_400};
+            }}
+        """)
+        search_layout.addWidget(self.entry_search)
+        main_layout.addLayout(search_layout)
+        main_layout.addSpacing(10)
+        
         # ===== TASK 7: CONNECT SEARCH KEYRELEASE SIGNAL =====
         # Connect search entry KeyRelease event to apply filters
         if self.entry_search:
             self.entry_search.keyReleaseEvent = self._on_search_key_release
-            logger.debug("✅ Search entry KeyRelease signal connected to apply_filters()")        
+            logger.debug("✅ Search entry KeyRelease signal connected to apply_filters()")
         # ===== SECTION 3: TABLE WIDGET (Task 8) =====
         # Display beasiswa data in table format
         self.tbl_beasiswa = self._create_table_widget()
@@ -281,6 +320,121 @@ class BeasiswaTab(QWidget):
         logger.debug(f"Timestamp label updated: {timestamp_text}")
     
     def _create_filter_layout(self) -> QHBoxLayout:
+        """
+        Create filter section with modern styling (Task 4 - Redesign filter section).
+        
+        Features:
+        - Filter icon + label at the start
+        - Jenjang and Status dropdowns with Navy styling
+        - Rounded corners and hover/focus effects
+        - Better spacing and typography
+        - Search entry di bawah
+        
+        Returns:
+            QHBoxLayout: Layout containing filter section
+        """
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+        
+        # ===== FILTER ICON & LABEL =====
+        filter_label = QLabel("🔍 Filter:")
+        filter_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
+        filter_label.setStyleSheet(f"color: {COLOR_NAVY};")
+        layout.addWidget(filter_label)
+        
+        # ===== JENJANG DROPDOWN WITH MODERN STYLING =====
+        lbl_jenjang = QLabel("Jenjang:")
+        lbl_jenjang.setFont(QFont("Arial", 10))
+        lbl_jenjang.setStyleSheet(f"color: {COLOR_GRAY_700}; font-weight: bold;")
+        layout.addWidget(lbl_jenjang)
+        
+        self.combo_jenjang = QComboBox()
+        self.combo_jenjang.addItems(["Semua", "D3", "D4", "S1", "S2"])
+        self.combo_jenjang.setMinimumHeight(36)
+        self.combo_jenjang.setMinimumWidth(140)
+        self.combo_jenjang.setStyleSheet(f"""
+            QComboBox {{
+                background-color: {COLOR_WHITE};
+                color: {COLOR_GRAY_900};
+                border: 1px solid {COLOR_GRAY_300};
+                border-radius: 6px;
+                padding: 6px 10px;
+                font-size: 11px;
+                font-weight: 500;
+            }}
+            QComboBox:hover {{
+                border: 1px solid {COLOR_NAVY};
+                background-color: {COLOR_GRAY_50};
+            }}
+            QComboBox:focus {{
+                border: 2px solid {COLOR_NAVY};
+                outline: none;
+            }}
+            QComboBox::drop-down {{
+                border: none;
+                background: transparent;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {COLOR_WHITE};
+                color: {COLOR_GRAY_900};
+                selection-background-color: {COLOR_NAVY};
+                selection-color: {COLOR_WHITE};
+                border: 1px solid {COLOR_GRAY_200};
+                padding: 4px;
+            }}
+        """)
+        layout.addWidget(self.combo_jenjang)
+        
+        # ===== STATUS DROPDOWN WITH MODERN STYLING =====
+        lbl_status = QLabel("Status:")
+        lbl_status.setFont(QFont("Arial", 10))
+        lbl_status.setStyleSheet(f"color: {COLOR_GRAY_700}; font-weight: bold;")
+        layout.addWidget(lbl_status)
+        
+        self.combo_status = QComboBox()
+        self.combo_status.addItems(["Semua", "Buka", "Segera Tutup", "Tutup"])
+        self.combo_status.setMinimumHeight(36)
+        self.combo_status.setMinimumWidth(160)
+        self.combo_status.setStyleSheet(f"""
+            QComboBox {{
+                background-color: {COLOR_WHITE};
+                color: {COLOR_GRAY_900};
+                border: 1px solid {COLOR_GRAY_300};
+                border-radius: 6px;
+                padding: 6px 10px;
+                font-size: 11px;
+                font-weight: 500;
+            }}
+            QComboBox:hover {{
+                border: 1px solid {COLOR_NAVY};
+                background-color: {COLOR_GRAY_50};
+            }}
+            QComboBox:focus {{
+                border: 2px solid {COLOR_NAVY};
+                outline: none;
+            }}
+            QComboBox::drop-down {{
+                border: none;
+                background: transparent;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {COLOR_WHITE};
+                color: {COLOR_GRAY_900};
+                selection-background-color: {COLOR_NAVY};
+                selection-color: {COLOR_WHITE};
+                border: 1px solid {COLOR_GRAY_200};
+                padding: 4px;
+            }}
+        """)
+        layout.addWidget(self.combo_status)
+        
+        # ===== SPACER =====
+        layout.addStretch()
+        
+        logger.debug("✅ Filter layout created with modern Navy styling (Jenjang + Status dropdowns)")
+        
+        return layout
         """
         Create filter section (Task 5-7).
         
