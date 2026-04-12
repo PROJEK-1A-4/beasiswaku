@@ -255,3 +255,49 @@ def create_pie_chart_status_lamaran(
         ax.axis("equal")
         fig.tight_layout()
         return fig, ax
+
+def create_bar_chart_lamaran_per_bulan(
+        data: Dict[str, int],
+        title: str = "Jumlah Lamaran per Bulan",
+    ) -> Tuple[plt.Figure, plt.Axes]:
+        """
+        Membuat bar chart jumlah lamaran per bulan.
+
+        Input:
+        - data: dict dengan key format YYYY-MM, contoh {"2026-01": 2, "2026-02": 5}
+
+        Return:
+        - (figure, axes)
+
+        Alasan chart ini:
+        - Menunjukkan tren aktivitas pendaftaran user dari waktu ke waktu.
+        """
+        fig, ax = plt.subplots(figsize=(9, 4.5))
+
+        if not data:
+            _render_empty_state(ax, title)
+            fig.tight_layout()
+            return fig, ax
+
+        months = sorted(data.keys())
+        values = [int(data[m]) for m in months]
+
+        bars = ax.bar(months, values, color=COLOR_PALETTE["bar_default"], alpha=0.9)
+        ax.set_title(title)
+        ax.set_xlabel("Bulan")
+        ax.set_ylabel("Jumlah Lamaran")
+        _apply_axis_style(ax)
+
+        for bar, value in zip(bars, values):
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                value + 0.05,
+                str(value),
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
+
+        plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
+        fig.tight_layout()
+        return fig, ax
