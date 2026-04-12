@@ -66,7 +66,7 @@ class BeasiswaTab(QWidget):
       * Statuses: pending, approved, rejected, draft, open, closing-soon, closed
       * Pill-shaped with emoji support
     
-    UI Enhancements (Tasks 1-10):
+    UI Enhancements (Tasks 1-11):
     - Task 1: Design tokens system (colors, typography, spacing)
     - Task 2: Navy + Orange color scheme applied throughout
     - Task 3: AlertBanner for success/error messages
@@ -89,6 +89,12 @@ class BeasiswaTab(QWidget):
       * Navy labels with medium weight
       * Rounded input fields with focus borders
       * Improved visual hierarchy and form clarity
+    - Task 11: Spacing & padding refinement for visual hierarchy
+      * Standardized margins: 16px (SPACING_4) for main container
+      * Standardized section spacing: 12px (SPACING_3) between segments
+      * Small separators: 8px (SPACING_2) after headers/tables
+      * All layouts use design token constants for consistency
+      * Better visual breathing room and improved readability
     """
     
     # Signal untuk refresh data
@@ -146,28 +152,30 @@ class BeasiswaTab(QWidget):
         Initialize Beasiswa Tab UI with complete layout hierarchy.
         
         Layout Structure:
-        ├── Top Bar (Title + Timestamp)
-        ├── Filter Section (Jenjang + Status Dropdowns)
-        ├── Search Section (Real-time search entry)
-        ├── Table Widget (Beasiswa data display)
-        ├── Row Count Label
-        └── CRUD Buttons (Tambah, Edit, Hapus, Refresh, Export)
+        ├── Top Bar (Title + Timestamp) - SPACING_4
+        ├── Alert Banner - SPACING_4
+        ├── Filter Section - SPACING_4
+        ├── Search Section - SPACING_4
+        ├── Table Widget - SPACING_3
+        ├── Row Count Label - SPACING_4
+        ├── CTA Section - SPACING_4
+        └── CRUD Buttons - SPACING_4
         
-        Each section will be implemented in Tasks 4-10.
+        Task 11: Refined spacing using design tokens for consistency and visual hierarchy.
         """
         logger.info("Initializing BeasiswaTab UI...")
         
-        # ===== MAIN LAYOUT =====
+        # ===== MAIN LAYOUT (Task 11: Refined spacing) =====
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(10, 10, 10, 10)  # Padding around edges
-        main_layout.setSpacing(10)  # Space between sections
+        main_layout.setContentsMargins(16, 16, 16, 16)  # SPACING_4 (16px) - better breathing room
+        main_layout.setSpacing(12)  # SPACING_3 (12px) - consistent section spacing
         
         # ===== SECTION 1: TOP BAR (Task 4) =====
         # Display title and last scraping timestamp
         top_bar_layout = self._create_top_bar_layout()
         if top_bar_layout:
             main_layout.addLayout(top_bar_layout)
-            main_layout.addSpacing(5)
+            main_layout.addSpacing(8)  # SPACING_2 (8px) - small separator after title
         
         # ===== SECTION 1.5: ALERT BANNER (Task 3) =====
         # Alert banner untuk info, success, warning, error messages
@@ -179,14 +187,14 @@ class BeasiswaTab(QWidget):
         self.alert_banner.closed.connect(self._on_alert_closed)
         self.alert_banner.hide()  # Hidden by default, show ketika perlu
         main_layout.addWidget(self.alert_banner)
-        main_layout.addSpacing(5)
+        main_layout.addSpacing(12)  # SPACING_3 (12px) - standard section spacing
         
         # ===== SECTION 2: FILTER SECTION (Tasks 5-7, 15, updated Task 4) =====
         # Filter by jenjang and status with modern styling
         filter_layout = self._create_filter_layout()
         if filter_layout:
             main_layout.addLayout(filter_layout)
-            main_layout.addSpacing(10)
+            main_layout.addSpacing(12)  # SPACING_3 (12px) - standard section spacing
         
         # ===== TASK 15: CONNECT FILTER DROPDOWN SIGNALS =====
         # Connect jenjang dropdown currentTextChanged to apply_filters
@@ -199,11 +207,11 @@ class BeasiswaTab(QWidget):
             self.combo_status.currentTextChanged.connect(self.apply_filters)
             logger.debug("✅ Status dropdown signal connected to apply_filters()")
         
-        # ===== SECTION 2.5: SEARCH SECTION (Task 7, updated Task 4) =====
+        # ===== TASK 7: SEARCH SECTION (Task 7, updated Task 4) =====
         # Real-time search with modern styling
         search_layout = QHBoxLayout()
         search_layout.setContentsMargins(0, 0, 0, 0)
-        search_layout.setSpacing(10)
+        search_layout.setSpacing(12)  # SPACING_3 (12px) - consistent with filter layout
         
         search_label = QLabel("🔎 Cari:")
         search_label.setFont(QFont("Arial", 10))
@@ -236,19 +244,20 @@ class BeasiswaTab(QWidget):
         """)
         search_layout.addWidget(self.entry_search)
         main_layout.addLayout(search_layout)
-        main_layout.addSpacing(10)
+        main_layout.addSpacing(12)  # SPACING_3 (12px) - standard section spacing
         
         # ===== TASK 7: CONNECT SEARCH KEYRELEASE SIGNAL =====
         # Connect search entry KeyRelease event to apply filters
         if self.entry_search:
             self.entry_search.keyReleaseEvent = self._on_search_key_release
             logger.debug("✅ Search entry KeyRelease signal connected to apply_filters()")
+        
         # ===== SECTION 3: TABLE WIDGET (Task 8) =====
         # Display beasiswa data in table format
         self.tbl_beasiswa = self._create_table_widget()
         if self.tbl_beasiswa:
             main_layout.addWidget(self.tbl_beasiswa)
-            main_layout.addSpacing(5)
+            main_layout.addSpacing(8)  # SPACING_2 (8px) - small spacing after table
         
         # ===== TASK 28: CONNECT TABLE DOUBLE-CLICK EVENT =====
         # Connect double-click to show detail dialog
@@ -262,14 +271,14 @@ class BeasiswaTab(QWidget):
         self.lbl_row_count.setFont(QFont("Arial", 9))
         self.lbl_row_count.setStyleSheet(f"color: {COLOR_GRAY_600}; font-style: italic;")
         main_layout.addWidget(self.lbl_row_count)
-        main_layout.addSpacing(8)
+        main_layout.addSpacing(12)  # SPACING_3 (12px) - standard section spacing
         
         # ===== SECTION 4.5: CTA SECTION (Task 9) =====
         # Call-to-action button to view all beasiswa
         cta_layout = self._create_cta_section()
         if cta_layout:
             main_layout.addLayout(cta_layout)
-            main_layout.addSpacing(8)
+            main_layout.addSpacing(12)  # SPACING_3 (12px) - standard section spacing
         
         # ===== SECTION 5: CRUD BUTTONS (Tasks 9-10) =====
         # Action buttons for CRUD operations
@@ -508,7 +517,7 @@ class BeasiswaTab(QWidget):
         """
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        layout.setSpacing(12)  # SPACING_3 (12px) - consistent spacing
         
         # ===== TASK 5: JENJANG DROPDOWN =====
         # Filter dropdown untuk education level
@@ -799,7 +808,7 @@ class BeasiswaTab(QWidget):
         """
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        layout.setSpacing(12)  # SPACING_3 (12px) - consistent spacing
         
         # ===== TASK 9: TAMBAH BUTTON (Green) =====
         self.btn_tambah = QPushButton("➕ Tambah")
