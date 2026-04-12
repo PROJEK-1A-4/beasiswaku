@@ -24,14 +24,14 @@ from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap
 from PyQt6.QtCore import pyqtSignal
 
 from src.database.crud import (
-    init_db, login_user, register_user, get_connection
+    init_db, login_user, register_user, get_connection,
+    hash_password, verify_password
 )
 from src.gui.tab_beranda import BerandaTab
 from src.gui.gui_beasiswa import BeasiswaTab
 from src.gui.tab_tracker import TrackerTab
 from src.gui.tab_statistik import StatistikTab
 from src.gui.tab_profil import ProfileTab
-from src.gui.sidebar import Sidebar
 from src.gui.sidebar import Sidebar
 
 # Setup logging
@@ -605,16 +605,20 @@ class SettingsWindow(QDialog):
             cursor = conn.cursor()
             
             # Check old password
-            cursor.execute("SELECT password FROM akun WHERE id_akun = ?", (self.user_id,))
+            cursor.execute("SELECT password_hash FROM akun WHERE id = ?", (self.user_id,))
             result = cursor.fetchone()
             
-            if result is None or result[0] != old_pwd:
+            if result is None or not verify_password(old_pwd, result[0]):
                 self.message_label.setText("❌ Password lama salah!")
                 self.message_label.setStyleSheet("color: red; font-weight: bold;")
                 return
             
             # Update password
-            cursor.execute("UPDATE akun SET password = ? WHERE id_akun = ?", (new_pwd, self.user_id))
+            new_password_hash = hash_password(new_pwd)
+            cursor.execute(
+                "UPDATE akun SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (new_password_hash, self.user_id)
+            )
             conn.commit()
             
             self.message_label.setText("✅ Password berhasil diubah!")

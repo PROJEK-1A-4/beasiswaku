@@ -5,6 +5,7 @@ Track scholarship applications with status visualization and analytics
 
 import logging
 from typing import List, Dict, Any
+from collections import Counter
 from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -60,11 +61,105 @@ class TrackerTab(QWidget):
     def __init__(self, user_id: int, parent=None):
         super().__init__(parent)
         self.user_id = user_id
-        self.applications = []
+        self.applications = self._fetch_applications()
         
         logger.info(f"Initializing TrackerTab for user {user_id}")
         self.init_ui()
-        self.load_applications()
+        self.populate_table(self.applications)
+
+    def _to_display_status(self, status: str) -> str:
+        """Map backend status ke label UI yang konsisten."""
+        normalized = (status or "").strip().lower()
+        if normalized in {"accepted", "diterima"}:
+            return "Diterima"
+        if normalized in {"rejected", "ditolak", "withdrawn"}:
+            return "Ditolak"
+        return "Pending"
+
+    def _fetch_applications(self) -> List[Dict[str, Any]]:
+        """Ambil data lamaran real dari database untuk user aktif."""
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    rl.id,
+                    b.judul AS nama_beasiswa,
+                    rl.tanggal_daftar,
+                    rl.status,
+                    COALESCE(rl.catatan, '') AS catatan
+                FROM riwayat_lamaran rl
+                JOIN beasiswa b ON rl.beasiswa_id = b.id
+                WHERE rl.user_id = ?
+                ORDER BY rl.tanggal_daftar DESC, rl.created_at DESC
+                """,
+                (self.user_id,)
+            )
+            rows = cursor.fetchall()
+            cursor.close()
+
+            applications = []
+            for row in rows:
+                if hasattr(row, "keys"):
+                    row_id = row["id"]
+                    nama_beasiswa = row["nama_beasiswa"]
+                    tanggal_raw = row["tanggal_daftar"]
+                    raw_status = row["status"]
+                    catatan = row["catatan"]
+                else:
+                    row_id = row[0]
+                    nama_beasiswa = row[1]
+                    tanggal_raw = row[2]
+                    raw_status = row[3]
+                    catatan = row[4]
+
+                tanggal_display = "-"
+                month_key = None
+
+                if tanggal_raw:
+                    try:
+                        dt = datetime.strptime(str(tanggal_raw), "%Y-%m-%d")
+                        tanggal_display = dt.strftime("%d %b %Y")
+                        month_key = dt.strftime("%Y-%m")
+                    except ValueError:
+                        tanggal_display = str(tanggal_raw)
+                        month_key = str(tanggal_raw)[:7] if len(str(tanggal_raw)) >= 7 else None
+
+                applications.append(
+                    {
+                        "id": row_id,
+                        "nama": nama_beasiswa,
+                        "tanggal": tanggal_display,
+                        "status": self._to_display_status(raw_status),
+                        "catatan": catatan or "-",
+                        "month_key": month_key,
+                    }
+                )
+
+            logger.info(f"Loaded {len(applications)} application(s) from database")
+            return applications
+        except Exception as e:
+            logger.error(f"Error fetching applications: {e}")
+            return []
+
+    def _get_status_counts(self) -> Dict[str, int]:
+        """Ringkas jumlah lamaran per status untuk UI analytics."""
+        counts = Counter(app["status"] for app in self.applications)
+        return {
+            "Pending": counts.get("Pending", 0),
+            "Diterima": counts.get("Diterima", 0),
+            "Ditolak": counts.get("Ditolak", 0),
+        }
+
+    def _get_month_counts(self) -> Dict[str, int]:
+        """Ringkas jumlah lamaran per bulan (format YYYY-MM)."""
+        month_counter = Counter(
+            app["month_key"]
+            for app in self.applications
+            if app.get("month_key")
+        )
+        return dict(sorted(month_counter.items()))
     
     def init_ui(self):
         """Initialize Tracker Tab UI."""
@@ -248,7 +343,10 @@ class TrackerTab(QWidget):
         title_label.setStyleSheet(f"color: {COLOR_NAVY};")
         layout.addWidget(title_label)
         
-        subtitle_label = QLabel("Berdasarkan total 9 lamaran tercatat")
+        status_counts = self._get_status_counts()
+        total_lamaran = sum(status_counts.values())
+
+        subtitle_label = QLabel(f"Berdasarkan total {total_lamaran} lamaran tercatat")
         subtitle_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
         subtitle_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
         layout.addWidget(subtitle_label)
@@ -260,61 +358,34 @@ class TrackerTab(QWidget):
         # Legend
         legend_layout = QHBoxLayout()
         legend_layout.setSpacing(16)
-        
-        # Pending
-        pending_box = QFrame()
-        pending_box.setStyleSheet(f"""
-            QFrame {{
-                background-color: {CHART_COLORS['blue']};
-                border-radius: 2px;
-                min-width: 20px;
-                min-height: 20px;
-            }}
-        """)
-        legend_layout.addWidget(pending_box)
-        
-        pending_label = QLabel("Pending\n5 lamaran")
-        pending_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
-        pending_label.setStyleSheet(f"color: {CHART_COLORS['blue']}; font-weight: bold;")
-        legend_layout.addWidget(pending_label)
-        
-        legend_layout.addSpacing(12)
-        
-        # Diterima
-        diterima_box = QFrame()
-        diterima_box.setStyleSheet(f"""
-            QFrame {{
-                background-color: {CHART_COLORS['success']};
-                border-radius: 2px;
-                min-width: 20px;
-                min-height: 20px;
-            }}
-        """)
-        legend_layout.addWidget(diterima_box)
-        
-        diterima_label = QLabel("Diterima\n2 lamaran")
-        diterima_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
-        diterima_label.setStyleSheet(f"color: {CHART_COLORS['success']}; font-weight: bold;")
-        legend_layout.addWidget(diterima_label)
-        
-        legend_layout.addSpacing(12)
-        
-        # Ditolak
-        ditolak_box = QFrame()
-        ditolak_box.setStyleSheet(f"""
-            QFrame {{
-                background-color: {CHART_COLORS['error']};
-                border-radius: 2px;
-                min-width: 20px;
-                min-height: 20px;
-            }}
-        """)
-        legend_layout.addWidget(ditolak_box)
-        
-        ditolak_label = QLabel("Ditolak\n2 lamaran")
-        ditolak_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
-        ditolak_label.setStyleSheet(f"color: {CHART_COLORS['error']}; font-weight: bold;")
-        legend_layout.addWidget(ditolak_label)
+
+        legend_items = [
+            ("Pending", CHART_COLORS["blue"]),
+            ("Diterima", CHART_COLORS["success"]),
+            ("Ditolak", CHART_COLORS["error"]),
+        ]
+
+        for idx, (label, color) in enumerate(legend_items):
+            color_box = QFrame()
+            color_box.setStyleSheet(
+                f"""
+                QFrame {{
+                    background-color: {color};
+                    border-radius: 2px;
+                    min-width: 20px;
+                    min-height: 20px;
+                }}
+                """
+            )
+            legend_layout.addWidget(color_box)
+
+            item_label = QLabel(f"{label}\n{status_counts[label]} lamaran")
+            item_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+            item_label.setStyleSheet(f"color: {color}; font-weight: bold;")
+            legend_layout.addWidget(item_label)
+
+            if idx < len(legend_items) - 1:
+                legend_layout.addSpacing(12)
         
         legend_layout.addStretch()
         layout.addLayout(legend_layout)
@@ -370,7 +441,19 @@ class TrackerTab(QWidget):
         info_icon.setFont(QFont(FONT_FAMILY_PRIMARY, 14))
         info_layout.addWidget(info_icon)
         
-        info_text = QLabel("Terbanyak di bulan Maret 2026 dengan 3 lamaran")
+        month_counts = self._get_month_counts()
+        if month_counts:
+            max_key = max(month_counts, key=month_counts.get)
+            max_value = month_counts[max_key]
+            try:
+                max_label = datetime.strptime(max_key, "%Y-%m").strftime("%B %Y")
+            except ValueError:
+                max_label = max_key
+            info_message = f"Terbanyak di bulan {max_label} dengan {max_value} lamaran"
+        else:
+            info_message = "Belum ada data lamaran bulanan"
+
+        info_text = QLabel(info_message)
         info_text.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
         info_text.setStyleSheet(f"color: {COLOR_ORANGE}; font-weight: bold;")
         info_layout.addWidget(info_text)
@@ -383,28 +466,43 @@ class TrackerTab(QWidget):
         """Create donut chart for status distribution."""
         figure = Figure(figsize=(6, 4), dpi=100)
         ax = figure.add_subplot(111)
-        
-        sizes = [5, 2, 2]  # Pending, Diterima, Ditolak
-        labels = ['Pending', 'Diterima', 'Ditolak']
-        colors = [CHART_COLORS['blue'], CHART_COLORS['success'], CHART_COLORS['error']]
-        
-        wedges, texts, autotexts = ax.pie(
-            sizes, labels=labels, colors=colors,
-            autopct='%1.0f%%', startangle=90,
-            textprops={'fontsize': 9, 'weight': 'bold'},
-            wedgeprops=dict(width=0.4, edgecolor='white', linewidth=2)
-        )
-        
-        for autotext in autotexts:
-            autotext.set_color('white')
-            autotext.set_fontweight('bold')
-            autotext.set_fontsize(10)
+
+        status_counts = self._get_status_counts()
+        sizes = [status_counts["Pending"], status_counts["Diterima"], status_counts["Ditolak"]]
+        labels = ["Pending", "Diterima", "Ditolak"]
+        colors = [CHART_COLORS["blue"], CHART_COLORS["success"], CHART_COLORS["error"]]
+        total = sum(sizes)
+
+        if total > 0:
+            wedges, texts, autotexts = ax.pie(
+                sizes,
+                labels=labels,
+                colors=colors,
+                autopct="%1.0f%%",
+                startangle=90,
+                textprops={"fontsize": 9, "weight": "bold"},
+                wedgeprops=dict(width=0.4, edgecolor="white", linewidth=2),
+            )
+
+            for autotext in autotexts:
+                autotext.set_color("white")
+                autotext.set_fontweight("bold")
+                autotext.set_fontsize(10)
+        else:
+            ax.pie(
+                [1],
+                labels=["Belum Ada Data"],
+                colors=[CHART_COLORS["light_gray"]],
+                startangle=90,
+                textprops={"fontsize": 9, "weight": "bold", "color": CHART_COLORS["gray"]},
+                wedgeprops=dict(width=0.4, edgecolor="white", linewidth=2),
+            )
         
         # Center circle text
         centre_circle = plt.Circle((0, 0), 0.70, fc='white', edgecolor='white', linewidth=0)
         ax.add_artist(centre_circle)
         
-        ax.text(0, 0, '9\nTotal', ha='center', va='center',
+        ax.text(0, 0, f'{total}\nTotal', ha='center', va='center',
                fontsize=18, fontweight='bold', color=CHART_COLORS['navy'])
         
         ax.set_facecolor('white')
@@ -417,17 +515,26 @@ class TrackerTab(QWidget):
         """Create bar chart for monthly applications."""
         figure = Figure(figsize=(6, 4), dpi=100)
         ax = figure.add_subplot(111)
-        
-        months = ['Nov 25', 'Des 25', 'Jan 26', 'Feb 26', 'Mar 26', 'Apr 26']
-        values = [1, 2, 2, 3, 1]
-        
-        # Colors: navy, navy, navy, orange (for Mar which is highest), navy
-        colors_list = [CHART_COLORS['navy'], CHART_COLORS['navy'], 
-                       CHART_COLORS['navy'], CHART_COLORS['orange'],
-                       CHART_COLORS['navy']]
-        
-        bars = ax.bar(months[:5], values, color=colors_list, edgecolor='none', 
-                     width=0.6, alpha=0.85)
+
+        month_counts = self._get_month_counts()
+        if month_counts:
+            month_keys = sorted(month_counts.keys())[-5:]
+            months = []
+            values = []
+            for key in month_keys:
+                values.append(month_counts[key])
+                try:
+                    months.append(datetime.strptime(key, "%Y-%m").strftime("%b %y"))
+                except ValueError:
+                    months.append(key)
+        else:
+            months = ["-"]
+            values = [0]
+
+        max_value = max(values) if values else 0
+        colors_list = [CHART_COLORS["orange"] if value == max_value and max_value > 0 else CHART_COLORS["navy"] for value in values]
+
+        bars = ax.bar(months, values, color=colors_list, edgecolor='none', width=0.6, alpha=0.85)
         
         # Value labels on top
         for bar, value in zip(bars, values):
@@ -437,7 +544,7 @@ class TrackerTab(QWidget):
                    fontweight='bold', color=CHART_COLORS['navy'])
         
         # Styling
-        ax.set_ylim(0, 4.5)
+        ax.set_ylim(0, max(1, max_value + 1))
         ax.set_ylabel('Jumlah Lamaran', fontsize=9, color=CHART_COLORS['gray'], 
                      fontweight='bold')
         ax.spines['top'].set_visible(False)
@@ -456,35 +563,18 @@ class TrackerTab(QWidget):
     
     def load_applications(self):
         """Load applications data."""
-        try:
-            conn = get_connection()
-            cursor = conn.cursor()
-            
-            # Sample data untuk sekarang
-            sample_apps = [
-                ("Beasiswa LPDP 2026", "10 Mar 2026", "Pending", "Menunggu hasil seleksi administrasi"),
-                ("Beasiswa Unggulan Kemendikbud", "15 Feb 2026", "Diterima", "Lulus seleksi, sudah menerima LOA"),
-                ("Beasiswa BCA", "20 Jan 2026", "Ditolak", "Tidak lolos seleksi wawancara"),
-                ("Beasiswa Djarum Plus", "5 Mar 2026", "Pending", "Proses verifikasi dokumen"),
-                ("Beasiswa Tanoto Foundation", "28 Feb 2026", "Diterima", "Sudah menandatangani kontrak beasiswa"),
-                ("Beasiswa Bank Indonesia", "12 Jan 2026", "Ditolak", "IPK tidak memenuhi syarat"),
-                ("Beasiswa Sampoerna University", "8 Mar 2026", "Pending", "Menunggu jadwal wawancara"),
-            ]
-            
-            self.applications = sample_apps
-            self.populate_table(sample_apps)
-            
-            logger.info(f"Loaded {len(self.applications)} applications")
-            conn.close()
-        except Exception as e:
-            logger.error(f"Error loading applications: {e}")
+        self.applications = self._fetch_applications()
+        self.populate_table(self.applications)
     
     def populate_table(self, apps):
         """Populate table dengan data."""
         self.table.setRowCount(len(apps))
         
         for row_idx, app in enumerate(apps):
-            nama, tanggal, status, catatan = app[0], app[1], app[2], app[3]
+            nama = app["nama"]
+            tanggal = app["tanggal"]
+            status = app["status"]
+            catatan = app["catatan"]
             
             # Nama Beasiswa
             nama_item = QTableWidgetItem(nama)

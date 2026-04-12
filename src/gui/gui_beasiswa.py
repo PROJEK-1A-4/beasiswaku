@@ -427,8 +427,8 @@ class BeasiswaTab(QWidget):
             
             logger.info(f"Loaded {len(self.beasiswa_data)} beasiswa")
             self.populate_table(self.beasiswa_data)
-            
-            conn.close()
+
+            # Connection lifecycle is managed by DatabaseManager singleton.
         except Exception as e:
             logger.error(f"Error loading beasiswa data: {e}")
     

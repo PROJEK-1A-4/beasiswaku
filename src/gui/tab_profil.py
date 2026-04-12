@@ -35,8 +35,8 @@ class ProfileTab(QWidget):
         self.user_data = {}
         
         logger.info(f"Initializing ProfileTab for user {user_id}")
-        self.init_ui()
         self.load_user_data()
+        self.init_ui()
     
     def init_ui(self):
         """Initialize Profile Tab dengan 2-column layout."""
@@ -710,10 +710,22 @@ class ProfileTab(QWidget):
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM users WHERE id = ?", (self.user_id,))
+            cursor.execute(
+                """
+                SELECT id, username, email, nama_lengkap, jenjang, created_at
+                FROM akun
+                WHERE id = ?
+                """,
+                (self.user_id,)
+            )
             result = cursor.fetchone()
             if result:
+                self.user_data = dict(result)
+                self.username = result["username"] or self.username
+                self.email = result["email"] or self.email
                 logger.info(f"Loaded user data for {self.username}")
-            conn.close()
+            else:
+                logger.warning(f"User data not found for user_id={self.user_id}")
+            cursor.close()
         except Exception as e:
             logger.error(f"Error loading user data: {e}")

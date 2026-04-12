@@ -89,8 +89,35 @@ class StatistikTab(QWidget):
         self.charts = []
         
         logger.info(f"Initializing StatistikTab")
-        self.init_ui()
         self.load_statistics()
+        self.init_ui()
+
+    def _get_status_count_map(self) -> Dict[str, int]:
+        """Convert status rows into a normalized dictionary."""
+        status_map = {"Buka": 0, "Segera Tutup": 0, "Tutup": 0}
+        for row in self.stat_data.get("status", []):
+            if hasattr(row, "keys"):
+                key = row["status"]
+                count = row["count"]
+            else:
+                key = row[0]
+                count = row[1]
+            status_map[key] = int(count)
+        return status_map
+
+    def _get_jenjang_count_map(self) -> Dict[str, int]:
+        """Convert jenjang rows into dictionary."""
+        jenjang_map: Dict[str, int] = {}
+        for row in self.stat_data.get("jenjang", []):
+            if hasattr(row, "keys"):
+                key = row["jenjang"]
+                count = row["count"]
+            else:
+                key = row[0]
+                count = row[1]
+            if key:
+                jenjang_map[str(key)] = int(count)
+        return jenjang_map
     
     def init_ui(self):
         """Initialize Statistik Tab UI dengan scroll area."""
@@ -154,12 +181,15 @@ class StatistikTab(QWidget):
         stats_layout = QGridLayout()
         stats_layout.setSpacing(16)  # SPACING_4
         stats_layout.setContentsMargins(0, 0, 0, 0)
+
+        status_map = self._get_status_count_map()
+        total_beasiswa = int(self.stat_data.get("total", 0) or 0)
         
         stat_configs = [
-            {"number": "48", "label": "Total Beasiswa", "icon": "📚"},
-            {"number": "30", "label": "Beasiswa Buka", "icon": "🟢"},
-            {"number": "8", "label": "Segera Tutup", "icon": "⏰"},
-            {"number": "10", "label": "Beasiswa Tutup", "icon": "🔒"},
+            {"number": str(total_beasiswa), "label": "Total Beasiswa", "icon": "📚"},
+            {"number": str(status_map.get("Buka", 0)), "label": "Beasiswa Buka", "icon": "🟢"},
+            {"number": str(status_map.get("Segera Tutup", 0)), "label": "Segera Tutup", "icon": "⏰"},
+            {"number": str(status_map.get("Tutup", 0)), "label": "Beasiswa Tutup", "icon": "🔒"},
         ]
         
         for idx, config in enumerate(stat_configs):
@@ -338,11 +368,25 @@ class StatistikTab(QWidget):
         """Create bar chart: Beasiswa per Jenjang Pendidikan dengan sizing yang lebih besar."""
         figure = Figure(figsize=(10, 4), dpi=100)
         ax = figure.add_subplot(111)
-        
-        # Data dengan label yang lebih jelas
-        jenjang = ['D3', 'D4', 'S1', 'S2']
-        values = [8, 6, 28, 6]
+
+        # Data dari database
+        jenjang_map = self._get_jenjang_count_map()
+        ordered_keys = ["D3", "D4", "S1", "S2"]
+        extra_keys = [k for k in jenjang_map.keys() if k not in ordered_keys]
+        jenjang = [k for k in ordered_keys if k in jenjang_map] + sorted(extra_keys)
+
+        if not jenjang:
+            jenjang = ["-"]
+            values = [0]
+        else:
+            values = [jenjang_map.get(k, 0) for k in jenjang]
+
+        max_val = max(values) if values else 0
         colors = [CHART_COLORS["navy"] if v != 28 else CHART_COLORS["orange"] for v in values]
+
+        # Highlight nilai tertinggi bila ada data
+        if max_val > 0:
+            colors = [CHART_COLORS["orange"] if v == max_val else CHART_COLORS["navy"] for v in values]
         
         # Create bar chart dengan styling yang lebih baik
         bars = ax.bar(jenjang, values, color=colors, edgecolor='none', width=0.65, alpha=0.85)
@@ -362,7 +406,7 @@ class StatistikTab(QWidget):
         # Styling
         ax.set_ylabel('Jumlah Beasiswa', fontsize=9, color=CHART_COLORS["gray"], fontweight='bold', labelpad=8)
         ax.set_xlabel('Jenjang Pendidikan', fontsize=9, color=CHART_COLORS["gray"], fontweight='bold', labelpad=8)
-        ax.set_ylim(0, max(values) * 1.2)
+        ax.set_ylim(0, max(1, int(max_val * 1.2) + 1))
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.spines['left'].set_color(CHART_COLORS["light_gray"])
@@ -384,36 +428,44 @@ class StatistikTab(QWidget):
         """Create donut chart: Status Ketersediaan Beasiswa dengan sizing yang lebih besar."""
         figure = Figure(figsize=(10, 4), dpi=100)
         ax = figure.add_subplot(111)
-        
-        # Data dengan label yang jelas
+
+        # Data dari database
+        status_map = self._get_status_count_map()
         statuses = ['Buka', 'Segera Tutup', 'Tutup']
-        values = [30, 8, 10]  # 63%, 17%, 20% of 48
+        values = [status_map.get(s, 0) for s in statuses]
         colors = [CHART_COLORS["success"], CHART_COLORS["orange"], CHART_COLORS["gray"]]
+        total = sum(values)
         
         # Create donut chart dengan styling lebih baik
-        wedges, texts, autotexts = ax.pie(values, labels=statuses, colors=colors,
-                                           autopct='%1.0f%%', startangle=90,
-                                           textprops={'fontsize': 9, 'weight': 'bold', 'color': CHART_COLORS["navy"]},
-                                           wedgeprops=dict(width=0.5, edgecolor='white', linewidth=2.5))
+        if total > 0:
+            wedges, texts, autotexts = ax.pie(values, labels=statuses, colors=colors,
+                                               autopct='%1.0f%%', startangle=90,
+                                               textprops={'fontsize': 9, 'weight': 'bold', 'color': CHART_COLORS["navy"]},
+                                               wedgeprops=dict(width=0.5, edgecolor='white', linewidth=2.5))
         
-        # Style percentage text dengan lebih baik
-        for autotext in autotexts:
-            autotext.set_color('white')
-            autotext.set_fontweight('bold')
-            autotext.set_fontsize(9)
-        
-        # Style labels
-        for text in texts:
-            text.set_fontsize(8)
-            text.set_fontweight('bold')
-            text.set_color(CHART_COLORS["navy"])
+            # Style percentage text dengan lebih baik
+            for autotext in autotexts:
+                autotext.set_color('white')
+                autotext.set_fontweight('bold')
+                autotext.set_fontsize(9)
+
+            # Style labels
+            for text in texts:
+                text.set_fontsize(8)
+                text.set_fontweight('bold')
+                text.set_color(CHART_COLORS["navy"])
+        else:
+            ax.pie([1], labels=["Belum Ada Data"], colors=[CHART_COLORS["light_gray"]],
+                   startangle=90,
+                   textprops={'fontsize': 9, 'weight': 'bold', 'color': CHART_COLORS["gray"]},
+                   wedgeprops=dict(width=0.5, edgecolor='white', linewidth=2.5))
         
         # Add center circle dan text yang lebih rapi
         centre_circle = plt.Circle((0, 0), 0.70, fc='white', edgecolor='white', linewidth=0)
         ax.add_artist(centre_circle)
         
         # Center text dengan styling lebih baik
-        ax.text(0, 0.18, '48', ha='center', va='center',
+        ax.text(0, 0.18, str(total), ha='center', va='center',
                fontsize=26, fontweight='bold', color=CHART_COLORS["navy"])
         ax.text(0, -0.18, 'Scholarship', ha='center', va='center',
                fontsize=9, color=CHART_COLORS["gray"], fontweight='bold')
@@ -428,16 +480,25 @@ class StatistikTab(QWidget):
         """Create horizontal bar chart: Top 5 Penyelenggara Beasiswa dengan full width."""
         figure = Figure(figsize=(10, 4), dpi=100)
         ax = figure.add_subplot(111)
-        
-        # Data dengan nama yang lebih rapi
-        penyelenggara = [
-            'Kemendikbud RI',
-            'LPDP (Kemenkeu)',
-            'Tanoto Foundation',
-            'Bank Indonesia',
-            'Djarum Plus'
-        ]
-        values = [8, 6, 5, 4, 3]
+
+        # Data dari database
+        penyelenggara_rows = self.stat_data.get("penyelenggara", [])
+        penyelenggara = []
+        values = []
+
+        for row in penyelenggara_rows:
+            if hasattr(row, "keys"):
+                nama = row["nama_penyelenggara"]
+                count = row["count"]
+            else:
+                nama = row[0]
+                count = row[1]
+            penyelenggara.append(str(nama) if nama else "(Tidak Ada)")
+            values.append(int(count))
+
+        if not penyelenggara:
+            penyelenggara = ["Belum Ada Data"]
+            values = [0]
         
         # Create horizontal bar chart dengan styling yang lebih baik
         bars = ax.barh(penyelenggara, values, color=CHART_COLORS["orange"], 
@@ -458,7 +519,7 @@ class StatistikTab(QWidget):
         
         # Styling
         ax.set_xlabel('Jumlah Beasiswa', fontsize=9, color=CHART_COLORS["gray"], fontweight='bold', labelpad=8)
-        ax.set_xlim(0, max(values) * 1.35)
+        ax.set_xlim(0, max(1, int(max(values) * 1.35) + 1))
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.spines['left'].set_color(CHART_COLORS["light_gray"])
@@ -508,10 +569,12 @@ class StatistikTab(QWidget):
             
             # Query 4: Top penyelenggara
             cursor.execute("""
-                SELECT penyelenggara_id, COUNT(*) as count 
-                FROM beasiswa 
-                WHERE penyelenggara_id IS NOT NULL
-                GROUP BY penyelenggara_id
+                SELECT
+                    COALESCE(p.nama, '(Tidak Ada)') as nama_penyelenggara,
+                    COUNT(*) as count
+                FROM beasiswa b
+                LEFT JOIN penyelenggara p ON b.penyelenggara_id = p.id
+                GROUP BY b.penyelenggara_id, p.nama
                 ORDER BY count DESC
                 LIMIT 5
             """)
@@ -524,6 +587,7 @@ class StatistikTab(QWidget):
                 'jenjang': jenjang_data,
                 'penyelenggara': penyelenggara_data
             }
+            cursor.close()
             
         except Exception as e:
             logger.error(f"Error loading statistics: {e}")

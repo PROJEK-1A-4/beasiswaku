@@ -404,11 +404,12 @@ class BeasiswaTab(QWidget):
             conn = get_connection()
             cursor = conn.cursor()
             
-            # Query semua beasiswa dari database
+            # Query semua beasiswa dari database dengan join penyelenggara
             cursor.execute("""
-                SELECT id, nama, penyelenggara, jenjang, deadline, status 
-                FROM beasiswa 
-                ORDER BY deadline ASC
+                SELECT b.id, b.judul, p.nama, b.jenjang, b.deadline, b.status 
+                FROM beasiswa b
+                LEFT JOIN penyelenggara p ON b.penyelenggara_id = p.id
+                ORDER BY b.deadline ASC
             """)
             
             rows = cursor.fetchall()
@@ -416,18 +417,18 @@ class BeasiswaTab(QWidget):
                 {
                     "id": row[0],
                     "nama": row[1],
-                    "penyelenggara": row[2],
-                    "jenjang": row[3],
+                    "penyelenggara": row[2] or "Tidak Ada",
+                    "jenjang": row[3] or "-",
                     "deadline": row[4],
-                    "status": row[5]
+                    "status": row[5] or "Buka"
                 }
                 for row in rows
             ]
             
             logger.info(f"Loaded {len(self.beasiswa_data)} beasiswa")
             self.populate_table(self.beasiswa_data)
-            
-            conn.close()
+
+            # Connection lifecycle is managed by DatabaseManager singleton.
         except Exception as e:
             logger.error(f"Error loading beasiswa data: {e}")
     
