@@ -1248,7 +1248,7 @@ class BeasiswaTab(QWidget):
     def on_export_csv_clicked(self):
         """
         Handle Export CSV button click (Task 30).
-        Open file dialog and export filtered data.
+        Open file dialog and export filtered data to CSV file.
         
         Steps:
         1. Open file save dialog
@@ -1257,18 +1257,102 @@ class BeasiswaTab(QWidget):
         4. Show success/error message
         """
         logger.info("Export CSV button clicked - opening file save dialog")
-        # Will be implemented in Task 30
-        pass
+        
+        try:
+            # Open file save dialog
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Simpan Data Beasiswa sebagai CSV",
+                "",
+                "CSV Files (*.csv);;All Files (*.*)"
+            )
+            
+            if not file_path:
+                logger.info("Export CSV cancelled by user")
+                return
+            
+            # Ensure file has .csv extension
+            if not file_path.endswith('.csv'):
+                file_path += '.csv'
+            
+            logger.info(f"Exporting to: {file_path}")
+            
+            # Get CSV data from export_to_csv()
+            csv_data = self.export_to_csv()
+            
+            if not csv_data:
+                logger.error("Failed to prepare CSV data")
+                QMessageBox.critical(self, "❌ Error", "Gagal menyiapkan data CSV!")
+                return
+            
+            # Write to file
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(csv_data)
+            
+            logger.info(f"✅ CSV file exported successfully: {file_path}")
+            QMessageBox.information(
+                self,
+                "Sukses",
+                f"✅ Data beasiswa berhasil diekspor ke:\n{file_path}"
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ Error exporting CSV: {e}")
+            QMessageBox.critical(self, "❌ Error", f"Gagal mengekspor CSV:\n{str(e)}")
     
     def export_to_csv(self):
         """
         Export filtered beasiswa data to CSV file (Task 29).
         
+        Exports current filtered table data to CSV format with columns:
+        No, Nama, Penyelenggara, Jenjang, Deadline, Status
+        
         Returns:
             bool: True if successful, False otherwise
         """
-        # Will be implemented in Task 29
-        pass
+        logger.info("Exporting filtered beasiswa data to CSV")
+        
+        try:
+            if not self.filtered_list:
+                logger.warning("No data to export")
+                QMessageBox.warning(self, "⚠️ Peringatan", "Tidak ada data untuk diekspor!")
+                return False
+            
+            # Prepare CSV content
+            csv_content = []
+            
+            # Header row
+            header = ["No", "Nama", "Penyelenggara", "Jenjang", "Deadline", "Status"]
+            csv_content.append(",".join(header))
+            
+            # Data rows
+            for row_num, beasiswa in enumerate(self.filtered_list, 1):
+                nama = beasiswa.get('judul', '')
+                penyelenggara = beasiswa.get('penyelenggara_name', str(beasiswa.get('penyelenggara_id', '')))
+                jenjang = beasiswa.get('jenjang', '')
+                deadline = beasiswa.get('deadline', '')
+                status = beasiswa.get('status', '')
+                
+                # Format row: escape quotes and handle commas
+                row = [
+                    str(row_num),
+                    f'"{nama}"',  # Quote name in case it has commas
+                    f'"{penyelenggara}"',
+                    jenjang,
+                    deadline,
+                    status
+                ]
+                csv_content.append(",".join(row))
+            
+            # Join all rows
+            csv_data = "\n".join(csv_content)
+            
+            logger.info(f"✅ CSV data prepared: {len(self.filtered_list)} rows")
+            return csv_data
+            
+        except Exception as e:
+            logger.error(f"❌ Error preparing CSV data: {e}")
+            return False
 
 
 # ==================== DIALOG CLASSES ====================
