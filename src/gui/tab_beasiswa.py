@@ -52,6 +52,7 @@ class BeasiswaTab(QWidget):
         super().__init__(parent)
         self.user_id = user_id
         self.beasiswa_data: List[Dict[str, Any]] = []
+        self.displayed_data: List[Dict[str, Any]] = []
         self.refresh_btn: Optional[QPushButton] = None
         self.sync_btn: Optional[QPushButton] = None
         self._sync_thread = None
@@ -550,6 +551,7 @@ class BeasiswaTab(QWidget):
     
     def populate_table(self, data: List[Dict[str, Any]]):
         """Populate table dengan data."""
+        self.displayed_data = list(data)
         self.table.setRowCount(len(data))
         
         for row_idx, item in enumerate(data):
@@ -594,19 +596,22 @@ class BeasiswaTab(QWidget):
     
     def filter_table(self):
         """Filter table berdasarkan search dan filters."""
+        filtered_data = self._get_filtered_data()
+        self.populate_table(filtered_data)
+
+    def _get_filtered_data(self) -> List[Dict[str, Any]]:
+        """Return beasiswa rows that match current search and filter controls."""
         search_text = self.search_input.text().lower()
         status_filter = self.status_filter.currentText()
         jenjang_filter = self.jenjang_filter.currentText()
-        
-        filtered_data = [
+
+        return [
             item for item in self.beasiswa_data
             if (search_text in item["nama"].lower() or 
                 search_text in item["penyelenggara"].lower()) and
                (status_filter == "Semua" or item["status"] == status_filter) and
                (jenjang_filter == "Semua" or item["jenjang"] == jenjang_filter)
         ]
-        
-        self.populate_table(filtered_data)
     
     def filter_by_deadline(self):
         """Filter beasiswa yang deadline-nya dekat (dalam 7 hari)."""
@@ -631,15 +636,27 @@ class BeasiswaTab(QWidget):
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Export Beasiswa", "", "CSV Files (*.csv)"
         )
-        
+
         if file_path:
+            if not file_path.lower().endswith(".csv"):
+                file_path = f"{file_path}.csv"
+
+            rows_to_export = self.displayed_data if self.displayed_data else self._get_filtered_data()
+            if not rows_to_export:
+                QMessageBox.information(
+                    self,
+                    "Export CSV",
+                    "Tidak ada data yang bisa diexport. Ubah filter atau kata kunci pencarian.",
+                )
+                return
+
             try:
                 with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
                     fieldnames = ['NO', 'NAMA BEASISWA', 'PENYELENGGARA', 'JENJANG', 'DEADLINE', 'STATUS']
                     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                     
                     writer.writeheader()
-                    for idx, item in enumerate(self.beasiswa_data, 1):
+                    for idx, item in enumerate(rows_to_export, 1):
                         writer.writerow({
                             'NO': idx,
                             'NAMA BEASISWA': item['nama'],
@@ -648,10 +665,20 @@ class BeasiswaTab(QWidget):
                             'DEADLINE': item['deadline'],
                             'STATUS': item['status']
                         })
-                
+
                 logger.info(f"Data exported to {file_path}")
+                QMessageBox.information(
+                    self,
+                    "Export CSV",
+                    f"Berhasil export {len(rows_to_export)} baris ke:\n{file_path}",
+                )
             except Exception as e:
                 logger.error(f"Error exporting data: {e}")
+                QMessageBox.warning(
+                    self,
+                    "Export Gagal",
+                    f"Terjadi kesalahan saat export CSV:\n{e}",
+                )
     
     def view_beasiswa(self, beasiswa_id: int):
         """View beasiswa details."""
