@@ -66,10 +66,23 @@ def _render_empty_state(ax, title: str, message: str = "Data tidak tersedia") ->
     - User tetap dapat feedback visual yang jelas.
     """
     ax.set_title(title)
+    ax.set_facecolor("#f8fafc")
     ax.text(
-        0.5, 0.5, message,
+        0.5, 0.58, "📭",
         ha="center", va="center",
-        fontsize=11, color=COLOR_PALETTE["empty_text"],
+        fontsize=24,
+        transform=ax.transAxes
+    )
+    ax.text(
+        0.5, 0.42, message,
+        ha="center", va="center",
+        fontsize=11, color="#5f6b7a",
+        bbox={
+            "boxstyle": "round,pad=0.45",
+            "facecolor": "white",
+            "edgecolor": "#d7dee8",
+            "linewidth": 1.0,
+        },
         transform=ax.transAxes
     )
     ax.set_xticks([])
@@ -78,6 +91,7 @@ def _render_empty_state(ax, title: str, message: str = "Data tidak tersedia") ->
     ax.spines["right"].set_visible(False)
     ax.spines["left"].set_visible(False)
     ax.spines["bottom"].set_visible(False)
+    ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
 
 def create_bar_chart_beasiswa_per_jenjang(
         data: Dict[str, int],
