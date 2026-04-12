@@ -35,6 +35,33 @@ from src.visualization.visualisasi import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+def _create_chart_section(section_title: str, canvas, min_height: int) -> QWidget:
+    """Bungkus canvas chart dalam kartu dengan judul yang jelas."""
+    section = QWidget()
+    section.setStyleSheet("""
+        QWidget {
+            background: white;
+            border: 1px solid #d7dee8;
+            border-radius: 12px;
+        }
+    """)
+
+    section_layout = QVBoxLayout(section)
+    section_layout.setContentsMargins(16, 14, 16, 16)
+    section_layout.setSpacing(8)
+
+    heading = QLabel(section_title)
+    heading.setFont(QFont("Arial", 13, QFont.Weight.Bold))
+    heading.setStyleSheet("color: #203040;")
+    section_layout.addWidget(heading)
+
+    canvas.setMinimumHeight(min_height)
+    canvas.setStyleSheet("background: transparent;")
+    section_layout.addWidget(canvas)
+
+    return section
+
 # ==================== LOGIN WINDOW ====================
 
 class LoginWindow(QDialog):
@@ -538,10 +565,12 @@ class TrackerTab(QWidget):
             tracker_canvases = build_tracker_canvases(self.user_id)
             tracker_status_canvas = tracker_canvases["canvas_lamaran_status"]
             tracker_month_canvas = tracker_canvases["canvas_lamaran_bulanan"]
-            tracker_status_canvas.setMinimumHeight(320)
-            tracker_month_canvas.setMinimumHeight(320)
-            content_layout.addWidget(tracker_status_canvas)
-            content_layout.addWidget(tracker_month_canvas)
+            content_layout.addWidget(
+                _create_chart_section("Distribusi Status Lamaran", tracker_status_canvas, 320)
+            )
+            content_layout.addWidget(
+                _create_chart_section("Jumlah Lamaran per Bulan", tracker_month_canvas, 320)
+            )
         except Exception as e:
             logger.error(f"❌ Gagal memuat chart tracker: {e}")
             error_label = QLabel(
@@ -590,12 +619,15 @@ class StatistikTab(QWidget):
             canvas_jenjang = statistik_canvases["canvas_jenjang"]
             canvas_penyelenggara = statistik_canvases["canvas_penyelenggara"]
             canvas_status = statistik_canvases["canvas_status"]
-            canvas_jenjang.setMinimumHeight(300)
-            canvas_penyelenggara.setMinimumHeight(300)
-            canvas_status.setMinimumHeight(300)
-            content_layout.addWidget(canvas_jenjang)
-            content_layout.addWidget(canvas_penyelenggara)
-            content_layout.addWidget(canvas_status)
+            content_layout.addWidget(
+                _create_chart_section("Jumlah Beasiswa per Jenjang", canvas_jenjang, 300)
+            )
+            content_layout.addWidget(
+                _create_chart_section("Top Penyelenggara Beasiswa", canvas_penyelenggara, 300)
+            )
+            content_layout.addWidget(
+                _create_chart_section("Status Ketersediaan Beasiswa", canvas_status, 300)
+            )
         except Exception as e:
             logger.error(f"❌ Gagal memuat chart statistik: {e}")
             error_label = QLabel(
