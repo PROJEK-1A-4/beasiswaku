@@ -301,3 +301,22 @@ def create_bar_chart_lamaran_per_bulan(
         plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
         fig.tight_layout()
         return fig, ax
+
+def load_statistik_data() -> Tuple[Dict[str, int], List[Dict], Dict[str, int]]:
+        """
+        Mengambil data statistik dari CRUD (data real database).
+
+        Return:
+        - jenjang_data: dict jumlah beasiswa per jenjang
+        - top_penyelenggara_data: list top penyelenggara
+        - status_data: dict status ketersediaan beasiswa
+
+        Alasan fungsi ini:
+        - Memisahkan proses ambil data dari proses render chart.
+        """
+        jenjang_data = get_beasiswa_per_jenjang() or {}
+        top_penyelenggara_data = get_top_penyelenggara(limit=5) or []
+        status_data = get_status_availability() or {}
+
+        return jenjang_data, top_penyelenggara_data, status_data
+
