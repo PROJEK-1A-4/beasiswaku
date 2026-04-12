@@ -372,3 +372,27 @@ def figure_to_canvas(fig: plt.Figure) -> FigureCanvas:
         """
         return FigureCanvas(fig)
 
+def build_statistik_canvases() -> Dict[str, FigureCanvas]:
+        """
+        Membuat paket canvas untuk Tab Statistik.
+
+        Return keys:
+        - canvas_jenjang
+        - canvas_penyelenggara
+        - canvas_status
+
+        Alasan:
+        - Mempermudah main.py dengan memanggil sekali untuk dapat 3 chart.
+        """
+        jenjang_data, top_org_data, status_data = load_statistik_data()
+
+        fig_jenjang, _ = create_bar_chart_beasiswa_per_jenjang(jenjang_data)
+        fig_org, _ = create_bar_chart_top_penyelenggara(top_org_data)
+        fig_status, _ = create_pie_chart_status_ketersediaan(status_data)
+
+        return {
+            "canvas_jenjang": figure_to_canvas(fig_jenjang),
+            "canvas_penyelenggara": figure_to_canvas(fig_org),
+            "canvas_status": figure_to_canvas(fig_status),
+        }
+
