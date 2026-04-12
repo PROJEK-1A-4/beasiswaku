@@ -133,7 +133,7 @@ class LoginWindow(QDialog):
         if success:
             user_id = user_data['id']
             self.current_user_id = user_id
-            logger.info(f"✅ User '{username}' berhasil login")
+            logger.info(f"[SUCCESS] User '{username}' berhasil login")
             self.login_success.emit(user_id, username)
             self.accept()  # Close dialog
         else:
@@ -271,8 +271,8 @@ class RegisterWindow(QDialog):
         if success:
             self.new_username = username
             self.new_password = password
-            logger.info(f"✅ Akun '{username}' berhasil dibuat")
-            QMessageBox.information(self, "Sukses", "✅ Akun berhasil dibuat!\n\nSilakan login dengan akun baru Anda.")
+            logger.info(f"[SUCCESS] Akun '{username}' berhasil dibuat")
+            QMessageBox.information(self, "Sukses", "Akun berhasil dibuat!\n\nSilakan login dengan akun baru Anda.")
             self.accept()
         else:
             self.error_label.setText(f"❌ {message}")
@@ -430,7 +430,7 @@ class MainWindow(QMainWindow):
         )
         
         if reply == QMessageBox.StandardButton.Yes:
-            logger.info(f"✅ User '{self.username}' logout")
+            logger.info(f"[SUCCESS] User '{self.username}' logout")
             self.close()
 
 
