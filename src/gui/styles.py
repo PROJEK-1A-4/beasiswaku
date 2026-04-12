@@ -404,3 +404,241 @@ def get_status_badge_stylesheet(status="pending"):
     """
     
     return stylesheet
+
+
+# ==================== TASK 8: BUTTON VARIANTS (Solid/Outlined) ====================
+
+def get_button_solid_stylesheet(color="navy", disabled=False):
+    """
+    Returns stylesheet for solid/filled buttons (primary style).
+    
+    Args:
+        color: 'navy' (default), 'orange', 'success', 'error', 'gray'
+        disabled: If True, applies disabled styling
+    
+    Example:
+        btn.setStyleSheet(get_button_solid_stylesheet('orange'))
+    """
+    
+    color_map = {
+        "navy": {
+            "bg": COLOR_NAVY,
+            "bg_hover": COLOR_NAVY_DARK,
+            "bg_pressed": COLOR_NAVY_DARK,
+            "text": COLOR_WHITE,
+        },
+        "orange": {
+            "bg": COLOR_ORANGE,
+            "bg_hover": COLOR_ORANGE_DARK,
+            "bg_pressed": COLOR_ORANGE_DARK,
+            "text": COLOR_WHITE,
+        },
+        "success": {
+            "bg": COLOR_SUCCESS,
+            "bg_hover": "#059669",  # Darker green
+            "bg_pressed": "#059669",
+            "text": COLOR_WHITE,
+        },
+        "error": {
+            "bg": COLOR_ERROR,
+            "bg_hover": COLOR_ERROR_DARK,
+            "bg_pressed": COLOR_ERROR_DARK,
+            "text": COLOR_WHITE,
+        },
+        "gray": {
+            "bg": COLOR_GRAY_500,
+            "bg_hover": COLOR_GRAY_600,
+            "bg_pressed": COLOR_GRAY_600,
+            "text": COLOR_WHITE,
+        },
+    }
+    
+    colors = color_map.get(color, color_map["navy"])
+    
+    if disabled:
+        return f"""
+        QPushButton {{
+            background-color: {COLOR_GRAY_300};
+            color: {COLOR_GRAY_500};
+            border: none;
+            border-radius: {BORDER_RADIUS_MD};
+            padding: 8px 16px;
+            font-weight: {FONT_WEIGHT_MEDIUM};
+            font-size: {FONT_SIZE_MD}px;
+        }}
+        """
+    
+    return f"""
+    QPushButton {{
+        background-color: {colors['bg']};
+        color: {colors['text']};
+        border: none;
+        border-radius: {BORDER_RADIUS_MD};
+        padding: 8px 16px;
+        font-weight: {FONT_WEIGHT_MEDIUM};
+        font-size: {FONT_SIZE_MD}px;
+    }}
+    QPushButton:hover {{
+        background-color: {colors['bg_hover']};
+    }}
+    QPushButton:pressed {{
+        background-color: {colors['bg_pressed']};
+    }}
+    QPushButton:disabled {{
+        background-color: {COLOR_GRAY_300};
+        color: {COLOR_GRAY_500};
+    }}
+    """
+
+
+def get_button_outlined_stylesheet(color="navy", disabled=False):
+    """
+    Returns stylesheet for outlined/hollow buttons (secondary style).
+    
+    Args:
+        color: 'navy' (default), 'orange', 'error', 'gray'
+        disabled: If True, applies disabled styling
+    
+    Example:
+        btn.setStyleSheet(get_button_outlined_stylesheet('orange'))
+    """
+    
+    color_map = {
+        "navy": {
+            "border": COLOR_NAVY,
+            "border_hover": COLOR_NAVY_DARK,
+            "text": COLOR_NAVY,
+            "text_hover": COLOR_NAVY_DARK,
+            "bg_hover": COLOR_GRAY_50,
+        },
+        "orange": {
+            "border": COLOR_ORANGE,
+            "border_hover": COLOR_ORANGE_DARK,
+            "text": COLOR_ORANGE,
+            "text_hover": COLOR_ORANGE_DARK,
+            "bg_hover": COLOR_WARNING_LIGHT,
+        },
+        "error": {
+            "border": COLOR_ERROR,
+            "border_hover": COLOR_ERROR_DARK,
+            "text": COLOR_ERROR,
+            "text_hover": COLOR_ERROR_DARK,
+            "bg_hover": COLOR_ERROR_LIGHT,
+        },
+        "gray": {
+            "border": COLOR_GRAY_300,
+            "border_hover": COLOR_GRAY_400,
+            "text": COLOR_GRAY_700,
+            "text_hover": COLOR_GRAY_900,
+            "bg_hover": COLOR_GRAY_100,
+        },
+    }
+    
+    colors = color_map.get(color, color_map["navy"])
+    
+    if disabled:
+        return f"""
+        QPushButton {{
+            background-color: {COLOR_WHITE};
+            color: {COLOR_GRAY_400};
+            border: {BORDER_WIDTH_SM} solid {COLOR_GRAY_300};
+            border-radius: {BORDER_RADIUS_MD};
+            padding: 8px 16px;
+            font-weight: {FONT_WEIGHT_MEDIUM};
+            font-size: {FONT_SIZE_MD}px;
+        }}
+        """
+    
+    return f"""
+    QPushButton {{
+        background-color: {COLOR_WHITE};
+        color: {colors['text']};
+        border: {BORDER_WIDTH_SM} solid {colors['border']};
+        border-radius: {BORDER_RADIUS_MD};
+        padding: 8px 16px;
+        font-weight: {FONT_WEIGHT_MEDIUM};
+        font-size: {FONT_SIZE_MD}px;
+    }}
+    QPushButton:hover {{
+        background-color: {colors['bg_hover']};
+        color: {colors['text_hover']};
+        border: {BORDER_WIDTH_SM} solid {colors['border_hover']};
+    }}
+    QPushButton:pressed {{
+        background-color: {colors['bg_hover']};
+        color: {colors['text_hover']};
+        border: {BORDER_WIDTH_SM} solid {colors['border_hover']};
+    }}
+    QPushButton:disabled {{
+        background-color: {COLOR_WHITE};
+        color: {COLOR_GRAY_400};
+        border: {BORDER_WIDTH_SM} solid {COLOR_GRAY_300};
+    }}
+    """
+
+
+def get_button_icon_stylesheet(color="navy", has_border=True):
+    """
+    Returns stylesheet for icon-only buttons (Task 7).
+    
+    Args:
+        color: 'navy' (default), 'error', 'gray', 'orange'
+        has_border: If True, shows subtle border; if False, transparent
+    
+    Example:
+        btn_edit.setStyleSheet(get_button_icon_stylesheet('navy'))
+        btn_delete.setStyleSheet(get_button_icon_stylesheet('error'))
+    """
+    
+    color_map = {
+        "navy": {
+            "icon_color": COLOR_NAVY,
+            "border_color": COLOR_GRAY_300,
+            "border_hover": COLOR_NAVY,
+            "bg_hover": COLOR_GRAY_100,
+        },
+        "error": {
+            "icon_color": COLOR_ERROR,
+            "border_color": COLOR_GRAY_300,
+            "border_hover": COLOR_ERROR,
+            "bg_hover": COLOR_ERROR_LIGHT,
+        },
+        "gray": {
+            "icon_color": COLOR_GRAY_600,
+            "border_color": COLOR_GRAY_300,
+            "border_hover": COLOR_GRAY_600,
+            "bg_hover": COLOR_GRAY_100,
+        },
+        "orange": {
+            "icon_color": COLOR_ORANGE,
+            "border_color": COLOR_GRAY_300,
+            "border_hover": COLOR_ORANGE,
+            "bg_hover": COLOR_WARNING_LIGHT,
+        },
+    }
+    
+    colors = color_map.get(color, color_map["navy"])
+    border_style = f"{BORDER_WIDTH_SM} solid {colors['border_color']}" if has_border else "none"
+    
+    return f"""
+    QPushButton {{
+        background-color: transparent;
+        color: {colors['icon_color']};
+        border: {border_style};
+        border-radius: {BORDER_RADIUS_MD};
+        padding: 4px;
+        font-size: 16px;
+    }}
+    QPushButton:hover {{
+        background-color: {colors['bg_hover']};
+        border: {BORDER_WIDTH_SM} solid {colors['border_hover']};
+    }}
+    QPushButton:pressed {{
+        background-color: {colors['bg_hover']};
+        border: {BORDER_WIDTH_SM} solid {colors['border_hover']};
+    }}
+    QPushButton:disabled {{
+        color: {COLOR_GRAY_400};
+        border: {BORDER_WIDTH_SM} solid {COLOR_GRAY_300};
+    }}
+    """

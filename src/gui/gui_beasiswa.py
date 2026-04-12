@@ -32,7 +32,7 @@ from src.database.crud import (
     delete_beasiswa, get_connection
 )
 from src.gui.design_tokens import *
-from src.gui.styles import get_stylesheet
+from src.gui.styles import get_stylesheet, get_button_solid_stylesheet, get_button_outlined_stylesheet, get_button_icon_stylesheet
 from src.gui.components import AlertBanner, StatusBadge, create_alert, create_status_badge
 
 # Setup logging
@@ -47,17 +47,37 @@ class BeasiswaTab(QWidget):
     - Tabel display dengan 6 kolom
     - Filter by jenjang (D3, D4, S1, S2)
     - Filter by status (Buka, Segera Tutup, Tutup)
-    - Real-time search
-    - CRUD operations (Tambah, Edit, Hapus)
+    - Real-time search with Navy styling
+    - CRUD operations (Tambah, Edit, Hapus) with modern icon design
     - Highlight deadline (merah ≤3 hari, kuning ≤7 hari)
     - Detail popup (double-click)
     - Export to CSV
+    - Responsive UI with Navy + Orange color scheme
     
-    Components Available (Task 6):
-    - StatusBadge: Reusable pill-shaped status indicator
+    Components Available (Tasks 3 & 6):
+    
+    - AlertBanner: Non-blocking in-tab alerts (Task 3)
+      * Types: info, success, warning, error
+      * Auto-close capable with close button
+      * Integrated with CRUD operations
+    
+    - StatusBadge: Reusable pill-shaped status indicator (Task 6)
       * Use: create_status_badge('approved', 'Status Approved')
       * Statuses: pending, approved, rejected, draft, open, closing-soon, closed
       * Pill-shaped with emoji support
+    
+    UI Enhancements (Tasks 1-8):
+    - Task 1: Design tokens system (colors, typography, spacing)
+    - Task 2: Navy + Orange color scheme applied throughout
+    - Task 3: AlertBanner for success/error messages
+    - Task 4: Modern filter section with Navy styling (36px dropdowns)
+    - Task 5: Table left-border accent effect with deadline highlighting
+    - Task 6: StatusBadge pill-shaped component with emoji
+    - Task 7: Icon-only buttons for Edit (✏️) and Hapus (🗑️) - compact 36x36px
+    - Task 8: Button styling variants - solid/outlined with hover/active states
+      * Helper functions: get_button_solid_stylesheet(), get_button_outlined_stylesheet(), get_button_icon_stylesheet()
+      * Applied to all buttons: Tambah, Edit, Hapus, Refresh, Export, and dialog buttons
+      * Variants: Navy (primary), Orange (accent), Error (danger), Gray (secondary)
     """
     
     # Signal untuk refresh data
@@ -624,6 +644,77 @@ class BeasiswaTab(QWidget):
         logger.debug("Table cleared (all rows removed)")
     
     def _create_crud_buttons_layout(self) -> QHBoxLayout:
+        """
+        Create CRUD buttons section with modern button variants (Task 8).
+        
+        Layout:
+        - Tambah button (solid Navy with darker hover)
+        - Spacer
+        - Edit icon (✏️) - transparent with border
+        - Hapus icon (🗑️) - transparent with red border
+        - Refresh button (solid Gray)
+        - Export CSV button (solid Orange)
+        
+        Task 7: Icon-only buttons for compact design
+        Task 8: Applied button styling variants:
+        - Solid buttons: Navy (Tambah), Gray (Refresh), Orange (Export)
+        - Icon buttons: Edit (Navy), Hapus (Error) with transparent bg
+        - All buttons have hover/pressed/disabled states
+        - Consistent spacing and sizing (36px height)
+        """
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        
+        # ===== TASK 8: TAMBAH BUTTON (Solid Navy) =====
+        self.btn_tambah = QPushButton("➕ Tambah Beasiswa")
+        self.btn_tambah.setFont(QFont("Arial", 11, QFont.Weight.Bold))
+        self.btn_tambah.setMinimumHeight(36)
+        self.btn_tambah.setMinimumWidth(160)
+        self.btn_tambah.setStyleSheet(get_button_solid_stylesheet("navy"))
+        layout.addWidget(self.btn_tambah)
+        
+        # ===== SPACER UNTUK PUSH ICONS KE KANAN =====
+        layout.addStretch()
+        
+        # ===== TASK 8: EDIT BUTTON (Icon-only with Navy) =====
+        self.btn_edit = QPushButton("✏️")
+        self.btn_edit.setFont(QFont("Arial", 14))
+        self.btn_edit.setFixedSize(36, 36)
+        self.btn_edit.setToolTip("Edit beasiswa yang dipilih")
+        self.btn_edit.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_edit.setStyleSheet(get_button_icon_stylesheet("navy", has_border=True))
+        layout.addWidget(self.btn_edit)
+        
+        # ===== TASK 8: HAPUS BUTTON (Icon-only with Error) =====
+        self.btn_hapus = QPushButton("🗑️")
+        self.btn_hapus.setFont(QFont("Arial", 14))
+        self.btn_hapus.setFixedSize(36, 36)
+        self.btn_hapus.setToolTip("Hapus beasiswa yang dipilih")
+        self.btn_hapus.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_hapus.setStyleSheet(get_button_icon_stylesheet("error", has_border=True))
+        layout.addWidget(self.btn_hapus)
+        
+        # ===== TASK 8: REFRESH BUTTON (Solid Gray) =====
+        self.btn_refresh = QPushButton("🔄")
+        self.btn_refresh.setFont(QFont("Arial", 12))
+        self.btn_refresh.setMinimumHeight(36)
+        self.btn_refresh.setMinimumWidth(100)
+        self.btn_refresh.setToolTip("Refresh data beasiswa dari database")
+        self.btn_refresh.setStyleSheet(get_button_solid_stylesheet("gray"))
+        layout.addWidget(self.btn_refresh)
+        
+        # ===== TASK 8: EXPORT CSV BUTTON (Solid Orange) =====
+        self.btn_export_csv = QPushButton("📥 Export CSV")
+        self.btn_export_csv.setFont(QFont("Arial", 11, QFont.Weight.Bold))
+        self.btn_export_csv.setMinimumHeight(36)
+        self.btn_export_csv.setMinimumWidth(120)
+        self.btn_export_csv.setStyleSheet(get_button_solid_stylesheet("orange"))
+        layout.addWidget(self.btn_export_csv)
+        
+        logger.debug("✅ CRUD buttons layout created with Task 8 styling variants (solid/icon)")
+        
+        return layout
         """
         Create CRUD buttons section (Task 9-10).
         
@@ -1834,34 +1925,12 @@ class AddBeasiswaDialog(QDialog):
         button_layout.addStretch()
         
         btn_ok = QPushButton("✅ Tambah")
-        btn_ok.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLOR_NAVY};
-                color: {COLOR_WHITE};
-                border: none;
-                border-radius: 5px;
-                padding: 8px 20px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{ background-color: {COLOR_NAVY_DARK}; }}
-            QPushButton:pressed {{ background-color: {COLOR_NAVY_DARK}; }}
-        """)
+        btn_ok.setStyleSheet(get_button_solid_stylesheet("navy"))
         btn_ok.clicked.connect(self.accept)
         button_layout.addWidget(btn_ok)
         
         btn_cancel = QPushButton("❌ Batal")
-        btn_cancel.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLOR_ERROR};
-                color: {COLOR_WHITE};
-                border: none;
-                border-radius: 5px;
-                padding: 8px 20px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{ background-color: {COLOR_ERROR_DARK}; }}
-            QPushButton:pressed {{ background-color: {COLOR_ERROR_DARK}; }}
-        """)
+        btn_cancel.setStyleSheet(get_button_solid_stylesheet("error"))
         btn_cancel.clicked.connect(self.reject)
         button_layout.addWidget(btn_cancel)
         
@@ -2040,34 +2109,12 @@ class EditBeasiswaDialog(QDialog):
         button_layout.addStretch()
         
         btn_ok = QPushButton("✅ Simpan")
-        btn_ok.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLOR_NAVY};
-                color: {COLOR_WHITE};
-                border: none;
-                border-radius: 5px;
-                padding: 8px 20px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{ background-color: {COLOR_NAVY_DARK}; }}
-            QPushButton:pressed {{ background-color: {COLOR_NAVY_DARK}; }}
-        """)
+        btn_ok.setStyleSheet(get_button_solid_stylesheet("navy"))
         btn_ok.clicked.connect(self.accept)
         button_layout.addWidget(btn_ok)
         
         btn_cancel = QPushButton("❌ Batal")
-        btn_cancel.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLOR_ERROR};
-                color: {COLOR_WHITE};
-                border: none;
-                border-radius: 5px;
-                padding: 8px 20px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{ background-color: {COLOR_ERROR_DARK}; }}
-            QPushButton:pressed {{ background-color: {COLOR_ERROR_DARK}; }}
-        """)
+        btn_cancel.setStyleSheet(get_button_solid_stylesheet("error"))
         btn_cancel.clicked.connect(self.reject)
         button_layout.addWidget(btn_cancel)
         
@@ -2196,37 +2243,13 @@ Tindakan ini TIDAK DAPAT DIBATALKAN dan akan menghapus semua data terkait."""
         
         # Yes button (Delete) - Red
         btn_yes = QPushButton("🗑️ Ya, Hapus")
-        btn_yes.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLOR_ERROR};
-                color: {COLOR_WHITE};
-                border: none;
-                border-radius: 5px;
-                padding: 10px 25px;
-                font-weight: bold;
-                font-size: 11px;
-            }}
-            QPushButton:hover {{ background-color: {COLOR_ERROR_DARK}; }}
-            QPushButton:pressed {{ background-color: {COLOR_ERROR_DARK}; }}
-        """)
+        btn_yes.setStyleSheet(get_button_solid_stylesheet("error"))
         btn_yes.clicked.connect(self.accept)
         button_layout.addWidget(btn_yes)
         
         # No button (Cancel) - Gray
         btn_no = QPushButton("❌ Batal")
-        btn_no.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLOR_GRAY_500};
-                color: {COLOR_WHITE};
-                border: none;
-                border-radius: 5px;
-                padding: 10px 25px;
-                font-weight: bold;
-                font-size: 11px;
-            }}
-            QPushButton:hover {{ background-color: {COLOR_GRAY_600}; }}
-            QPushButton:pressed {{ background-color: {COLOR_GRAY_600}; }}
-        """)
+        btn_no.setStyleSheet(get_button_solid_stylesheet("gray"))
         btn_no.clicked.connect(self.reject)
         button_layout.addWidget(btn_no)
         
@@ -2299,19 +2322,7 @@ class BeasiswaDetailDialog(QDialog):
         
         # Close button
         btn_close = QPushButton("✅ Tutup")
-        btn_close.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLOR_NAVY};
-                color: {COLOR_WHITE};
-                border: none;
-                border-radius: 5px;
-                padding: 10px 30px;
-                font-weight: bold;
-                font-size: 11px;
-            }}
-            QPushButton:hover {{ background-color: {COLOR_NAVY_DARK}; }}
-            QPushButton:pressed {{ background-color: {COLOR_NAVY_DARK}; }}
-        """)
+        btn_close.setStyleSheet(get_button_solid_stylesheet("navy"))
         btn_close.clicked.connect(self.accept)
         button_layout.addWidget(btn_close)
         
