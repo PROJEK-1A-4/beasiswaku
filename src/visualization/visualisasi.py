@@ -86,11 +86,11 @@ def create_pie_chart_lamaran(user_id: int) -> FigureCanvas:
         ax.set_title('Proporsi Status Lamaran', fontsize=12, pad=15, fontweight='bold')
         fig.tight_layout()
         
-        logger.info(f"✅ Pie chart lamaran berhasil di-generate untuk user {user_id}")
+        logger.info(f"Pie chart lamaran berhasil di-generate untuk user {user_id}")
         return FigureCanvas(fig)
         
     except Exception as e:
-        logger.error(f"❌ Error generating pie chart lamaran: {e}")
+        logger.error(f"Error generating pie chart lamaran: {e}")
         return create_empty_canvas("Gagal memuat grafik")
 
 
@@ -148,11 +148,11 @@ def create_bar_chart_lamaran_per_bulan(user_id: int) -> FigureCanvas:
             
         fig.tight_layout()
         
-        logger.info(f"✅ Bar chart tren lamaran berhasil di-generate untuk user {user_id}")
+        logger.info(f"Bar chart tren lamaran berhasil di-generate untuk user {user_id}")
         return FigureCanvas(fig)
 
     except Exception as e:
-        logger.error(f"❌ Error generating bar chart lamaran: {e}")
+        logger.error(f"Error generating bar chart lamaran: {e}")
         return create_empty_canvas("Gagal memuat grafik")
     
 # ============================================================================
@@ -190,7 +190,7 @@ def create_bar_chart_jenjang() -> FigureCanvas:
         return FigureCanvas(fig)
 
     except Exception as e:
-        logger.error(f"❌ Error generating chart jenjang: {e}")
+        logger.error(f"Error generating chart jenjang: {e}")
         return create_empty_canvas("Gagal memuat grafik")
 
 
@@ -228,7 +228,7 @@ def create_bar_chart_top_penyelenggara(limit: int = 5) -> FigureCanvas:
         return FigureCanvas(fig)
 
     except Exception as e:
-        logger.error(f"❌ Error generating chart top penyelenggara: {e}")
+        logger.error(f"Error generating chart top penyelenggara: {e}")
         return create_empty_canvas("Gagal memuat grafik")
 
 
@@ -261,5 +261,5 @@ def create_pie_chart_status() -> FigureCanvas:
         return FigureCanvas(fig)
 
     except Exception as e:
-        logger.error(f"❌ Error generating chart status ketersediaan: {e}")
+        logger.error(f"Error generating chart status ketersediaan: {e}")
         return create_empty_canvas("Gagal memuat grafik")
