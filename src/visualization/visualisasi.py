@@ -57,6 +57,17 @@ def _apply_axis_style(ax) -> None:
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
+
+def _style_chart_title(ax, title: str) -> None:
+    """Membuat judul chart lebih menonjol dan aman dari clipping."""
+    ax.set_title(
+        title,
+        fontsize=13,
+        fontweight="bold",
+        color="#203040",
+        pad=16,
+    )
+
 def _render_empty_state(ax, title: str, message: str = "Data tidak tersedia") -> None:
     """
     Menampilkan tampilan fallback apabila data kosong.
@@ -65,7 +76,7 @@ def _render_empty_state(ax, title: str, message: str = "Data tidak tersedia") ->
     - Aplikasi tidak crash saat database belum ada data.
     - User tetap dapat feedback visual yang jelas.
     """
-    ax.set_title(title)
+    _style_chart_title(ax, title)
     ax.set_facecolor("#f8fafc")
     ax.text(
         0.5, 0.58, "📭",
@@ -120,7 +131,7 @@ def create_bar_chart_beasiswa_per_jenjang(
         values = [int(v) for v in data.values()]
 
         bars = ax.bar(labels, values, color=COLOR_PALETTE["bar_default"], alpha=0.9)
-        ax.set_title(title)
+        _style_chart_title(ax, title)
         ax.set_xlabel("Jenjang")
         ax.set_ylabel("Jumlah Beasiswa")
         _apply_axis_style(ax)
@@ -136,6 +147,7 @@ def create_bar_chart_beasiswa_per_jenjang(
                 fontsize=10,
             )
 
+        fig.subplots_adjust(top=0.88, bottom=0.18)
         fig.tight_layout()
         return fig, ax
 
@@ -170,7 +182,7 @@ def create_bar_chart_top_penyelenggara(
         totals = [int(item.get("total_beasiswa", 0)) for item in sliced]
 
         bars = ax.barh(names, totals, color=COLOR_PALETTE["bar_secondary"], alpha=0.9)
-        ax.set_title(title)
+        _style_chart_title(ax, title)
         ax.set_xlabel("Jumlah Beasiswa")
         ax.set_ylabel("Penyelenggara")
         _apply_axis_style(ax)
@@ -185,6 +197,7 @@ def create_bar_chart_top_penyelenggara(
                 fontsize=10,
             )
 
+        fig.subplots_adjust(top=0.88, bottom=0.18)
         fig.tight_layout()
         return fig, ax
 
@@ -224,8 +237,9 @@ def create_pie_chart_status_ketersediaan(
             wedgeprops={"edgecolor": "white", "linewidth": 1.0},
             textprops={"fontsize": 10},
         )
-        ax.set_title(title)
+        _style_chart_title(ax, title)
         ax.axis("equal")
+        fig.subplots_adjust(top=0.88, bottom=0.08)
         fig.tight_layout()
         return fig, ax
 
@@ -265,8 +279,9 @@ def create_pie_chart_status_lamaran(
             wedgeprops={"edgecolor": "white", "linewidth": 1.0},
             textprops={"fontsize": 10},
         )
-        ax.set_title(title)
+        _style_chart_title(ax, title)
         ax.axis("equal")
+        fig.subplots_adjust(top=0.88, bottom=0.08)
         fig.tight_layout()
         return fig, ax
 
@@ -297,7 +312,7 @@ def create_bar_chart_lamaran_per_bulan(
         values = [int(data[m]) for m in months]
 
         bars = ax.bar(months, values, color=COLOR_PALETTE["bar_default"], alpha=0.9)
-        ax.set_title(title)
+        _style_chart_title(ax, title)
         ax.set_xlabel("Bulan")
         ax.set_ylabel("Jumlah Lamaran")
         _apply_axis_style(ax)
@@ -313,7 +328,7 @@ def create_bar_chart_lamaran_per_bulan(
             )
 
         plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
-        fig.subplots_adjust(bottom=0.25)
+        fig.subplots_adjust(top=0.88, bottom=0.28)
         fig.tight_layout()
         return fig, ax
 
