@@ -345,8 +345,17 @@ class MainWindow(QMainWindow):
         layout.setSpacing(10)
         
         # ===== TOP BAR =====
-        top_bar_layout = QHBoxLayout()
-        top_bar_layout.setContentsMargins(4, 4, 4, 4)
+        header_bar = QWidget()
+        header_bar.setStyleSheet("""
+            QWidget {
+                background: white;
+                border: 1px solid #d7dee8;
+                border-radius: 12px;
+            }
+        """)
+        top_bar_layout = QHBoxLayout(header_bar)
+        top_bar_layout.setContentsMargins(16, 12, 16, 12)
+        top_bar_layout.setSpacing(10)
         
         # App logo/title
         app_title = QLabel("🎓 BeasiswaKu - Personal Scholarship Manager")
@@ -377,10 +386,12 @@ class MainWindow(QMainWindow):
         logout_btn.clicked.connect(self.handle_logout)
         top_bar_layout.addWidget(logout_btn)
         
-        layout.addLayout(top_bar_layout)
+        layout.addWidget(header_bar)
         
         # ===== TAB WIDGET =====
         self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)
+        self.tabs.setStyleSheet(self.tabs.styleSheet() + "QTabBar::tab { min-width: 110px; }")
         
         # Tab 1: Beasiswa
         self.beasiswa_tab = BeasiswaTab(self.user_id)
@@ -445,20 +456,55 @@ class BeasiswaTab(QWidget):
     def init_ui(self):
         """Initialize beasiswa tab UI"""
         layout = QVBoxLayout()
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(0)
+
+        card = QWidget()
+        card.setStyleSheet("""
+            QWidget {
+                background: #ffffff;
+                border: 1px solid #d7dee8;
+                border-radius: 12px;
+            }
+        """)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(24, 24, 24, 24)
+        card_layout.setSpacing(12)
+
+        title = QLabel("📚 Daftar Beasiswa")
+        title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        title.setStyleSheet("color: #203040;")
+        card_layout.addWidget(title)
+
+        subtitle = QLabel("Area ini akan berisi daftar beasiswa, filter, dan aksi CRUD.")
+        subtitle.setFont(QFont("Arial", 10))
+        subtitle.setStyleSheet("color: #607080;")
+        card_layout.addWidget(subtitle)
         
         # Placeholder content
-        label = QLabel("📚 Daftar Beasiswa\n\n" + 
+        label = QLabel("" + 
                       "Fitur ini akan menampilkan:\n" +
                       "• Tabel beasiswa dengan filter & search\n" +
                       "• Highlight deadline (merah/kuning)\n" +
                       "• CRUD beasiswa (tambah, edit, hapus)\n" +
                       "• Export CSV\n" +
                       "• Refresh data")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         label.setFont(QFont("Arial", 11))
-        label.setStyleSheet("padding: 50px; background-color: #f0f0f0; border-radius: 5px;")
+        label.setStyleSheet("""
+            QLabel {
+                padding: 18px;
+                background: #f7f9fc;
+                color: #243447;
+                border: 1px dashed #c7d0db;
+                border-radius: 10px;
+                line-height: 1.5;
+            }
+        """)
         
-        layout.addWidget(label)
+        card_layout.addWidget(label)
+        card_layout.addStretch()
+        layout.addWidget(card)
         self.setLayout(layout)
 
 
