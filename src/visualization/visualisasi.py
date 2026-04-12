@@ -44,3 +44,17 @@ COLOR_PALETTE = {
     "grid": "#D9D9D9",
     "empty_text": "#777777",
 }
+
+def _apply_axis_style(ax) -> None:
+    """
+    Fungsi helper internal untuk merapikan style sumbu chart.
+
+    Alasan ada fungsi ini:
+    - Agar semua chart memiliki style yang konsisten.
+    - Menghindari duplikasi kode styling di setiap fungsi chart.
+    """
+    ax.grid(axis="y", linestyle="--", alpha=0.35, color=COLOR_PALETTE["grid"])
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    
