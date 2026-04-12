@@ -79,7 +79,6 @@ def _render_empty_state(ax, title: str, message: str = "Data tidak tersedia") ->
     ax.spines["left"].set_visible(False)
     ax.spines["bottom"].set_visible(False)
 
-
     def create_bar_chart_beasiswa_per_jenjang(
         data: Dict[str, int],
         title: str = "Jumlah Beasiswa per Jenjang",
@@ -120,6 +119,55 @@ def _render_empty_state(ax, title: str, message: str = "Data tidak tersedia") ->
                 str(value),
                 ha="center",
                 va="bottom",
+                fontsize=10,
+            )
+
+        fig.tight_layout()
+        return fig, ax
+
+def create_bar_chart_top_penyelenggara(
+        data: List[Dict],
+        title: str = "Top Penyelenggara Beasiswa",
+        limit: int = 5,
+    ) -> Tuple[plt.Figure, plt.Axes]:
+        """
+        Membuat bar horizontal untuk top penyelenggara.
+
+        Input:
+        - data: list of dict, contoh:
+          [{"nama_penyelenggara": "LPDP", "total_beasiswa": 12}, ...]
+        - limit: jumlah top data yang ditampilkan (default 5)
+
+        Return:
+        - (figure, axes)
+
+        Alasan chart ini:
+        - Menunjukkan institusi penyedia beasiswa paling dominan.
+        """
+        fig, ax = plt.subplots(figsize=(9, 5))
+
+        if not data:
+            _render_empty_state(ax, title)
+            fig.tight_layout()
+            return fig, ax
+
+        sliced = data[: max(1, limit)]
+        names = [str(item.get("nama_penyelenggara", "Unknown")) for item in sliced]
+        totals = [int(item.get("total_beasiswa", 0)) for item in sliced]
+
+        bars = ax.barh(names, totals, color=COLOR_PALETTE["bar_secondary"], alpha=0.9)
+        ax.set_title(title)
+        ax.set_xlabel("Jumlah Beasiswa")
+        ax.set_ylabel("Penyelenggara")
+        _apply_axis_style(ax)
+        ax.invert_yaxis()  # Nilai tertinggi di atas
+
+        for bar, total in zip(bars, totals):
+            ax.text(
+                total + 0.05,
+                bar.get_y() + bar.get_height() / 2,
+                str(total),
+                va="center",
                 fontsize=10,
             )
 
