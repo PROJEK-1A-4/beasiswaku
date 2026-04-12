@@ -78,3 +78,50 @@ def _render_empty_state(ax, title: str, message: str = "Data tidak tersedia") ->
     ax.spines["right"].set_visible(False)
     ax.spines["left"].set_visible(False)
     ax.spines["bottom"].set_visible(False)
+
+
+    def create_bar_chart_beasiswa_per_jenjang(
+        data: Dict[str, int],
+        title: str = "Jumlah Beasiswa per Jenjang",
+    ) -> Tuple[plt.Figure, plt.Axes]:
+        """
+        Membuat bar chart jumlah beasiswa per jenjang.
+
+        Input:
+        - data: dict, contoh {"D3": 4, "D4": 5, "S1": 14, "S2": 9}
+
+        Return:
+        - (figure, axes) dari matplotlib
+
+        Alasan chart ini:
+        - Menjawab pertanyaan: jenjang mana yang paling banyak peluang beasiswanya?
+        """
+        fig, ax = plt.subplots(figsize=(8, 4.5))
+
+        if not data:
+            _render_empty_state(ax, title)
+            fig.tight_layout()
+            return fig, ax
+
+        labels = list(data.keys())
+        values = [int(v) for v in data.values()]
+
+        bars = ax.bar(labels, values, color=COLOR_PALETTE["bar_default"], alpha=0.9)
+        ax.set_title(title)
+        ax.set_xlabel("Jenjang")
+        ax.set_ylabel("Jumlah Beasiswa")
+        _apply_axis_style(ax)
+
+        # Label angka di atas bar agar nilai mudah dibaca saat presentasi
+        for bar, value in zip(bars, values):
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                value + 0.05,
+                str(value),
+                ha="center",
+                va="bottom",
+                fontsize=10,
+            )
+
+        fig.tight_layout()
+        return fig, ax
