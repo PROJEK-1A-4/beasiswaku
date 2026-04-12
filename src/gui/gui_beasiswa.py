@@ -553,10 +553,14 @@ class BeasiswaTab(QWidget):
         header.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         header.setStyleSheet(f"background-color: {COLOR_NAVY}; color: {COLOR_WHITE};")
         header.setStretchLastSection(False)
+        header.setMinimumHeight(40)  # Increase header height for better spacing
+        header.setDefaultAlignment(Qt.AlignmentFlag.AlignVCenter)
         
         # ===== SELECTION BEHAVIOR =====
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        table.setSelectionModel(table.selectionModel())
+        table.setDefaultRowHeight(36)  # Increase row height untuk better readability dan spacing
         
         # ===== ROW APPEARANCE =====
         table.setAlternatingRowColors(True)
@@ -567,14 +571,26 @@ class BeasiswaTab(QWidget):
                 gridline-color: {COLOR_GRAY_200};
             }}
             QTableWidget::item {{
-                padding: 5px;
+                padding: 8px 10px;
                 border: none;
+                border-left: 4px solid transparent;
+            }}
+            QTableWidget::item:selected {{
+                background-color: {COLOR_NAVY};
+                color: {COLOR_WHITE};
             }}
         """)
         
         # ===== RESIZE BEHAVIOR =====
         table.setSortingEnabled(False)  # Will be enabled in Task 8 extension
         table.setColumnCount(6)
+        
+        # ===== TASK 5: MODERN TABLE STYLING WITH LEFT BORDER ACCENT =====
+        # Instead of full-row background colors, use subtle background + deadline text color
+        # This creates visual hierarchy:
+        # - Deadline cell: Bold colored text (Red/Orange/Green) untuk strong signal
+        # - Row background: Subtle light color (error-light, warning-light, white)
+        # - Combined effect: Looks like left border accent while maintaining readability
         
         # ===== READ-ONLY CELLS =====
         # Cells will be set as read-only in Task 12 during population
@@ -1375,6 +1391,88 @@ class BeasiswaTab(QWidget):
     # =====================================================================
     
     def highlight_deadline(self, deadline_str: str) -> Tuple[QColor, str]:
+        """
+        Determine deadline status and return matching color enum and status text (Task 25).
+        
+        Color logic:
+        - Red (#FF6B6B): overdue atau ≤ 3 hari
+        - Orange (#FFA500): 4-7 hari
+        - Green (#4CAF50): > 7 hari
+        """
+        try:
+            deadline = datetime.strptime(deadline_str, '%Y-%m-%d').date()
+            today = datetime.now().date()
+            days_remaining = (deadline - today).days
+            
+            if days_remaining < 0:
+                return QColor(COLOR_DEADLINE_CRITICAL), "LEWAT"  # Red - overdue
+            elif days_remaining <= 3:
+                return QColor(COLOR_DEADLINE_CRITICAL), f"{days_remaining}h"  # Red - urgent
+            elif days_remaining <= 7:
+                return QColor(COLOR_DEADLINE_WARNING), f"{days_remaining}h"  # Yellow - soon
+            else:
+                return QColor(COLOR_DEADLINE_SAFE), f"{days_remaining}h"  # Green - plenty of time
+        except ValueError:
+            return QColor(COLOR_WHITE), "?"
+    
+    def apply_row_formatting(self):
+        """
+        Apply deadline highlight to all table rows (Task 5 + Task 26).
+        Modern styling dengan subtle left border accent via background colors.
+        
+        Styling strategy (Task 5 - Modern left border design):
+        - Instead of full row background, use subtle color blend
+        - Deadline text color: Red/Orange/Green (strong)
+        - Row background: Light red/orange/white (subtle)
+        - Gives left-border accent effect through visual hierarchy
+        
+        Colors:
+        - Red (≤3 hari deadline): ERROR_LIGHT background
+        - Orange (≤7 hari deadline): WARNING_LIGHT background  
+        - Green (>7 hari deadline): WHITE background
+        """
+        if not self.tbl_beasiswa:
+            logger.warning("Table widget not initialized for formatting")
+            return
+        
+        try:
+            # Iterate setiap row untuk apply deadline-based styling
+            for row in range(self.tbl_beasiswa.rowCount()):
+                # Get deadline dari column 4
+                deadline_item = self.tbl_beasiswa.item(row, 4)
+                
+                if deadline_item:
+                    # Parse deadline dan get color
+                    deadline_str = deadline_item.text()
+                    color, status_text = self.highlight_deadline(deadline_str)
+                    
+                    # Apply color text to deadline cell dengan bold
+                    deadline_item.setForeground(QBrush(color))
+                    deadline_item.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+                    
+                    # Apply subtle background styling to all cells in row (Task 5 - Left border effect)
+                    for col in range(self.tbl_beasiswa.columnCount()):
+                        cell_item = self.tbl_beasiswa.item(row, col)
+                        if cell_item:
+                            cell_item.setFont(QFont("Arial", 10))
+                            
+                            # Set subtle background untuk indicate deadline urgency
+                            if color == QColor(COLOR_DEADLINE_CRITICAL):  # Red - urgent/overdue
+                                # Light red background untuk visual urgency
+                                cell_item.setBackground(QBrush(QColor(COLOR_ERROR_LIGHT)))
+                                
+                            elif color == QColor(COLOR_DEADLINE_WARNING):  # Orange - soon
+                                # Light orange background untuk visual warning
+                                cell_item.setBackground(QBrush(QColor(COLOR_WARNING_LIGHT)))
+                                
+                            else:  # Green - plenty of time
+                                # Keep white/default background untuk success state
+                                cell_item.setBackground(QBrush(QColor(COLOR_WHITE)))
+            
+            logger.info(f"✅ Row formatting applied to {self.tbl_beasiswa.rowCount()} rows (modern accent styling)")
+            
+        except Exception as e:
+            logger.error(f"❌ Error applying row formatting: {e}")
         """
         Determine deadline color based on days remaining (Task 25).
         
