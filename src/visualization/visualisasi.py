@@ -79,7 +79,7 @@ def _render_empty_state(ax, title: str, message: str = "Data tidak tersedia") ->
     ax.spines["left"].set_visible(False)
     ax.spines["bottom"].set_visible(False)
 
-    def create_bar_chart_beasiswa_per_jenjang(
+def create_bar_chart_beasiswa_per_jenjang(
         data: Dict[str, int],
         title: str = "Jumlah Beasiswa per Jenjang",
     ) -> Tuple[plt.Figure, plt.Axes]:
@@ -171,5 +171,46 @@ def create_bar_chart_top_penyelenggara(
                 fontsize=10,
             )
 
+        fig.tight_layout()
+        return fig, ax
+
+def create_pie_chart_status_ketersediaan(
+        data: Dict[str, int],
+        title: str = "Status Ketersediaan Beasiswa",
+    ) -> Tuple[plt.Figure, plt.Axes]:
+        """
+        Membuat pie chart status ketersediaan beasiswa.
+
+        Input:
+        - data: dict, contoh {"Buka": 18, "Segera Tutup": 7, "Tutup": 3}
+
+        Return:
+        - (figure, axes)
+
+        Alasan chart ini:
+        - Mempermudah melihat proporsi beasiswa yang masih buka atau hampir tutup atau sudah tutup.
+        """
+        fig, ax = plt.subplots(figsize=(6.5, 6.5))
+
+        if not data:
+            _render_empty_state(ax, title)
+            fig.tight_layout()
+            return fig, ax
+
+        labels = list(data.keys())
+        values = [int(v) for v in data.values()]
+        colors = [COLOR_PALETTE.get(label, "#90A4AE") for label in labels]
+
+        ax.pie(
+            values,
+            labels=labels,
+            colors=colors,
+            autopct="%1.1f%%",
+            startangle=90,
+            wedgeprops={"edgecolor": "white", "linewidth": 1.0},
+            textprops={"fontsize": 10},
+        )
+        ax.set_title(title)
+        ax.axis("equal")
         fig.tight_layout()
         return fig, ax
