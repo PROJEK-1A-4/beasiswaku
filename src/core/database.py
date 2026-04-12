@@ -55,15 +55,32 @@ class DatabaseManager:
             sqlite3.Connection: Active database connection
         """
         if self._connection is None:
-            from .config import Config
-            self._connection = sqlite3.connect(
-                str(self.db_path),
-                timeout=Config.DATABASE_TIMEOUT,
-                check_same_thread=Config.DATABASE_CHECK_SAME_THREAD
-            )
-            self._connection.row_factory = sqlite3.Row
-            logger.debug("New database connection created")
+            self._connection = self._create_connection()
+        else:
+            try:
+                self._connection.execute("SELECT 1")
+            except sqlite3.Error:
+                logger.warning("Existing database connection was closed/invalid. Reconnecting...")
+                try:
+                    self._connection.close()
+                except sqlite3.Error:
+                    pass
+                self._connection = self._create_connection()
+
         return self._connection
+
+    def _create_connection(self) -> sqlite3.Connection:
+        """Create a fresh sqlite connection with configured defaults."""
+        from .config import Config
+
+        connection = sqlite3.connect(
+            str(self.db_path),
+            timeout=Config.DATABASE_TIMEOUT,
+            check_same_thread=Config.DATABASE_CHECK_SAME_THREAD
+        )
+        connection.row_factory = sqlite3.Row
+        logger.debug("New database connection created")
+        return connection
 
     def close_connection(self) -> None:
         """Close the database connection."""

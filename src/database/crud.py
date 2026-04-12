@@ -1297,9 +1297,11 @@ def get_favorit_list(user_id: int, sort_by: str = 'created_at',
             SELECT 
                 f.id, f.user_id, f.beasiswa_id, f.created_at,
                 b.judul, b.jenjang, b.deadline, b.benefit, b.status,
-                b.penyelenggara_id, b.minimal_ipk, b.coverage
+                b.penyelenggara_id, b.minimal_ipk, b.coverage,
+                COALESCE(p.nama, 'Tidak Ada') as penyelenggara
             FROM favorit f
             JOIN beasiswa b ON f.beasiswa_id = b.id
+            LEFT JOIN penyelenggara p ON b.penyelenggara_id = p.id
             WHERE f.user_id = ?
             ORDER BY {sort_column} {sort_order}
         """

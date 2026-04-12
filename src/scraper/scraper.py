@@ -450,7 +450,7 @@ if PYQT_AVAILABLE:
         
         Signals:
             progress (int): Progress 0-100
-            finished (list): List of beasiswa saat selesai
+            finished (object): Scrape payload saat selesai
             error (str): Error message jika terjadi error
         
         Usage:
@@ -463,7 +463,7 @@ if PYQT_AVAILABLE:
         
         # Define signals
         progress = pyqtSignal(int)      # Progress 0-100
-        finished = pyqtSignal(list)     # Result: list of beasiswa
+        finished = pyqtSignal(object)   # Result: scrape payload
         error = pyqtSignal(str)         # Error message
         
         def run(self):
@@ -477,9 +477,10 @@ if PYQT_AVAILABLE:
                 
                 # Main scraping logic
                 beasiswa_data = scrape_beasiswa_data()
+                total_rows = len(beasiswa_data.get("beasiswa", [])) if isinstance(beasiswa_data, dict) else len(beasiswa_data)
                 
                 self.progress.emit(100)  # 100% - complete
-                logger.info(f"✅ Background scraping done: {len(beasiswa_data)} beasiswa")
+                logger.info(f"✅ Background scraping done: {total_rows} beasiswa")
                 
                 # Emit hasil ke main thread
                 self.finished.emit(beasiswa_data)
@@ -568,9 +569,14 @@ def auto_scrape_on_startup(crud_module):
         # 1. Cek apakah database kosong menggunakan fungsi dari crud.py milik Darva
         # Asumsi: Darva memiliki fungsi get_beasiswa_list() yang mengembalikan list
         existing_data = crud_module.get_beasiswa_list()
+        total_data = 0
+        if isinstance(existing_data, tuple) and len(existing_data) >= 2:
+            total_data = int(existing_data[1] or 0)
+        elif isinstance(existing_data, list):
+            total_data = len(existing_data)
         
         # 2. Jika kosong (panjang list = 0), jalankan scraping
-        if not existing_data:
+        if total_data == 0:
             logger.info("⚠️ Database beasiswa masih kosong. Memulai proses auto-scraping...")
             
             # Jalankan proses scraping utamamu
@@ -587,7 +593,7 @@ def auto_scrape_on_startup(crud_module):
                 return False
                 
         else:
-            logger.info(f"✅ Database sudah terisi ({len(existing_data)} data). Melewati auto-scraping.")
+            logger.info(f"✅ Database sudah terisi ({total_data} data). Melewati auto-scraping.")
             return False
             
     except Exception as e:

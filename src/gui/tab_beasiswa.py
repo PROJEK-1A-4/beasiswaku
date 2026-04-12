@@ -12,14 +12,23 @@ import os
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QLineEdit,
     QPushButton, QComboBox, QTableWidget, QTableWidgetItem, QHeaderView,
-    QAbstractItemView, QFileDialog, QSpacerItem, QSizePolicy
+    QAbstractItemView, QFileDialog, QSpacerItem, QSizePolicy, QMessageBox
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QFont, QIcon, QColor
 
 from src.gui.design_tokens import *
-from src.gui.styles import get_button_solid_stylesheet, get_input_field_stylesheet
+from src.database.crud import (
+    add_favorit,
+    add_lamaran,
+    check_user_applied,
+    delete_favorit,
+    get_connection,
+)
+from src.core.database import DatabaseManager
+from src.scraper.scraper import get_scraper_thread
 from src.services.beasiswa_service import get_beasiswa_table_data
+from src.services.dashboard_service import sync_beasiswa_from_scraper
 from src.services.status_utils import SCHOLARSHIP_STATUS_ORDER
 
 # Setup logging
@@ -43,10 +52,16 @@ class BeasiswaTab(QWidget):
         super().__init__(parent)
         self.user_id = user_id
         self.beasiswa_data: List[Dict[str, Any]] = []
+        self.refresh_btn: Optional[QPushButton] = None
+        self.sync_btn: Optional[QPushButton] = None
+        self._sync_thread = None
+        self._sync_in_progress = False
         
         logger.info(f"Initializing BeasiswaTab")
         self.init_ui()
-        self.load_beasiswa_data()
+        loaded_count = self.load_beasiswa_data()
+        if loaded_count == 0:
+            self.sync_from_web(auto_trigger=True)
     
     def init_ui(self):
         """Initialize Beasiswa Tab UI dengan search, filters, dan table."""
@@ -191,10 +206,10 @@ class BeasiswaTab(QWidget):
         toolbar_layout.addWidget(deadline_btn)
         
         # Refresh button
-        refresh_btn = QPushButton("↻ Refresh")
-        refresh_btn.setMinimumHeight(40)
-        refresh_btn.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
-        refresh_btn.setStyleSheet(f"""
+        self.refresh_btn = QPushButton("↻ Refresh")
+        self.refresh_btn.setMinimumHeight(40)
+        self.refresh_btn.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        self.refresh_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLOR_WHITE};
                 border: 1px solid {COLOR_GRAY_200};
@@ -211,8 +226,32 @@ class BeasiswaTab(QWidget):
                 background-color: {COLOR_GRAY_200};
             }}
         """)
-        refresh_btn.clicked.connect(self.refresh_data)
-        toolbar_layout.addWidget(refresh_btn)
+        self.refresh_btn.clicked.connect(self.refresh_data)
+        toolbar_layout.addWidget(self.refresh_btn)
+
+        # Sync web button
+        self.sync_btn = QPushButton("🌐 Sync Web")
+        self.sync_btn.setMinimumHeight(40)
+        self.sync_btn.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        self.sync_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_WHITE};
+                border: 1px solid {COLOR_ORANGE};
+                border-radius: {BORDER_RADIUS_MD};
+                color: {COLOR_ORANGE};
+                padding: 8px 16px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_WARNING_LIGHT};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_WARNING_LIGHT};
+                border: 1px solid {COLOR_ORANGE_DARK};
+            }}
+        """)
+        self.sync_btn.clicked.connect(self.sync_from_web)
+        toolbar_layout.addWidget(self.sync_btn)
         
         # Export CSV button
         export_btn = QPushButton("⬇ Export CSV")
@@ -289,8 +328,12 @@ class BeasiswaTab(QWidget):
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # PENYELENGGARA
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # JENJANG
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # DEADLINE
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # STATUS
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # AKSI
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Interactive)  # STATUS
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Interactive)  # AKSI
+
+        self.table.setColumnWidth(5, 130)
+        self.table.setColumnWidth(6, 170)
+        self.table.verticalHeader().setDefaultSectionSize(44)
         
         self.table.setMinimumHeight(400)
         main_layout.addWidget(self.table)
@@ -299,9 +342,11 @@ class BeasiswaTab(QWidget):
     def _create_status_badge(self, status: str) -> QWidget:
         """Create a styled status badge."""
         badge_frame = QFrame()
+        badge_frame.setObjectName("statusBadgeFrame")
         badge_layout = QHBoxLayout(badge_frame)
-        badge_layout.setContentsMargins(8, 4, 8, 4)
+        badge_layout.setContentsMargins(0, 0, 0, 0)
         badge_layout.setSpacing(0)
+        badge_frame.setMinimumHeight(28)
         
         # Determine colors based on status
         if status == "Buka":
@@ -318,21 +363,25 @@ class BeasiswaTab(QWidget):
             border_color = COLOR_GRAY_400
         
         badge_label = QLabel(status)
+        badge_label.setObjectName("statusBadgeLabel")
         badge_label.setFont(QFont(FONT_FAMILY_PRIMARY, 9))
+        badge_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         badge_label.setStyleSheet(f"""
+            background-color: {bg_color};
             color: {text_color};
             font-weight: bold;
-            padding: 4px 8px;
+            padding: 4px 12px;
+            border: 1px solid {border_color};
+            border-radius: 5px;
         """)
-        
+
         badge_frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {bg_color};
-                border: 1px solid {border_color};
-                border-radius: 4px;
+            QFrame#statusBadgeFrame {{
+                background: transparent;
+                border: none;
             }}
         """)
-        
+
         badge_layout.addWidget(badge_label)
         return badge_frame
     
@@ -340,74 +389,164 @@ class BeasiswaTab(QWidget):
         """Create action buttons (View, Bookmark, Apply)."""
         action_frame = QFrame()
         action_layout = QHBoxLayout(action_frame)
-        action_layout.setContentsMargins(0, 0, 0, 0)
-        action_layout.setSpacing(8)
+        action_layout.setContentsMargins(6, 4, 6, 4)
+        action_layout.setSpacing(6)
+        action_frame.setMinimumSize(150, 34)
         
         # View button
-        view_btn = QPushButton("👁")
-        view_btn.setMaximumSize(32, 32)
+        view_btn = QPushButton("Detail")
+        view_btn.setMinimumSize(46, 28)
+        view_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         view_btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: transparent;
-                border: none;
-                font-size: 16px;
+                background-color: {COLOR_WHITE};
+                border: 1px solid {COLOR_GRAY_300};
+                border-radius: 6px;
+                font-size: 10px;
+                color: {COLOR_GRAY_700};
+                font-weight: 600;
+                padding: 0 6px;
             }}
             QPushButton:hover {{
                 background-color: {COLOR_GRAY_100};
-                border-radius: 4px;
+                border: 1px solid {COLOR_GRAY_400};
             }}
         """)
         view_btn.clicked.connect(lambda: self.view_beasiswa(row_id))
         action_layout.addWidget(view_btn)
         
         # Bookmark button
-        bookmark_btn = QPushButton("🔖")
-        bookmark_btn.setMaximumSize(32, 32)
+        bookmark_btn = QPushButton("Fav")
+        bookmark_btn.setMinimumSize(40, 28)
+        bookmark_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         bookmark_btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: transparent;
-                border: none;
-                font-size: 16px;
+                background-color: {COLOR_WHITE};
+                border: 1px solid {COLOR_ORANGE};
+                border-radius: 6px;
+                font-size: 10px;
+                color: {COLOR_ORANGE};
+                font-weight: 600;
+                padding: 0 6px;
             }}
             QPushButton:hover {{
-                background-color: {COLOR_GRAY_100};
-                border-radius: 4px;
+                background-color: {COLOR_WARNING_LIGHT};
             }}
         """)
         bookmark_btn.clicked.connect(lambda: self.toggle_bookmark(row_id))
         action_layout.addWidget(bookmark_btn)
         
         # Apply button
-        apply_btn = QPushButton("✓")
-        apply_btn.setMaximumSize(32, 32)
+        apply_btn = QPushButton("Lamar")
+        apply_btn.setMinimumSize(48, 28)
+        apply_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         apply_btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: transparent;
-                border: none;
-                font-size: 18px;
+                background-color: {COLOR_SUCCESS_LIGHT};
+                border: 1px solid {COLOR_SUCCESS};
+                border-radius: 6px;
+                font-size: 10px;
                 color: {COLOR_SUCCESS};
-                font-weight: bold;
+                font-weight: 700;
+                padding: 0 6px;
             }}
             QPushButton:hover {{
-                background-color: {COLOR_SUCCESS_LIGHT};
-                border-radius: 4px;
+                background-color: #c5f2df;
             }}
         """)
         apply_btn.clicked.connect(lambda: self.apply_beasiswa(row_id))
         action_layout.addWidget(apply_btn)
-        
-        action_layout.addStretch()
+
         return action_frame
     
-    def load_beasiswa_data(self):
+    def load_beasiswa_data(self) -> int:
         """Load beasiswa data dari database."""
         try:
             self.beasiswa_data = get_beasiswa_table_data()
             
             logger.info(f"Loaded {len(self.beasiswa_data)} beasiswa")
             self.populate_table(self.beasiswa_data)
+            self.subtitle_label.setText(
+                "Terakhir diperbaharui: "
+                f"{datetime.now().strftime('%d %b %Y %H:%M')} | "
+                f"Total {len(self.beasiswa_data)} | "
+                f"DB {self._current_db_name()}"
+            )
+            return len(self.beasiswa_data)
         except Exception as e:
             logger.error(f"Error loading beasiswa data: {e}")
+            self.beasiswa_data = []
+            self.populate_table([])
+            self.subtitle_label.setText(
+                "Gagal memuat data | "
+                f"DB {self._current_db_name()}"
+            )
+            return 0
+
+    def _current_db_name(self) -> str:
+        """Get current sqlite filename for quick diagnostics in UI."""
+        try:
+            return DatabaseManager().db_path.name
+        except Exception:
+            return "unknown"
+
+    def _set_sync_state(self, syncing: bool):
+        """Toggle button states while sync is running."""
+        self._sync_in_progress = syncing
+
+        if self.refresh_btn:
+            self.refresh_btn.setEnabled(not syncing)
+
+        if self.sync_btn:
+            self.sync_btn.setEnabled(not syncing)
+            self.sync_btn.setText("⏳ Syncing..." if syncing else "🌐 Sync Web")
+
+    def _finish_sync(self, summary: Dict[str, int]):
+        """Finalize sync flow and reload table."""
+        loaded = self.load_beasiswa_data()
+        self.subtitle_label.setText(
+            "Terakhir diperbaharui: "
+            f"{datetime.now().strftime('%d %b %Y %H:%M')} | "
+            f"Scraped {summary.get('scraped', 0)} | "
+            f"Baru {summary.get('inserted', 0)} | "
+            f"Update {summary.get('updated', 0)} | "
+            f"Total tampil {loaded} | "
+            f"DB {self._current_db_name()}"
+        )
+        self._set_sync_state(False)
+
+    def _on_sync_finished(self, scrape_payload: object):
+        """Handle async scrape completion."""
+        summary = sync_beasiswa_from_scraper(scrape_payload if isinstance(scrape_payload, dict) else None)
+        self._finish_sync(summary)
+
+    def _on_sync_error(self, message: str):
+        """Handle async scrape error."""
+        logger.error("Beasiswa sync error: %s", message)
+        self.subtitle_label.setText(f"Sync gagal: {message} | DB {self._current_db_name()}")
+        self._set_sync_state(False)
+
+    def sync_from_web(self, auto_trigger: bool = False):
+        """Sync latest scholarship data from web scraper into database."""
+        if self._sync_in_progress:
+            return
+
+        self._set_sync_state(True)
+        if auto_trigger:
+            self.subtitle_label.setText("Database kosong, sinkronisasi web dimulai...")
+        else:
+            self.subtitle_label.setText("Sinkronisasi web sedang berjalan...")
+
+        thread = get_scraper_thread()
+        if thread is None:
+            summary = sync_beasiswa_from_scraper()
+            self._finish_sync(summary)
+            return
+
+        self._sync_thread = thread
+        self._sync_thread.finished.connect(self._on_sync_finished)
+        self._sync_thread.error.connect(self._on_sync_error)
+        self._sync_thread.start()
     
     def populate_table(self, data: List[Dict[str, Any]]):
         """Populate table dengan data."""
@@ -446,16 +585,12 @@ class BeasiswaTab(QWidget):
             self.table.setItem(row_idx, 4, deadline_item)
             
             # STATUS (Badge)
-            status_item = QTableWidgetItem()
             badge = self._create_status_badge(item["status"])
             self.table.setCellWidget(row_idx, 5, badge)
-            self.table.setItem(row_idx, 5, status_item)
-            
+
             # AKSI (Buttons)
-            action_item = QTableWidgetItem()
             actions = self._create_action_buttons(item["id"])
             self.table.setCellWidget(row_idx, 6, actions)
-            self.table.setItem(row_idx, 6, action_item)
     
     def filter_table(self):
         """Filter table berdasarkan search dan filters."""
@@ -485,7 +620,10 @@ class BeasiswaTab(QWidget):
     def refresh_data(self):
         """Refresh data dari database."""
         logger.info("Refreshing beasiswa data...")
-        self.load_beasiswa_data()
+        loaded = self.load_beasiswa_data()
+        if loaded == 0 and not self._sync_in_progress:
+            self.sync_from_web(auto_trigger=True)
+            return
         self.subtitle_label.setText(f"Terakhir diperbaharui: {datetime.now().strftime('%d %b %Y %H:%M')}")
     
     def export_to_csv(self):
@@ -518,17 +656,164 @@ class BeasiswaTab(QWidget):
     def view_beasiswa(self, beasiswa_id: int):
         """View beasiswa details."""
         logger.info(f"Viewing beasiswa {beasiswa_id}")
-        # TODO: Implement detail view
+
+        detail = self._get_beasiswa_detail(beasiswa_id)
+        if detail is None:
+            QMessageBox.warning(self, "Detail Tidak Tersedia", "Data detail beasiswa tidak ditemukan.")
+            return
+
+        summary_lines = [
+            f"Nama: {detail.get('judul', '(Tanpa Judul)')}",
+            f"Penyelenggara: {detail.get('penyelenggara', 'Tidak Ada')}",
+            f"Jenjang: {detail.get('jenjang', '-')}",
+            f"Deadline: {detail.get('deadline', '-')}",
+            f"Status: {detail.get('status', '-')}",
+        ]
+
+        extra_lines = [
+            f"Benefit: {detail.get('benefit') or '-'}",
+            f"Persyaratan: {detail.get('persyaratan') or '-'}",
+            f"Minimal IPK: {detail.get('minimal_ipk') if detail.get('minimal_ipk') is not None else '-'}",
+            f"Coverage: {detail.get('coverage') or '-'}",
+            f"Link Aplikasi: {detail.get('link_aplikasi') or '-'}",
+            "",
+            "Deskripsi:",
+            detail.get('deskripsi') or '-',
+        ]
+
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.setWindowTitle("Detail Beasiswa")
+        msg.setText("\n".join(summary_lines))
+        msg.setDetailedText("\n".join(extra_lines))
+        msg.exec()
+
+    def _get_beasiswa_detail(self, beasiswa_id: int) -> Optional[Dict[str, Any]]:
+        """Fetch full scholarship detail row from DB for detail dialog."""
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute(
+                """
+                SELECT b.id, b.judul, COALESCE(p.nama, 'Tidak Ada') AS penyelenggara,
+                       b.jenjang, b.deadline, b.status, b.deskripsi, b.benefit,
+                       b.persyaratan, b.minimal_ipk, b.coverage, b.link_aplikasi
+                FROM beasiswa b
+                LEFT JOIN penyelenggara p ON b.penyelenggara_id = p.id
+                WHERE b.id = ?
+                LIMIT 1
+                """,
+                (beasiswa_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+
+            return {
+                "id": row[0],
+                "judul": row[1],
+                "penyelenggara": row[2],
+                "jenjang": row[3],
+                "deadline": row[4],
+                "status": row[5],
+                "deskripsi": row[6],
+                "benefit": row[7],
+                "persyaratan": row[8],
+                "minimal_ipk": row[9],
+                "coverage": row[10],
+                "link_aplikasi": row[11],
+            }
+        finally:
+            cursor.close()
+
+    def _is_favorited(self, beasiswa_id: int) -> bool:
+        """Check if current user already bookmarked a scholarship."""
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute(
+                """
+                SELECT id FROM favorit
+                WHERE user_id = ? AND beasiswa_id = ?
+                LIMIT 1
+                """,
+                (self.user_id, beasiswa_id),
+            )
+            return cursor.fetchone() is not None
+        finally:
+            cursor.close()
     
     def toggle_bookmark(self, beasiswa_id: int):
         """Toggle bookmark untuk beasiswa."""
         logger.info(f"Toggling bookmark for beasiswa {beasiswa_id}")
-        # TODO: Implement bookmark toggle
+
+        if self._is_favorited(beasiswa_id):
+            success, message = delete_favorit(self.user_id, beasiswa_id)
+            if success:
+                QMessageBox.information(self, "Favorit", message)
+                self._refresh_beranda_tab()
+                return
+            QMessageBox.warning(self, "Favorit Gagal", message)
+            return
+
+        success, message, _ = add_favorit(self.user_id, beasiswa_id)
+        if success:
+            QMessageBox.information(self, "Favorit", message)
+            self._refresh_beranda_tab()
+            return
+
+        QMessageBox.warning(self, "Favorit Gagal", message)
     
     def apply_beasiswa(self, beasiswa_id: int):
         """Apply untuk beasiswa."""
         logger.info(f"Applying for beasiswa {beasiswa_id}")
-        # TODO: Implement apply functionality
+
+        if check_user_applied(self.user_id, beasiswa_id):
+            QMessageBox.information(
+                self,
+                "Lamaran Sudah Ada",
+                "Anda sudah pernah menambahkan lamaran untuk beasiswa ini.",
+            )
+            return
+
+        success, message, _ = add_lamaran(
+            user_id=self.user_id,
+            beasiswa_id=beasiswa_id,
+            status="Pending",
+        )
+
+        if success:
+            QMessageBox.information(self, "Lamaran Berhasil", message)
+            self.subtitle_label.setText(
+                "Lamaran berhasil ditambahkan ke Tracker | "
+                f"DB {self._current_db_name()}"
+            )
+            self._refresh_tracker_tab()
+            return
+
+        QMessageBox.warning(self, "Lamaran Gagal", message)
+
+    def _refresh_tracker_tab(self):
+        """Refresh tracker tab data if main window exposes tracker instance."""
+        try:
+            main_window = self.window()
+            tracker_tab = getattr(main_window, "tracker_tab", None)
+            if tracker_tab and hasattr(tracker_tab, "load_applications"):
+                tracker_tab.load_applications()
+        except Exception as exc:
+            logger.warning("Tracker refresh skipped: %s", exc)
+
+    def _refresh_beranda_tab(self):
+        """Refresh beranda snapshot so favorites/stats stay in sync."""
+        try:
+            main_window = self.window()
+            beranda_tab = getattr(main_window, "beranda_tab", None)
+            if beranda_tab and hasattr(beranda_tab, "load_dashboard_data"):
+                beranda_tab.load_dashboard_data()
+        except Exception as exc:
+            logger.warning("Beranda refresh skipped: %s", exc)
 
 
 def _make_bold_font(font: QFont) -> QFont:

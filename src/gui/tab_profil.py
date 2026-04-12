@@ -40,6 +40,7 @@ class ProfileTab(QWidget):
     
     def init_ui(self):
         """Initialize Profile Tab dengan 2-column layout."""
+        self.setObjectName("profileTabRoot")
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(24, 20, 24, 20)
         main_layout.setSpacing(0)
@@ -70,6 +71,7 @@ class ProfileTab(QWidget):
         scroll.setStyleSheet(f"border: none; background-color: {COLOR_GRAY_BACKGROUND};")
         
         scroll_widget = QWidget()
+        scroll_widget.setObjectName("profileScrollContent")
         scroll_layout = QVBoxLayout(scroll_widget)
         scroll_layout.setContentsMargins(0, 0, 0, 0)
         scroll_layout.setSpacing(0)
@@ -109,17 +111,39 @@ class ProfileTab(QWidget):
         
         scroll.setWidget(scroll_widget)
         main_layout.addWidget(scroll)
-        
-        self.setStyleSheet(f"background-color: {COLOR_GRAY_BACKGROUND};")
+
+        self.setStyleSheet(f"""
+            QWidget#profileTabRoot {{
+                background-color: {COLOR_GRAY_BACKGROUND};
+            }}
+            QWidget#profileScrollContent {{
+                background-color: transparent;
+            }}
+            QLabel {{
+                background: transparent;
+                border: none;
+            }}
+        """)
     
     def _create_profile_card(self) -> QFrame:
         """Create left column profile card."""
         frame = QFrame()
+        frame.setObjectName("profileCard")
         frame.setStyleSheet(f"""
-            QFrame {{
+            QFrame#profileCard {{
                 background-color: {COLOR_WHITE};
                 border: 1px solid {COLOR_GRAY_200};
                 border-radius: {BORDER_RADIUS_MD};
+            }}
+            QFrame#profileCard QFrame#profileDivider {{
+                background-color: {COLOR_GRAY_200};
+                border: none;
+                min-height: 1px;
+                max-height: 1px;
+            }}
+            QFrame#profileCard QFrame#profileInfoRow {{
+                background: transparent;
+                border: none;
             }}
         """)
         
@@ -169,7 +193,7 @@ class ProfileTab(QWidget):
         
         # Divider
         divider = QFrame()
-        divider.setStyleSheet(f"background-color: {COLOR_GRAY_200};")
+        divider.setObjectName("profileDivider")
         divider.setMaximumHeight(1)
         layout.addWidget(divider)
         
@@ -221,86 +245,36 @@ class ProfileTab(QWidget):
         
         # Divider
         divider2 = QFrame()
-        divider2.setStyleSheet(f"background-color: {COLOR_GRAY_200};")
+        divider2.setObjectName("profileDivider")
         divider2.setMaximumHeight(1)
         layout.addWidget(divider2)
         
         # ===== DETAILS =====
         details_layout = QVBoxLayout()
-        details_layout.setSpacing(12)
+        details_layout.setSpacing(8)
         details_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Username
-        username_row = QHBoxLayout()
-        username_icon = QLabel("👤")
-        username_icon.setFont(QFont(FONT_FAMILY_PRIMARY, 14))
-        username_row.addWidget(username_icon)
-        username_label = QLabel("Username")
-        username_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
-        username_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
-        username_row.addWidget(username_label)
-        details_layout.addLayout(username_row)
-        
-        username_value = QLabel(self.username or "aulia_rahmi")
-        username_value.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
-        username_value.setStyleSheet(f"color: {COLOR_NAVY}; font-weight: bold; margin-left: 28px;")
-        details_layout.addWidget(username_value)
-        
-        # Email
-        email_row = QHBoxLayout()
-        email_icon = QLabel("✉")
-        email_icon.setFont(QFont(FONT_FAMILY_PRIMARY, 14))
-        email_row.addWidget(email_icon)
-        email_label = QLabel("Email")
-        email_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
-        email_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
-        email_row.addWidget(email_label)
-        details_layout.addLayout(email_row)
-        
-        email_value = QLabel(self.email or "aulia@email.com")
-        email_value.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
-        email_value.setStyleSheet(f"color: {COLOR_NAVY}; font-weight: bold; margin-left: 28px;")
-        details_layout.addWidget(email_value)
-        
-        # Bergabung
-        join_row = QHBoxLayout()
-        join_icon = QLabel("📅")
-        join_icon.setFont(QFont(FONT_FAMILY_PRIMARY, 14))
-        join_row.addWidget(join_icon)
-        join_label = QLabel("Bergabung")
-        join_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
-        join_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
-        join_row.addWidget(join_label)
-        details_layout.addLayout(join_row)
-        
-        join_value = QLabel("Januari 2026")
-        join_value.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
-        join_value.setStyleSheet(f"color: {COLOR_NAVY}; font-weight: bold; margin-left: 28px;")
-        details_layout.addWidget(join_value)
-        
-        # Status
-        status_row = QHBoxLayout()
-        status_icon = QLabel("🔐")
-        status_icon.setFont(QFont(FONT_FAMILY_PRIMARY, 14))
-        status_row.addWidget(status_icon)
-        status_label = QLabel("Status Akun")
-        status_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
-        status_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
-        status_row.addWidget(status_label)
-        details_layout.addLayout(status_row)
-        
-        status_badge = QLabel("Aktif")
-        status_badge.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
-        status_badge.setStyleSheet(f"""
-            color: {COLOR_SUCCESS}; 
-            font-weight: bold; 
-            margin-left: 28px;
-            background-color: {COLOR_SUCCESS_LIGHT};
-            padding: 4px 8px;
-            border-radius: 4px;
-            width: fit-content;
-        """)
-        details_layout.addWidget(status_badge)
+
+        join_display = "Januari 2026"
+        created_at = self.user_data.get("created_at")
+        if created_at:
+            try:
+                parsed = datetime.strptime(str(created_at).split(" ")[0], "%Y-%m-%d")
+                join_display = parsed.strftime("%B %Y")
+            except ValueError:
+                pass
+
+        details_layout.addWidget(
+            self._create_profile_info_row("👤", "Username", self.username or "-")
+        )
+        details_layout.addWidget(
+            self._create_profile_info_row("✉", "Email", self.email or "-")
+        )
+        details_layout.addWidget(
+            self._create_profile_info_row("📅", "Bergabung", join_display)
+        )
+        details_layout.addWidget(
+            self._create_profile_info_row("🔐", "Status Akun", "Aktif", badge=True)
+        )
         
         layout.addLayout(details_layout)
         layout.addStretch()
@@ -310,8 +284,9 @@ class ProfileTab(QWidget):
     def _create_informasi_pribadi(self) -> QFrame:
         """Create Informasi Pribadi section."""
         frame = QFrame()
+        frame.setObjectName("informasiPribadiCard")
         frame.setStyleSheet(f"""
-            QFrame {{
+            QFrame#informasiPribadiCard {{
                 background-color: {COLOR_WHITE};
                 border: 1px solid {COLOR_GRAY_200};
                 border-radius: {BORDER_RADIUS_MD};
@@ -351,73 +326,47 @@ class ProfileTab(QWidget):
         header_layout.addWidget(edit_btn)
         layout.addLayout(header_layout)
         
-        # Form Grid (2 columns)
+        # Form Grid (2 columns, aligned rows)
         form_layout = QGridLayout()
         form_layout.setSpacing(16)
         form_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Nama Lengkap
-        form_layout.addWidget(QLabel("NAMA LENGKAP"), 0, 0)
-        nama_input = QLineEdit()
-        nama_input.setText("Aulia Rahmi Taufik")
-        nama_input.setReadOnly(True)
-        nama_input.setMinimumHeight(40)
-        nama_input.setStyleSheet(self._get_input_stylesheet())
-        form_layout.addWidget(nama_input, 1, 0)
-        
-        # Username
-        form_layout.addWidget(QLabel("USERNAME"), 1, 1)
-        username_input = QLineEdit()
-        username_input.setText("aulia_rahmi")
-        username_input.setReadOnly(True)
-        username_input.setMinimumHeight(40)
-        username_input.setStyleSheet(self._get_input_stylesheet())
-        form_layout.addWidget(username_input, 2, 1)
-        
-        # Email
-        form_layout.addWidget(QLabel("EMAIL"), 2, 0)
-        email_input = QLineEdit()
-        email_input.setText("aulia.rahmi@gmail.com")
-        email_input.setReadOnly(True)
-        email_input.setMinimumHeight(40)
-        email_input.setStyleSheet(self._get_input_stylesheet())
-        form_layout.addWidget(email_input, 3, 0)
-        
-        # Jenjang
-        form_layout.addWidget(QLabel("JENJANG"), 3, 1)
-        jenjang_input = QLineEdit()
-        jenjang_input.setText("D4 Sarjana Terapan")
-        jenjang_input.setReadOnly(True)
-        jenjang_input.setMinimumHeight(40)
-        jenjang_input.setStyleSheet(self._get_input_stylesheet())
-        form_layout.addWidget(jenjang_input, 4, 1)
-        
-        # Institusi
-        form_layout.addWidget(QLabel("INSTITUSI"), 4, 0)
-        institusi_input = QLineEdit()
-        institusi_input.setText("POLBAN")
-        institusi_input.setReadOnly(True)
-        institusi_input.setMinimumHeight(40)
-        institusi_input.setStyleSheet(self._get_input_stylesheet())
-        form_layout.addWidget(institusi_input, 5, 0)
-        
-        # NIM
-        form_layout.addWidget(QLabel("NIM"), 5, 1)
-        nim_input = QLineEdit()
-        nim_input.setText("21524003")
-        nim_input.setReadOnly(True)
-        nim_input.setMinimumHeight(40)
-        nim_input.setStyleSheet(self._get_input_stylesheet())
-        form_layout.addWidget(nim_input, 6, 1)
-        
-        # Semester
-        form_layout.addWidget(QLabel("SEMESTER"), 6, 0)
-        semester_input = QLineEdit()
-        semester_input.setText("Semester 2")
-        semester_input.setReadOnly(True)
-        semester_input.setMinimumHeight(40)
-        semester_input.setStyleSheet(self._get_input_stylesheet())
-        form_layout.addWidget(semester_input, 7, 0)
+
+        nama_lengkap = self.user_data.get("nama_lengkap") or self.username or "-"
+        username = self.user_data.get("username") or self.username or "-"
+        email = self.user_data.get("email") or self.email or "-"
+        jenjang = self.user_data.get("jenjang") or "-"
+
+        left_fields = [
+            ("NAMA LENGKAP", nama_lengkap),
+            ("EMAIL", email),
+            ("INSTITUSI", "POLBAN"),
+            ("SEMESTER", "Semester 2"),
+        ]
+        right_fields = [
+            ("USERNAME", username),
+            ("JENJANG", jenjang),
+            ("NIM", "21524003"),
+        ]
+
+        for idx, (label, value) in enumerate(left_fields):
+            row = idx * 2
+            form_layout.addWidget(self._create_form_label(label), row, 0)
+            field = QLineEdit()
+            field.setText(str(value))
+            field.setReadOnly(True)
+            field.setMinimumHeight(40)
+            field.setStyleSheet(self._get_input_stylesheet())
+            form_layout.addWidget(field, row + 1, 0)
+
+        for idx, (label, value) in enumerate(right_fields):
+            row = idx * 2
+            form_layout.addWidget(self._create_form_label(label), row, 1)
+            field = QLineEdit()
+            field.setText(str(value))
+            field.setReadOnly(True)
+            field.setMinimumHeight(40)
+            field.setStyleSheet(self._get_input_stylesheet())
+            form_layout.addWidget(field, row + 1, 1)
         
         form_layout.setColumnStretch(0, 1)
         form_layout.setColumnStretch(1, 1)
@@ -447,8 +396,9 @@ class ProfileTab(QWidget):
     def _create_keamanan_akun(self) -> QFrame:
         """Create Keamanan Akun section."""
         frame = QFrame()
+        frame.setObjectName("keamananCard")
         frame.setStyleSheet(f"""
-            QFrame {{
+            QFrame#keamananCard {{
                 background-color: {COLOR_WHITE};
                 border: 1px solid {COLOR_GRAY_200};
                 border-radius: {BORDER_RADIUS_MD};
@@ -473,7 +423,7 @@ class ProfileTab(QWidget):
         form_layout.setContentsMargins(0, 0, 0, 0)
         
         # Current password
-        form_layout.addWidget(QLabel("PASSWORD SAAT INI"))
+        form_layout.addWidget(self._create_form_label("PASSWORD SAAT INI"))
         current_pass = QLineEdit()
         current_pass.setEchoMode(QLineEdit.EchoMode.Password)
         current_pass.setText("••••••••")
@@ -482,7 +432,7 @@ class ProfileTab(QWidget):
         form_layout.addWidget(current_pass)
         
         # New password
-        form_layout.addWidget(QLabel("PASSWORD BARU"))
+        form_layout.addWidget(self._create_form_label("PASSWORD BARU"))
         new_pass = QLineEdit()
         new_pass.setPlaceholderText("Min. 8 karakter")
         new_pass.setMinimumHeight(40)
@@ -490,7 +440,7 @@ class ProfileTab(QWidget):
         form_layout.addWidget(new_pass)
         
         # Confirm password
-        form_layout.addWidget(QLabel("KONFIRMASI"))
+        form_layout.addWidget(self._create_form_label("KONFIRMASI"))
         confirm_pass = QLineEdit()
         confirm_pass.setPlaceholderText("Ulangi password")
         confirm_pass.setMinimumHeight(40)
@@ -522,8 +472,9 @@ class ProfileTab(QWidget):
     def _create_preferensi_aplikasi(self) -> QFrame:
         """Create Preferensi Aplikasi section."""
         frame = QFrame()
+        frame.setObjectName("preferensiCard")
         frame.setStyleSheet(f"""
-            QFrame {{
+            QFrame#preferensiCard {{
                 background-color: {COLOR_WHITE};
                 border: 1px solid {COLOR_GRAY_200};
                 border-radius: {BORDER_RADIUS_MD};
@@ -579,7 +530,7 @@ class ProfileTab(QWidget):
         toggle2.setMinimumSize(40, 24)
         dark_row.addWidget(toggle2)
         
-        layout.addWidget(QFrame())  # Spacer
+        layout.addSpacing(8)
         layout.addLayout(dark_row)
         
         dark_desc = QLabel("Tampilan gelap untuk kenyamanan mata")
@@ -602,7 +553,7 @@ class ProfileTab(QWidget):
         toggle3.setMinimumSize(40, 24)
         scrape_row.addWidget(toggle3)
         
-        layout.addWidget(QFrame())  # Spacer
+        layout.addSpacing(8)
         layout.addLayout(scrape_row)
         
         scrape_desc = QLabel("Perbarui data beasiswa otomatis saat buka app")
@@ -615,8 +566,9 @@ class ProfileTab(QWidget):
     def _create_aktivitas_terakhir(self) -> QFrame:
         """Create Aktivitas Terakhir section."""
         frame = QFrame()
+        frame.setObjectName("aktivitasCard")
         frame.setStyleSheet(f"""
-            QFrame {{
+            QFrame#aktivitasCard {{
                 background-color: {COLOR_WHITE};
                 border: 1px solid {COLOR_GRAY_200};
                 border-radius: {BORDER_RADIUS_MD};
@@ -695,6 +647,46 @@ class ProfileTab(QWidget):
                 padding: 9px 11px;
             }}
         """
+
+    def _create_form_label(self, text: str) -> QLabel:
+        """Create consistent form label style for profile sections."""
+        label = QLabel(text)
+        label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        label.setStyleSheet(f"color: {COLOR_GRAY_700}; font-weight: bold;")
+        return label
+
+    def _create_profile_info_row(self, icon: str, label_text: str, value_text: str, badge: bool = False) -> QFrame:
+        """Create compact info row for profile card details."""
+        row = QFrame()
+        row.setObjectName("profileInfoRow")
+
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 2, 0, 2)
+        row_layout.setSpacing(8)
+
+        icon_label = QLabel(icon)
+        icon_label.setFont(QFont(FONT_FAMILY_PRIMARY, 13))
+        row_layout.addWidget(icon_label)
+
+        label = QLabel(label_text)
+        label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        label.setStyleSheet(f"color: {COLOR_GRAY_600};")
+        row_layout.addWidget(label)
+        row_layout.addStretch()
+
+        value = QLabel(value_text)
+        value.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        if badge:
+            value.setStyleSheet(
+                f"color: {COLOR_SUCCESS}; font-weight: 700; "
+                f"background-color: {COLOR_SUCCESS_LIGHT}; border-radius: 6px; "
+                "padding: 4px 10px;"
+            )
+        else:
+            value.setStyleSheet(f"color: {COLOR_NAVY}; font-weight: 700;")
+        row_layout.addWidget(value)
+
+        return row
     
     def _get_initials(self) -> str:
         """Get user initials."""

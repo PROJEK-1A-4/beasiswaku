@@ -406,6 +406,51 @@ def get_status_badge_stylesheet(status="pending"):
     return stylesheet
 
 
+def get_input_field_stylesheet(disabled=False):
+    """
+    Backward-compatible input field stylesheet helper.
+
+    Some GUI modules previously imported this symbol directly. Keeping this
+    helper avoids runtime ImportError while returning the same token-based
+    styling used across the app.
+    """
+
+    if disabled:
+        return f"""
+        QLineEdit, QTextEdit, QComboBox {{
+            background-color: {COLOR_GRAY_100};
+            border: {BORDER_WIDTH_SM} solid {COLOR_GRAY_200};
+            border-radius: {BORDER_RADIUS_MD};
+            padding: 8px 12px;
+            font-size: {FONT_SIZE_BASE}px;
+            color: {COLOR_GRAY_500};
+        }}
+        """
+
+    return f"""
+    QLineEdit, QTextEdit, QComboBox {{
+        background-color: {COLOR_WHITE};
+        border: {BORDER_WIDTH_SM} solid {COLOR_GRAY_200};
+        border-radius: {BORDER_RADIUS_MD};
+        padding: 8px 12px;
+        font-size: {FONT_SIZE_BASE}px;
+        color: {COLOR_GRAY_900};
+    }}
+    QLineEdit:focus, QTextEdit:focus, QComboBox:focus {{
+        border: {BORDER_WIDTH_SM} solid {COLOR_NAVY};
+        outline: none;
+    }}
+    QLineEdit:hover, QTextEdit:hover, QComboBox:hover {{
+        border: {BORDER_WIDTH_SM} solid {COLOR_GRAY_300};
+    }}
+    QLineEdit:disabled, QTextEdit:disabled, QComboBox:disabled {{
+        background-color: {COLOR_GRAY_100};
+        color: {COLOR_GRAY_500};
+        border: {BORDER_WIDTH_SM} solid {COLOR_GRAY_200};
+    }}
+    """
+
+
 # ==================== TASK 8: BUTTON VARIANTS (Solid/Outlined) ====================
 
 def get_button_solid_stylesheet(color="navy", disabled=False):

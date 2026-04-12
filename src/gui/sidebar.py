@@ -42,16 +42,23 @@ class SidebarNavItem(QPushButton):
         if self.is_active:
             self.setStyleSheet(f"""
                 QPushButton {{
-                    background-color: {COLOR_ORANGE};
+                    background-color: qlineargradient(
+                        x1:0, y1:0, x2:1, y2:0,
+                        stop:0 {COLOR_COBALT}, stop:1 {COLOR_COBALT_LIGHT}
+                    );
                     color: {COLOR_WHITE};
-                    border: none;
-                    border-left: 4px solid {COLOR_ORANGE};
-                    padding: 12px 16px;
+                    border: 1px solid {COLOR_COBALT_DARK};
+                    border-radius: 10px;
+                    padding: 12px 14px;
+                    margin: 2px 8px;
                     text-align: left;
-                    font-weight: bold;
+                    font-weight: 600;
                 }}
                 QPushButton:hover {{
-                    background-color: {COLOR_ORANGE};
+                    background-color: qlineargradient(
+                        x1:0, y1:0, x2:1, y2:0,
+                        stop:0 {COLOR_COBALT}, stop:1 {COLOR_COBALT}
+                    );
                 }}
             """)
         else:
@@ -59,15 +66,16 @@ class SidebarNavItem(QPushButton):
                 QPushButton {{
                     background-color: transparent;
                     color: {COLOR_GRAY_600};
-                    border: none;
-                    border-left: 4px solid transparent;
-                    padding: 12px 16px;
+                    border: 1px solid transparent;
+                    border-radius: 10px;
+                    padding: 12px 14px;
+                    margin: 2px 8px;
                     text-align: left;
                 }}
                 QPushButton:hover {{
-                    background-color: {COLOR_GRAY_100};
-                    color: {COLOR_NAVY};
-                    border-left: 4px solid {COLOR_ORANGE};
+                    background-color: {COLOR_WHITE};
+                    color: {COLOR_COBALT};
+                    border: 1px solid #d7e2f2;
                 }}
             """)
 
@@ -116,38 +124,62 @@ class Sidebar(QWidget):
     
     def init_ui(self):
         """Initialize sidebar UI."""
+        self.setObjectName("sidebarRoot")
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
         # ===== HEADER SECTION =====
         header_frame = QFrame()
+        header_frame.setObjectName("sidebarHeader")
         header_frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLOR_NAVY};
-                border-bottom: 1px solid {COLOR_GRAY_300};
+            QFrame#sidebarHeader {{
+                background-color: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {COLOR_COBALT_DARK}, stop:1 {COLOR_COBALT}
+                );
+                border-bottom: 1px solid #0b2a53;
             }}
         """)
-        header_frame.setMinimumHeight(70)
-        header_frame.setMaximumHeight(70)
+        header_frame.setMinimumHeight(94)
+        header_frame.setMaximumHeight(94)
         
         header_layout = QVBoxLayout(header_frame)
-        header_layout.setContentsMargins(16, 12, 16, 12)
-        header_layout.setSpacing(4)
+        header_layout.setContentsMargins(14, 10, 14, 10)
+        header_layout.setSpacing(2)
         
         # Logo
         logo_label = QLabel("🎓 BeasiswaKu")
-        logo_font = QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_LG)
+        logo_label.setObjectName("sidebarLogo")
+        logo_font = QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_XL)
         logo_font.setWeight(QFont.Weight.Bold)
         logo_label.setFont(logo_font)
-        logo_label.setStyleSheet(f"color: {COLOR_WHITE};")
+        logo_label.setStyleSheet(f"color: {COLOR_WHITE}; letter-spacing: 0.2px;")
         header_layout.addWidget(logo_label)
         
         # Tagline
-        tagline_label = QLabel("Scholarship Manager")
+        tagline_label = QLabel("Discover • Track • Apply")
+        tagline_label.setObjectName("sidebarTagline")
         tagline_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_XS))
-        tagline_label.setStyleSheet(f"color: {COLOR_GRAY_300};")
+        tagline_label.setStyleSheet(f"color: #c9d8f0;")
         header_layout.addWidget(tagline_label)
+
+        badge_row = QHBoxLayout()
+        badge_row.setContentsMargins(0, 4, 0, 0)
+        badge_row.setSpacing(0)
+        edition_badge = QLabel("Desktop Edition")
+        edition_badge.setObjectName("editionBadge")
+        edition_badge.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_XS))
+        edition_badge.setStyleSheet(
+            f"background-color: {COLOR_AMBER}; color: #3a2a00; "
+            "padding: 2px 10px; border-radius: 9px; font-weight: 700;"
+        )
+        edition_badge.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        edition_badge.setFixedHeight(18)
+        edition_badge.setMaximumWidth(108)
+        badge_row.addWidget(edition_badge, alignment=Qt.AlignmentFlag.AlignLeft)
+        badge_row.addStretch()
+        header_layout.addLayout(badge_row)
         
         main_layout.addWidget(header_frame)
         
@@ -157,26 +189,26 @@ class Sidebar(QWidget):
         nav_scroll.setStyleSheet(f"""
             QScrollArea {{
                 border: none;
-                background-color: {COLOR_WHITE};
+                background-color: {COLOR_SURFACE_SOFT};
             }}
             QScrollBar:vertical {{
                 border: none;
-                background-color: {COLOR_WHITE};
+                background-color: {COLOR_SURFACE_SOFT};
                 width: 6px;
             }}
             QScrollBar::handle:vertical {{
-                background-color: {COLOR_GRAY_300};
+                background-color: #c7d6eb;
                 border-radius: 3px;
             }}
             QScrollBar::handle:vertical:hover {{
-                background-color: {COLOR_GRAY_400};
+                background-color: #9eb6d7;
             }}
         """)
         
         nav_widget = QWidget()
         nav_layout = QVBoxLayout(nav_widget)
-        nav_layout.setContentsMargins(0, 0, 0, 0)
-        nav_layout.setSpacing(2)
+        nav_layout.setContentsMargins(0, 10, 0, 10)
+        nav_layout.setSpacing(4)
         
         # Navigation menu items
         menu_items = [
@@ -201,8 +233,8 @@ class Sidebar(QWidget):
         bottom_frame = QFrame()
         bottom_frame.setStyleSheet(f"""
             QFrame {{
-                background-color: {COLOR_WHITE};
-                border-top: 1px solid {COLOR_GRAY_200};
+                background-color: {COLOR_SURFACE_SOFT};
+                border-top: 1px solid #d7e1f1;
             }}
         """)
         bottom_frame.setMinimumHeight(120)
@@ -220,14 +252,16 @@ class Sidebar(QWidget):
             QPushButton {{
                 background-color: transparent;
                 color: {COLOR_GRAY_600};
-                border: none;
-                padding: 8px 8px;
+                border: 1px solid transparent;
+                border-radius: 10px;
+                padding: 10px 12px;
+                margin: 0 4px;
                 text-align: left;
             }}
             QPushButton:hover {{
-                background-color: {COLOR_GRAY_50};
-                color: {COLOR_NAVY};
-                border-left: 4px solid {COLOR_ORANGE};
+                background-color: {COLOR_WHITE};
+                color: {COLOR_COBALT};
+                border: 1px solid #d7e2f2;
             }}
         """)
         settings_btn.clicked.connect(self.settings_clicked.emit)
@@ -242,15 +276,17 @@ class Sidebar(QWidget):
             QPushButton {{
                 background-color: transparent;
                 color: {COLOR_ERROR};
-                border: none;
-                padding: 8px 8px;
+                border: 1px solid transparent;
+                border-radius: 10px;
+                padding: 10px 12px;
+                margin: 0 4px;
                 text-align: left;
-                font-weight: bold;
+                font-weight: 600;
             }}
             QPushButton:hover {{
                 background-color: {COLOR_ERROR_LIGHT};
                 color: {COLOR_ERROR};
-                border-left: 4px solid {COLOR_ERROR};
+                border: 1px solid #f5c7c7;
             }}
         """)
         logout_btn.clicked.connect(self.logout_clicked.emit)
@@ -260,9 +296,9 @@ class Sidebar(QWidget):
         
         # Apply main stylesheet
         self.setStyleSheet(f"""
-            QWidget {{
-                background-color: {COLOR_WHITE};
-                border-right: 1px solid {COLOR_GRAY_200};
+            QWidget#sidebarRoot {{
+                background-color: {COLOR_SURFACE_SOFT};
+                border-right: 1px solid #d9e2f0;
             }}
         """)
         

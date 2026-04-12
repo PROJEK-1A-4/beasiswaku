@@ -16,6 +16,16 @@ COLOR_ORANGE = "#f59e0b"  # Accent color - warm orange
 COLOR_ORANGE_DARK = "#d97706"  # Darker shade for hover/active states
 COLOR_ORANGE_LIGHT = "#fbbf24"  # Lighter shade of orange
 
+# Redesign Theme Colors
+COLOR_COBALT = "#183d76"  # Main shell accents
+COLOR_COBALT_DARK = "#10284f"  # Sidebar header depth
+COLOR_COBALT_LIGHT = "#2f63a8"  # Highlight gradients
+COLOR_AMBER = "#ffb020"  # Warm accent for active indicators
+COLOR_AMBER_DARK = "#de8f06"
+COLOR_AMBER_LIGHT = "#ffe2ab"
+COLOR_SURFACE_APP = "#edf2fb"  # App canvas background
+COLOR_SURFACE_SOFT = "#f6f9ff"  # Sidebar/soft cards
+
 # Neutral Colors
 COLOR_WHITE = "#ffffff"
 COLOR_GRAY_50 = "#f9fafb"  # Very light gray - backgrounds
@@ -30,7 +40,7 @@ COLOR_GRAY_800 = "#1f2937"
 COLOR_GRAY_900 = "#111827"  # Very dark gray - text
 
 # Background Colors
-COLOR_GRAY_BACKGROUND = "#f9fafb"  # Main page background color
+COLOR_GRAY_BACKGROUND = COLOR_SURFACE_APP  # Main page background color
 
 COLOR_BLACK = "#000000"
 
@@ -67,7 +77,7 @@ COLOR_DEADLINE_SAFE = "#10b981"  # Green - > 7 days
 # ============================================================================
 
 # Font Families
-FONT_FAMILY_PRIMARY = "Segoe UI, -apple-system, BlinkMacSystemFont, sans-serif"
+FONT_FAMILY_PRIMARY = "Trebuchet MS, Segoe UI, Tahoma, sans-serif"
 FONT_FAMILY_MONOSPACE = "Courier New, monospace"
 
 # Font Sizes (in pixels)
