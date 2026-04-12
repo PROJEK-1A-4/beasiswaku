@@ -362,3 +362,13 @@ def load_tracker_data(user_id: int) -> Tuple[Dict[str, int], Dict[str, int]]:
 
         month_dict = dict(sorted(month_counter.items(), key=lambda x: (x[0] == "Unknown", x[0])))
         return dict(status_counter), month_dict
+
+def figure_to_canvas(fig: plt.Figure) -> FigureCanvas:
+        """
+        Mengubah matplotlib figure menjadi canvas PyQt6.
+
+        Alasan:
+        - UI PyQt6 membutuhkan widget canvas agar figure bisa ditaruh di layout.
+        """
+        return FigureCanvas(fig)
+
