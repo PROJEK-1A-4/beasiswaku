@@ -31,6 +31,8 @@ from src.database.crud import (
     get_beasiswa_list, add_beasiswa, edit_beasiswa,
     delete_beasiswa, get_connection
 )
+from src.gui.design_tokens import *
+from src.gui.styles import get_stylesheet
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -163,7 +165,7 @@ class BeasiswaTab(QWidget):
         # Display total number of rows displayed
         self.lbl_row_count = QLabel("Total: 0 Beasiswa")
         self.lbl_row_count.setFont(QFont("Arial", 9))
-        self.lbl_row_count.setStyleSheet("color: #666; font-style: italic;")
+        self.lbl_row_count.setStyleSheet(f"color: {COLOR_GRAY_600}; font-style: italic;")
         main_layout.addWidget(self.lbl_row_count)
         main_layout.addSpacing(5)
         
@@ -200,6 +202,10 @@ class BeasiswaTab(QWidget):
         
         # ===== FINALIZE LAYOUT =====
         self.setLayout(main_layout)
+        
+        # ===== APPLY STYLESHEET (Task 2: Update color scheme) =====
+        self.setStyleSheet(get_stylesheet())
+        
         logger.info("✅ BeasiswaTab UI initialized with all sections")
     
     def _create_top_bar_layout(self) -> QHBoxLayout:
@@ -220,7 +226,7 @@ class BeasiswaTab(QWidget):
         # ===== TITLE LABEL (Left side) =====
         self.lbl_title = QLabel("📚 Daftar Beasiswa")
         self.lbl_title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-        self.lbl_title.setStyleSheet("color: #1976D2; padding: 5px 0px;")
+        self.lbl_title.setStyleSheet(f"color: {COLOR_NAVY}; padding: 5px 0px;")
         layout.addWidget(self.lbl_title)
         
         # ===== SPACER (Center) =====
@@ -234,7 +240,7 @@ class BeasiswaTab(QWidget):
         
         self.lbl_timestamp = QLabel(timestamp_text)
         self.lbl_timestamp.setFont(QFont("Arial", 9))
-        self.lbl_timestamp.setStyleSheet("color: #666; font-style: italic;")
+        self.lbl_timestamp.setStyleSheet(f"color: {COLOR_GRAY_600}; font-style: italic;")
         self.lbl_timestamp.setAlignment(Qt.AlignmentFlag.AlignRight)
         layout.addWidget(self.lbl_timestamp)
         
@@ -375,7 +381,7 @@ class BeasiswaTab(QWidget):
         # ===== HEADER CONFIGURATION =====
         header = table.horizontalHeader()
         header.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-        header.setStyleSheet("background-color: #E8EAF6; color: #1976D2;")
+        header.setStyleSheet(f"background-color: {COLOR_NAVY}; color: {COLOR_WHITE};")
         header.setStretchLastSection(False)
         
         # ===== SELECTION BEHAVIOR =====
@@ -384,16 +390,16 @@ class BeasiswaTab(QWidget):
         
         # ===== ROW APPEARANCE =====
         table.setAlternatingRowColors(True)
-        table.setStyleSheet("""
-            QTableWidget {
-                background-color: white;
-                alternate-background-color: #F5F5F5;
-                gridline-color: #E0E0E0;
-            }
-            QTableWidget::item {
+        table.setStyleSheet(f"""
+            QTableWidget {{
+                background-color: {COLOR_WHITE};
+                alternate-background-color: {COLOR_GRAY_50};
+                gridline-color: {COLOR_GRAY_200};
+            }}
+            QTableWidget::item {{
                 padding: 5px;
                 border: none;
-            }
+            }}
         """)
         
         # ===== RESIZE BEHAVIOR =====
@@ -443,120 +449,120 @@ class BeasiswaTab(QWidget):
         self.btn_tambah.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         self.btn_tambah.setMinimumHeight(35)
         self.btn_tambah.setMinimumWidth(100)
-        self.btn_tambah.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
+        self.btn_tambah.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_NAVY};
+                color: {COLOR_WHITE};
                 border: none;
                 border-radius: 5px;
                 padding: 8px 15px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-            QPushButton:pressed {
-                background-color: #3d8b40;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_NAVY_DARK};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_NAVY_DARK};
+            }}
         """)
         layout.addWidget(self.btn_tambah)
-        logger.debug("✅ Tambah button created (green, #4CAF50)")
+        logger.debug(f"✅ Tambah button created (navy, {COLOR_NAVY})")
         
         # ===== TASK 9: EDIT BUTTON (Blue) =====
         self.btn_edit = QPushButton("✏️ Edit")
         self.btn_edit.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         self.btn_edit.setMinimumHeight(35)
         self.btn_edit.setMinimumWidth(100)
-        self.btn_edit.setStyleSheet("""
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
+        self.btn_edit.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_NAVY};
+                color: {COLOR_WHITE};
                 border: none;
                 border-radius: 5px;
                 padding: 8px 15px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #0b7dda;
-            }
-            QPushButton:pressed {
-                background-color: #0a66c2;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_NAVY_DARK};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_NAVY_DARK};
+            }}
         """)
         layout.addWidget(self.btn_edit)
-        logger.debug("✅ Edit button created (blue, #2196F3)")
+        logger.debug(f"✅ Edit button created (navy, {COLOR_NAVY})")
         
         # ===== TASK 9: HAPUS BUTTON (Red) =====
         self.btn_hapus = QPushButton("🗑️ Hapus")
         self.btn_hapus.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         self.btn_hapus.setMinimumHeight(35)
         self.btn_hapus.setMinimumWidth(100)
-        self.btn_hapus.setStyleSheet("""
-            QPushButton {
-                background-color: #f44336;
-                color: white;
+        self.btn_hapus.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_ERROR};
+                color: {COLOR_WHITE};
                 border: none;
                 border-radius: 5px;
                 padding: 8px 15px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #da190b;
-            }
-            QPushButton:pressed {
-                background-color: #ba0000;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_ERROR_DARK};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_ERROR_DARK};
+            }}
         """)
         layout.addWidget(self.btn_hapus)
-        logger.debug("✅ Hapus button created (red, #f44336)")
+        logger.debug(f"✅ Hapus button created (error red, {COLOR_ERROR})")
         
         # ===== TASK 10: REFRESH BUTTON (Gray) =====
         self.btn_refresh = QPushButton("🔄 Refresh")
         self.btn_refresh.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         self.btn_refresh.setMinimumHeight(35)
         self.btn_refresh.setMinimumWidth(100)
-        self.btn_refresh.setStyleSheet("""
-            QPushButton {
-                background-color: #757575;
-                color: white;
+        self.btn_refresh.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_GRAY_500};
+                color: {COLOR_WHITE};
                 border: none;
                 border-radius: 5px;
                 padding: 8px 15px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #616161;
-            }
-            QPushButton:pressed {
-                background-color: #424242;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_GRAY_600};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_GRAY_600};
+            }}
         """)
         layout.addWidget(self.btn_refresh)
-        logger.debug("✅ Refresh button created (gray, #757575)")
+        logger.debug(f"✅ Refresh button created (gray, {COLOR_GRAY_500})")
         
         # ===== TASK 10: EXPORT CSV BUTTON (Orange) =====
         self.btn_export_csv = QPushButton("📊 Export CSV")
         self.btn_export_csv.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         self.btn_export_csv.setMinimumHeight(35)
         self.btn_export_csv.setMinimumWidth(120)
-        self.btn_export_csv.setStyleSheet("""
-            QPushButton {
-                background-color: #FF9800;
-                color: white;
+        self.btn_export_csv.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_ORANGE};
+                color: {COLOR_WHITE};
                 border: none;
                 border-radius: 5px;
                 padding: 8px 15px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #F57C00;
-            }
-            QPushButton:pressed {
-                background-color: #E65100;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_ORANGE_DARK};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_ORANGE_DARK};
+            }}
         """)
         layout.addWidget(self.btn_export_csv)
-        logger.debug("✅ Export CSV button created (orange, #FF9800)")
+        logger.debug(f"✅ Export CSV button created (orange, {COLOR_ORANGE})")
         
         # ===== SPACER =====
         layout.addStretch()
@@ -1153,15 +1159,15 @@ class BeasiswaTab(QWidget):
             days_remaining = (deadline - today).days
             
             if days_remaining < 0:
-                return QColor("#FF6B6B"), "LEWAT"  # Red - overdue
+                return QColor(COLOR_DEADLINE_CRITICAL), "LEWAT"  # Red - overdue
             elif days_remaining <= 3:
-                return QColor("#FF6B6B"), f"{days_remaining}h"  # Red - urgent
+                return QColor(COLOR_DEADLINE_CRITICAL), f"{days_remaining}h"  # Red - urgent
             elif days_remaining <= 7:
-                return QColor("#FFA500"), f"{days_remaining}h"  # Yellow - soon
+                return QColor(COLOR_DEADLINE_WARNING), f"{days_remaining}h"  # Yellow - soon
             else:
-                return QColor("#4CAF50"), f"{days_remaining}h"  # Green - plenty of time
+                return QColor(COLOR_DEADLINE_SAFE), f"{days_remaining}h"  # Green - plenty of time
         except ValueError:
-            return QColor("#FFFFFF"), "?"
+            return QColor(COLOR_WHITE), "?"
     
     def apply_row_formatting(self):
         """
@@ -1194,10 +1200,10 @@ class BeasiswaTab(QWidget):
                 for col in range(self.tbl_beasiswa.columnCount()):
                     cell_item = self.tbl_beasiswa.item(row, col)
                     if cell_item:
-                        if color == QColor("#FF6B6B"):  # Red - urgent/overdue
-                            cell_item.setBackground(QBrush(QColor("#FFEBEE")))  # Light red background
-                        elif color == QColor("#FFA500"):  # Yellow - soon
-                            cell_item.setBackground(QBrush(QColor("#FFFDE7")))  # Light yellow background
+                        if color == QColor(COLOR_DEADLINE_CRITICAL):  # Red - urgent/overdue
+                            cell_item.setBackground(QBrush(QColor(COLOR_ERROR_LIGHT)))  # Light red background
+                        elif color == QColor(COLOR_DEADLINE_WARNING):  # Yellow - soon
+                            cell_item.setBackground(QBrush(QColor(COLOR_WARNING_LIGHT)))  # Light yellow background
                         # Green doesn't need special background, keep default
             
             logger.info(f"✅ Row formatting applied to {self.tbl_beasiswa.rowCount()} rows")
@@ -1452,33 +1458,33 @@ class AddBeasiswaDialog(QDialog):
         button_layout.addStretch()
         
         btn_ok = QPushButton("✅ Tambah")
-        btn_ok.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
+        btn_ok.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_NAVY};
+                color: {COLOR_WHITE};
                 border: none;
                 border-radius: 5px;
                 padding: 8px 20px;
                 font-weight: bold;
-            }
-            QPushButton:hover { background-color: #45a049; }
-            QPushButton:pressed { background-color: #3d8b40; }
+            }}
+            QPushButton:hover {{ background-color: {COLOR_NAVY_DARK}; }}
+            QPushButton:pressed {{ background-color: {COLOR_NAVY_DARK}; }}
         """)
         btn_ok.clicked.connect(self.accept)
         button_layout.addWidget(btn_ok)
         
         btn_cancel = QPushButton("❌ Batal")
-        btn_cancel.setStyleSheet("""
-            QPushButton {
-                background-color: #f44336;
-                color: white;
+        btn_cancel.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_ERROR};
+                color: {COLOR_WHITE};
                 border: none;
                 border-radius: 5px;
                 padding: 8px 20px;
                 font-weight: bold;
-            }
-            QPushButton:hover { background-color: #da190b; }
-            QPushButton:pressed { background-color: #ba0a0a; }
+            }}
+            QPushButton:hover {{ background-color: {COLOR_ERROR_DARK}; }}
+            QPushButton:pressed {{ background-color: {COLOR_ERROR_DARK}; }}
         """)
         btn_cancel.clicked.connect(self.reject)
         button_layout.addWidget(btn_cancel)
@@ -1658,33 +1664,33 @@ class EditBeasiswaDialog(QDialog):
         button_layout.addStretch()
         
         btn_ok = QPushButton("✅ Simpan")
-        btn_ok.setStyleSheet("""
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
+        btn_ok.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_NAVY};
+                color: {COLOR_WHITE};
                 border: none;
                 border-radius: 5px;
                 padding: 8px 20px;
                 font-weight: bold;
-            }
-            QPushButton:hover { background-color: #0b7dda; }
-            QPushButton:pressed { background-color: #0966cc; }
+            }}
+            QPushButton:hover {{ background-color: {COLOR_NAVY_DARK}; }}
+            QPushButton:pressed {{ background-color: {COLOR_NAVY_DARK}; }}
         """)
         btn_ok.clicked.connect(self.accept)
         button_layout.addWidget(btn_ok)
         
         btn_cancel = QPushButton("❌ Batal")
-        btn_cancel.setStyleSheet("""
-            QPushButton {
-                background-color: #f44336;
-                color: white;
+        btn_cancel.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_ERROR};
+                color: {COLOR_WHITE};
                 border: none;
                 border-radius: 5px;
                 padding: 8px 20px;
                 font-weight: bold;
-            }
-            QPushButton:hover { background-color: #da190b; }
-            QPushButton:pressed { background-color: #ba0a0a; }
+            }}
+            QPushButton:hover {{ background-color: {COLOR_ERROR_DARK}; }}
+            QPushButton:pressed {{ background-color: {COLOR_ERROR_DARK}; }}
         """)
         btn_cancel.clicked.connect(self.reject)
         button_layout.addWidget(btn_cancel)
@@ -1801,7 +1807,7 @@ Tindakan ini TIDAK DAPAT DIBATALKAN dan akan menghapus semua data terkait."""
         msg_label = QLabel(message_text)
         msg_label.setFont(QFont("Arial", 10))
         msg_label.setWordWrap(True)
-        msg_label.setStyleSheet("color: #d32f2f; font-weight: bold;")
+        msg_label.setStyleSheet(f"color: {COLOR_ERROR}; font-weight: bold;")
         msg_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         message_layout.addWidget(msg_label, 1)
         
@@ -1814,36 +1820,36 @@ Tindakan ini TIDAK DAPAT DIBATALKAN dan akan menghapus semua data terkait."""
         
         # Yes button (Delete) - Red
         btn_yes = QPushButton("🗑️ Ya, Hapus")
-        btn_yes.setStyleSheet("""
-            QPushButton {
-                background-color: #f44336;
-                color: white;
+        btn_yes.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_ERROR};
+                color: {COLOR_WHITE};
                 border: none;
                 border-radius: 5px;
                 padding: 10px 25px;
                 font-weight: bold;
                 font-size: 11px;
-            }
-            QPushButton:hover { background-color: #da190b; }
-            QPushButton:pressed { background-color: #ba0a0a; }
+            }}
+            QPushButton:hover {{ background-color: {COLOR_ERROR_DARK}; }}
+            QPushButton:pressed {{ background-color: {COLOR_ERROR_DARK}; }}
         """)
         btn_yes.clicked.connect(self.accept)
         button_layout.addWidget(btn_yes)
         
         # No button (Cancel) - Gray
         btn_no = QPushButton("❌ Batal")
-        btn_no.setStyleSheet("""
-            QPushButton {
-                background-color: #757575;
-                color: white;
+        btn_no.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_GRAY_500};
+                color: {COLOR_WHITE};
                 border: none;
                 border-radius: 5px;
                 padding: 10px 25px;
                 font-weight: bold;
                 font-size: 11px;
-            }
-            QPushButton:hover { background-color: #616161; }
-            QPushButton:pressed { background-color: #424242; }
+            }}
+            QPushButton:hover {{ background-color: {COLOR_GRAY_600}; }}
+            QPushButton:pressed {{ background-color: {COLOR_GRAY_600}; }}
         """)
         btn_no.clicked.connect(self.reject)
         button_layout.addWidget(btn_no)
@@ -1882,27 +1888,27 @@ class BeasiswaDetailDialog(QDialog):
         # ===== TITLE SECTION =====
         title_label = QLabel(f"📚 {judul}")
         title_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-        title_label.setStyleSheet("color: #1976D2; padding: 10px 0px;")
+        title_label.setStyleSheet(f"color: {COLOR_NAVY}; padding: 10px 0px;")
         main_layout.addWidget(title_label)
         
         # ===== SEPARATOR LINE =====
         separator = QLabel("─" * 80)
-        separator.setStyleSheet("color: #E0E0E0;")
+        separator.setStyleSheet(f"color: {COLOR_GRAY_200};")
         main_layout.addWidget(separator)
         
         # ===== TEXT AREA FOR CONTENT =====
         text_edit = QTextEdit()
         text_edit.setReadOnly(True)
-        text_edit.setStyleSheet("""
-            QTextEdit {
-                background-color: #FAFAFA;
-                border: 1px solid #E0E0E0;
+        text_edit.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {COLOR_GRAY_50};
+                border: 1px solid {COLOR_GRAY_200};
                 border-radius: 5px;
                 padding: 15px;
                 font-family: 'Courier New', monospace;
                 font-size: 10px;
                 line-height: 1.6;
-            }
+            }}
         """)
         
         # Build detail content as HTML
@@ -1917,18 +1923,18 @@ class BeasiswaDetailDialog(QDialog):
         
         # Close button
         btn_close = QPushButton("✅ Tutup")
-        btn_close.setStyleSheet("""
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
+        btn_close.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_NAVY};
+                color: {COLOR_WHITE};
                 border: none;
                 border-radius: 5px;
                 padding: 10px 30px;
                 font-weight: bold;
                 font-size: 11px;
-            }
-            QPushButton:hover { background-color: #0b7dda; }
-            QPushButton:pressed { background-color: #0966cc; }
+            }}
+            QPushButton:hover {{ background-color: {COLOR_NAVY_DARK}; }}
+            QPushButton:pressed {{ background-color: {COLOR_NAVY_DARK}; }}
         """)
         btn_close.clicked.connect(self.accept)
         button_layout.addWidget(btn_close)
@@ -1995,7 +2001,7 @@ class BeasiswaDetailDialog(QDialog):
             
             link_aplikasi = self.beasiswa_data.get('link_aplikasi')
             if link_aplikasi and link_aplikasi.strip():
-                html_parts.append(f"<p><b>Link Aplikasi:</b><br/><a href='{link_aplikasi}' style='color: #1976D2;'>{link_aplikasi}</a></p>")
+                html_parts.append(f"<p><b>Link Aplikasi:</b><br/><a href='{link_aplikasi}' style='color: {COLOR_NAVY};'>{link_aplikasi}</a></p>")
             
             html_parts.append("</div>")
             
