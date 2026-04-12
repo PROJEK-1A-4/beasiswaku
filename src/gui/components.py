@@ -3,11 +3,15 @@ Alert Banner Component for BeasiswaKu
 Reusable widget untuk menampilkan info, warning, success, dan error messages
 """
 
+import logging
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon
 
 from src.gui.design_tokens import *
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 
 class AlertBanner(QWidget):
@@ -175,3 +179,181 @@ def create_alert(alert_type: str, message: str, closable: bool = True) -> AlertB
         AlertBanner: Instance dari alert banner
     """
     return AlertBanner(alert_type=alert_type, message=message, closable=closable)
+
+
+# ============================================================================
+# STATUS BADGE COMPONENT (Task 6)
+# ============================================================================
+
+class StatusBadge(QLabel):
+    """
+    Reusable status badge widget dengan pill-shaped design.
+    Menampilkan status dengan warna yang sesuai dan rounded corners.
+    
+    Status yang didukung:
+    - 'pending': Light blue (#dbeafe) untuk status menunggu
+    - 'approved': Light green (#d1fae5) untuk status approved
+    - 'rejected': Light red (#fee2e2) untuk status rejected
+    - 'draft': Light gray (#f3f4f6) untuk status draft
+    - 'open': Green untuk beasiswa masih buka
+    - 'closing-soon': Orange untuk beasiswa segera tutup
+    - 'closed': Red untuk beasiswa sudah tutup
+    
+    Features:
+    - Pill-shaped design (fully rounded corners)
+    - Automatic color adjustment berdasarkan status
+    - Responsive font size
+    - Emoji support untuk visual clarity
+    - Centered text alignment
+    
+    Example:
+        badge = StatusBadge(status='approved', text='✅ Approved')
+        layout.addWidget(badge)
+    """
+    
+    # Mapping status ke color scheme
+    STATUS_COLORS = {
+        'pending': {
+            'text_color': COLOR_STATUS_PENDING,
+            'bg_color': '#dbeafe',
+            'emoji': '⏳'
+        },
+        'approved': {
+            'text_color': COLOR_STATUS_APPROVED,
+            'bg_color': COLOR_SUCCESS_LIGHT,
+            'emoji': '✅'
+        },
+        'rejected': {
+            'text_color': COLOR_STATUS_REJECTED,
+            'bg_color': COLOR_ERROR_LIGHT,
+            'emoji': '❌'
+        },
+        'draft': {
+            'text_color': COLOR_STATUS_DRAFT,
+            'bg_color': COLOR_GRAY_100,
+            'emoji': '📝'
+        },
+        'open': {
+            'text_color': COLOR_SUCCESS,
+            'bg_color': COLOR_SUCCESS_LIGHT,
+            'emoji': '🟢'
+        },
+        'closing-soon': {
+            'text_color': COLOR_WARNING,
+            'bg_color': COLOR_WARNING_LIGHT,
+            'emoji': '🟡'
+        },
+        'closed': {
+            'text_color': COLOR_ERROR,
+            'bg_color': COLOR_ERROR_LIGHT,
+            'emoji': '🔴'
+        },
+    }
+    
+    def __init__(self, status: str = "pending", text: str = "", show_emoji: bool = True, parent=None):
+        """
+        Inisialisasi StatusBadge
+        
+        Args:
+            status (str): Status key ('pending', 'approved', 'rejected', 'draft', 'open', 'closing-soon', 'closed')
+            text (str): Text yang ditampilkan (auto-generated jika kosong)
+            show_emoji (bool): Apakah menampilkan emoji
+            parent: Parent widget
+        """
+        super().__init__(parent)
+        self.status = status
+        self.show_emoji = show_emoji
+        
+        # Get color scheme dari status
+        colors = self.STATUS_COLORS.get(status, self.STATUS_COLORS['draft'])
+        text_color = colors['text_color']
+        bg_color = colors['bg_color']
+        emoji = colors['emoji']
+        
+        # Set text (gunakan default jika kosong)
+        if not text:
+            text = status.replace('-', ' ').title()
+        
+        if show_emoji:
+            display_text = f"{emoji} {text}"
+        else:
+            display_text = text
+        
+        # Setup label
+        self.setText(display_text)
+        self.setFont(QFont("Arial", 11, QFont.Weight.Medium))
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # Apply pill-shaped styling dengan nama color
+        self.setStyleSheet(f"""
+            QLabel {{
+                background-color: {bg_color};
+                color: {text_color};
+                border: none;
+                border-radius: {BORDER_RADIUS_FULL};
+                padding: 4px 12px;
+                font-weight: 500;
+                font-size: 11px;
+            }}
+        """)
+        
+        # Set fixed size untuk badge (width auto-adjust, height fixed)
+        self.setFixedHeight(28)
+        self.setMinimumWidth(80)
+        
+        logger.debug(f"✅ StatusBadge created: {status} ({display_text})")
+    
+    def set_status(self, status: str, text: str = ""):
+        """
+        Update status dan text badge
+        
+        Args:
+            status (str): Status key baru
+            text (str): Text baru (optional)
+        """
+        self.status = status
+        
+        # Get color scheme
+        colors = self.STATUS_COLORS.get(status, self.STATUS_COLORS['draft'])
+        text_color = colors['text_color']
+        bg_color = colors['bg_color']
+        emoji = colors['emoji']
+        
+        # Set text
+        if not text:
+            text = status.replace('-', ' ').title()
+        
+        if self.show_emoji:
+            display_text = f"{emoji} {text}"
+        else:
+            display_text = text
+        
+        # Update label
+        self.setText(display_text)
+        self.setStyleSheet(f"""
+            QLabel {{
+                background-color: {bg_color};
+                color: {text_color};
+                border: none;
+                border-radius: {BORDER_RADIUS_FULL};
+                padding: 4px 12px;
+                font-weight: 500;
+                font-size: 11px;
+            }}
+        """)
+
+
+# Factory function untuk membuat status badge dengan mudah
+def create_status_badge(status: str, text: str = "", show_emoji: bool = True) -> StatusBadge:
+    """
+    Factory function untuk membuat StatusBadge dengan cepat
+    
+    Args:
+        status (str): Status key ('pending', 'approved', 'rejected', 'draft', 'open', 'closing-soon', 'closed')
+        text (str): Custom text (akan auto-generate jika kosong)
+        show_emoji (bool): Tampilkan emoji
+    
+    Returns:
+        StatusBadge: Instance dari status badge
+    """
+    return StatusBadge(status=status, text=text, show_emoji=show_emoji)

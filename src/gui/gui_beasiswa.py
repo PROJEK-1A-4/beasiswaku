@@ -33,7 +33,7 @@ from src.database.crud import (
 )
 from src.gui.design_tokens import *
 from src.gui.styles import get_stylesheet
-from src.gui.components import AlertBanner
+from src.gui.components import AlertBanner, StatusBadge, create_alert, create_status_badge
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -52,6 +52,12 @@ class BeasiswaTab(QWidget):
     - Highlight deadline (merah ≤3 hari, kuning ≤7 hari)
     - Detail popup (double-click)
     - Export to CSV
+    
+    Components Available (Task 6):
+    - StatusBadge: Reusable pill-shaped status indicator
+      * Use: create_status_badge('approved', 'Status Approved')
+      * Statuses: pending, approved, rejected, draft, open, closing-soon, closed
+      * Pill-shaped with emoji support
     """
     
     # Signal untuk refresh data
@@ -260,6 +266,13 @@ class BeasiswaTab(QWidget):
         
         # ===== APPLY STYLESHEET (Task 2: Update color scheme) =====
         self.setStyleSheet(get_stylesheet())
+        
+        # ===== TASK 6: STATUS BADGE COMPONENT NOW AVAILABLE =====
+        # StatusBadge widget created in src/gui/components.py
+        # Usage: badge = create_status_badge('approved', 'Approved')
+        # Supports: pending, approved, rejected, draft, open, closing-soon, closed
+        # Features: Pill-shaped, emoji, color-coded, responsive font
+        # Helper in this class: self.create_status_badge_for_beasiswa(status_text)
         
         logger.info("✅ BeasiswaTab UI initialized with all sections")
     
@@ -818,6 +831,37 @@ class BeasiswaTab(QWidget):
     def _on_alert_closed(self):
         """Callback ketika alert banner ditutup"""
         logger.debug("Alert banner closed by user")
+    
+    def create_status_badge_for_beasiswa(self, status_text: str) -> StatusBadge:
+        """
+        Helper method untuk create status badge untuk beasiswa status (Task 6).
+        
+        Mapping status text ke badge status:
+        - "Buka" -> "open"
+        - "Segera Tutup" -> "closing-soon"
+        - "Tutup" -> "closed"
+        - Anything else -> auto-map
+        
+        Args:
+            status_text (str): Status text dari beasiswa data
+        
+        Returns:
+            StatusBadge: Widget dengan status badge styling
+        """
+        # Map status text ke badge status key
+        status_map = {
+            "Buka": "open",
+            "Segera Tutup": "closing-soon",
+            "Tutup": "closed",
+        }
+        
+        badge_status = status_map.get(status_text, status_text.lower())
+        
+        # Create dan return badge
+        badge = StatusBadge(status=badge_status, text=status_text, show_emoji=True)
+        logger.debug(f"✅ Status badge created untuk: {status_text} → {badge_status}")
+        
+        return badge
     
     # =====================================================================
     # SECTION 2: DATA LOADING (Tasks 11-13)
