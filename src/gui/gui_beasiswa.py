@@ -66,7 +66,7 @@ class BeasiswaTab(QWidget):
       * Statuses: pending, approved, rejected, draft, open, closing-soon, closed
       * Pill-shaped with emoji support
     
-    UI Enhancements (Tasks 1-8):
+    UI Enhancements (Tasks 1-9):
     - Task 1: Design tokens system (colors, typography, spacing)
     - Task 2: Navy + Orange color scheme applied throughout
     - Task 3: AlertBanner for success/error messages
@@ -78,6 +78,11 @@ class BeasiswaTab(QWidget):
       * Helper functions: get_button_solid_stylesheet(), get_button_outlined_stylesheet(), get_button_icon_stylesheet()
       * Applied to all buttons: Tambah, Edit, Hapus, Refresh, Export, and dialog buttons
       * Variants: Navy (primary), Orange (accent), Error (danger), Gray (secondary)
+    - Task 9: CTA button "Lihat Semua Beasiswa" with orange styling
+      * Prominent button to view all scholarships
+      * Resets filters and shows complete beasiswa list
+      * Encourages user exploration
+      * One-click action to clear search/filters
     """
     
     # Signal untuk refresh data
@@ -112,6 +117,9 @@ class BeasiswaTab(QWidget):
         self.btn_hapus: Optional[QPushButton] = None
         self.btn_refresh: Optional[QPushButton] = None
         self.btn_export_csv: Optional[QPushButton] = None
+        
+        # CTA button (Task 9)
+        self.btn_lihat_semua: Optional[QPushButton] = None
         
         # Alert banner
         self.alert_banner: Optional[AlertBanner] = None
@@ -248,7 +256,14 @@ class BeasiswaTab(QWidget):
         self.lbl_row_count.setFont(QFont("Arial", 9))
         self.lbl_row_count.setStyleSheet(f"color: {COLOR_GRAY_600}; font-style: italic;")
         main_layout.addWidget(self.lbl_row_count)
-        main_layout.addSpacing(5)
+        main_layout.addSpacing(8)
+        
+        # ===== SECTION 4.5: CTA SECTION (Task 9) =====
+        # Call-to-action button to view all beasiswa
+        cta_layout = self._create_cta_section()
+        if cta_layout:
+            main_layout.addLayout(cta_layout)
+            main_layout.addSpacing(8)
         
         # ===== SECTION 5: CRUD BUTTONS (Tasks 9-10) =====
         # Action buttons for CRUD operations
@@ -280,6 +295,12 @@ class BeasiswaTab(QWidget):
         if self.btn_export_csv:
             self.btn_export_csv.clicked.connect(self.on_export_csv_clicked)
             logger.debug("✅ Export CSV button clicked signal connected to on_export_csv_clicked()")
+        
+        # ===== TASK 9: CONNECT CTA BUTTON SIGNAL =====
+        # Connect "Lihat Semua Beasiswa" button to show all beasiswa view
+        if self.btn_lihat_semua:
+            self.btn_lihat_semua.clicked.connect(self.on_lihat_semua_clicked)
+            logger.debug("✅ Lihat Semua button clicked signal connected to on_lihat_semua_clicked()")
         
         # ===== FINALIZE LAYOUT =====
         self.setLayout(main_layout)
@@ -642,6 +663,46 @@ class BeasiswaTab(QWidget):
         
         self.tbl_beasiswa.setRowCount(0)
         logger.debug("Table cleared (all rows removed)")
+    
+    def _create_cta_section(self) -> QHBoxLayout:
+        """
+        Create Call-to-Action section with prominent orange button (Task 9).
+        
+        Purpose: Encourage users to explore all available scholarships
+        
+        Button: "🚀 Lihat Semua Beasiswa"
+        - Orange color (accent/CTA styling)
+        - Prominent width and height
+        - Hover effect with darker orange
+        - Action: Show all beasiswa with extended filtering/sorting options
+        
+        Layout: Centered CTA button with spacers
+        
+        Returns:
+            QHBoxLayout: Layout containing the CTA button
+        """
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        
+        # Left spacer
+        layout.addStretch()
+        
+        # ===== TASK 9: LIHAT SEMUA BEASISWA CTA BUTTON =====
+        self.btn_lihat_semua = QPushButton("🚀 Lihat Semua Beasiswa")
+        self.btn_lihat_semua.setFont(QFont("Arial", 11, QFont.Weight.Bold))
+        self.btn_lihat_semua.setMinimumHeight(40)
+        self.btn_lihat_semua.setMinimumWidth(200)
+        self.btn_lihat_semua.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_lihat_semua.setStyleSheet(get_button_solid_stylesheet("orange"))
+        layout.addWidget(self.btn_lihat_semua)
+        
+        # Right spacer
+        layout.addStretch()
+        
+        logger.debug("✅ CTA section created (Task 9: Lihat Semua Beasiswa button)")
+        
+        return layout
     
     def _create_crud_buttons_layout(self) -> QHBoxLayout:
         """
@@ -1832,6 +1893,59 @@ class BeasiswaTab(QWidget):
         except Exception as e:
             logger.error(f"❌ Error preparing CSV data: {e}")
             return False
+    
+    def on_lihat_semua_clicked(self):
+        """
+        Handle "Lihat Semua Beasiswa" CTA button click (Task 9).
+        
+        Purpose:
+        - Show all available scholarships in current view
+        - Reset filters to show complete beasiswa list
+        - Scroll table to top to show first entry
+        
+        Implementation:
+        - Clear filter dropdowns (reset to "Semua")
+        - Clear search entry (reset text)
+        - Trigger apply_filters() to show all data
+        
+        User Experience:
+        - Encourages exploration of all scholarships
+        - Quick way to see full dataset
+        - One-click reset of all filters
+        """
+        logger.info("Lihat Semua Beasiswa button clicked - resetting filters")
+        
+        try:
+            # Reset filter dropdowns to "Semua"
+            if self.combo_jenjang:
+                self.combo_jenjang.setCurrentIndex(0)  # "Semua"
+                logger.debug("✅ Jenjang filter reset to 'Semua'")
+            
+            if self.combo_status:
+                self.combo_status.setCurrentIndex(0)  # "Semua"
+                logger.debug("✅ Status filter reset to 'Semua'")
+            
+            # Clear search entry
+            if self.entry_search:
+                self.entry_search.clear()
+                logger.debug("✅ Search entry cleared")
+            
+            # Apply filters (which will show all beasiswa since filters are reset)
+            self.apply_filters()
+            
+            # Scroll table to top
+            if self.tbl_beasiswa:
+                self.tbl_beasiswa.scrollToTop()
+                logger.debug("✅ Table scrolled to top")
+            
+            # Show success alert
+            self.show_alert("success", "✅ Menampilkan semua beasiswa yang tersedia")
+            
+            logger.info("✅ Lihat Semua Beasiswa action completed")
+            
+        except Exception as e:
+            logger.error(f"❌ Error in on_lihat_semua_clicked: {e}")
+            self.show_alert("error", f"❌ Error: {str(e)}")
 
 
 # ==================== DIALOG CLASSES ====================
