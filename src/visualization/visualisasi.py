@@ -272,7 +272,7 @@ def create_bar_chart_lamaran_per_bulan(
         Alasan chart ini:
         - Menunjukkan tren aktivitas pendaftaran user dari waktu ke waktu.
         """
-        fig, ax = plt.subplots(figsize=(9, 4.5))
+        fig, ax = plt.subplots(figsize=(10, 5.5))
 
         if not data:
             _render_empty_state(ax, title)
@@ -298,7 +298,8 @@ def create_bar_chart_lamaran_per_bulan(
                 fontsize=9,
             )
 
-        plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
+        fig.subplots_adjust(bottom=0.25)
         fig.tight_layout()
         return fig, ax
 
