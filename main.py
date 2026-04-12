@@ -38,6 +38,33 @@ from src.gui.sidebar import Sidebar
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+def _create_chart_section(section_title: str, canvas, min_height: int) -> QWidget:
+    """Bungkus canvas chart dalam kartu dengan judul yang jelas."""
+    section = QWidget()
+    section.setStyleSheet("""
+        QWidget {
+            background: white;
+            border: 1px solid #d7dee8;
+            border-radius: 12px;
+        }
+    """)
+
+    section_layout = QVBoxLayout(section)
+    section_layout.setContentsMargins(16, 14, 16, 16)
+    section_layout.setSpacing(8)
+
+    heading = QLabel(section_title)
+    heading.setFont(QFont("Arial", 13, QFont.Weight.Bold))
+    heading.setStyleSheet("color: #203040;")
+    section_layout.addWidget(heading)
+
+    canvas.setMinimumHeight(min_height)
+    canvas.setStyleSheet("background: transparent;")
+    section_layout.addWidget(canvas)
+
+    return section
+
 # ==================== LOGIN WINDOW ====================
 
 class LoginWindow(QDialog):
@@ -302,6 +329,41 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"BeasiswaKu - {self.username}")
         self.setGeometry(0, 0, 1200, 700)
         self.center_window()
+        self.setStyleSheet("""
+            QMainWindow {
+                background: #f5f7fb;
+            }
+            QWidget {
+                font-family: Arial;
+            }
+            QTabWidget::pane {
+                border: 1px solid #d7dee8;
+                background: white;
+                top: -1px;
+            }
+            QTabBar::tab {
+                background: #e9eef5;
+                color: #2b2b2b;
+                padding: 8px 14px;
+                margin-right: 4px;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
+            }
+            QTabBar::tab:selected {
+                background: white;
+                border: 1px solid #d7dee8;
+                border-bottom-color: white;
+            }
+            QPushButton {
+                padding: 7px 12px;
+                border-radius: 6px;
+                border: 1px solid #c7d0db;
+                background: #ffffff;
+            }
+            QPushButton:hover {
+                background: #f0f4f8;
+            }
+        """)
         
         # Central widget
         central_widget = QWidget()
@@ -331,7 +393,8 @@ class MainWindow(QMainWindow):
         
         # App logo/title
         app_title = QLabel("🎓 BeasiswaKu - Personal Scholarship Manager")
-        app_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        app_title.setFont(QFont("Arial", 13, QFont.Weight.Bold))
+        app_title.setStyleSheet("color: #203040;")
         top_bar_layout.addWidget(app_title)
         
         # Spacer
@@ -340,6 +403,7 @@ class MainWindow(QMainWindow):
         # User info
         user_label = QLabel(f"👤 {self.username}")
         user_label.setFont(QFont("Arial", 10))
+        user_label.setStyleSheet("color: #4c5a6b;")
         top_bar_layout.addWidget(user_label)
         
         top_bar_layout.setContentsMargins(16, 12, 16, 12)
@@ -351,6 +415,8 @@ class MainWindow(QMainWindow):
         
         # ===== TAB WIDGET =====
         self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)
+        self.tabs.setStyleSheet(self.tabs.styleSheet() + "QTabBar::tab { min-width: 110px; }")
         
         # Tab 0: Beranda (Home/Dashboard)
         self.beranda_tab = BerandaTab(self.user_id, self.username)
@@ -367,6 +433,8 @@ class MainWindow(QMainWindow):
         # Tab 3: Statistik
         self.statistik_tab = StatistikTab(self.user_id)
         self.tabs.addTab(self.statistik_tab, "📊 Statistik")
+        self.tabs.setDocumentMode(True)
+        self.tabs.setStyleSheet("QTabBar::tab { min-width: 110px; }")
         
         # Tab 4: Profil
         self.profil_tab = ProfileTab(self.user_id, self.username)
