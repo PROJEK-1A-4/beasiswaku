@@ -396,3 +396,37 @@ def build_statistik_canvases() -> Dict[str, FigureCanvas]:
             "canvas_status": figure_to_canvas(fig_status),
         }
 
+def build_tracker_canvases(user_id: int) -> Dict[str, FigureCanvas]:
+        """
+        Membuat paket canvas untuk Tab Tracker user tertentu.
+
+        Input:
+        - user_id: user aktif
+
+        Return keys:
+        - canvas_lamaran_status
+        - canvas_lamaran_bulanan
+        """
+        status_counts, month_counts = load_tracker_data(user_id)
+
+        fig_status, _ = create_pie_chart_status_lamaran(status_counts)
+        fig_month, _ = create_bar_chart_lamaran_per_bulan(month_counts)
+
+        return {
+            "canvas_lamaran_status": figure_to_canvas(fig_status),
+            "canvas_lamaran_bulanan": figure_to_canvas(fig_month),
+        }
+
+if __name__ == "__main__":
+        """
+        Demo lokal cepat:
+        - Menjalankan chart statistik dari data real database.
+        - Berguna untuk cek visual sebelum integrasi ke main.py.
+        """
+        statistik_canvases = build_statistik_canvases()
+
+        # Preview figure statistik
+        for canvas in statistik_canvases.values():
+            canvas.figure.show()
+
+        plt.show()
