@@ -174,13 +174,19 @@ class BeasiswaTab(QWidget):
             main_layout.addLayout(crud_layout)
         
         # ===== TASK 20: CONNECT TAMBAH BUTTON SIGNAL =====
-        # Will be implemented in Task 20 (connect to on_tambah_clicked)
+        if self.btn_tambah:
+            self.btn_tambah.clicked.connect(self.on_tambah_clicked)
+            logger.debug("✅ Tambah button clicked signal connected to on_tambah_clicked()")
         
         # ===== TASK 21: CONNECT EDIT BUTTON SIGNAL =====
-        # Will be implemented in Task 21 (connect to on_edit_clicked)
+        if self.btn_edit:
+            self.btn_edit.clicked.connect(self.on_edit_clicked)
+            logger.debug("✅ Edit button clicked signal connected to on_edit_clicked()")
         
         # ===== TASK 23: CONNECT HAPUS BUTTON SIGNAL =====
-        # Will be implemented in Task 23 (connect to on_hapus_clicked)
+        if self.btn_hapus:
+            self.btn_hapus.clicked.connect(self.on_hapus_clicked)
+            logger.debug("✅ Hapus button clicked signal connected to on_hapus_clicked()")
         
         # ===== TASK 16: CONNECT REFRESH BUTTON SIGNAL (Task 10) =====
         if self.btn_refresh:
