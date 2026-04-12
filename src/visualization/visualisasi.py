@@ -320,3 +320,45 @@ def load_statistik_data() -> Tuple[Dict[str, int], List[Dict], Dict[str, int]]:
 
         return jenjang_data, top_penyelenggara_data, status_data
 
+def load_tracker_data(user_id: int) -> Tuple[Dict[str, int], Dict[str, int]]:
+        """
+        Mengambil daftar lamaran user dari database, lalu mengelompokkan berdasarkan status dan bulan.
+
+        Input:
+        - user_id: id user aktif
+
+        Return:
+        - status_counts: dict jumlah status lamaran
+        - month_counts: dict jumlah lamaran per bulan (YYYY-MM)
+
+        Alasan:
+        - get_lamaran_list memberi data detail per baris.
+        - Fungsi ini merangkum detail itu menjadi format siap-chart.
+        """
+        lamaran_list, _ = get_lamaran_list(filter_user_id=user_id)
+
+        if not lamaran_list:
+            return {}, {}
+
+        status_counter: Counter = Counter()
+        month_counter: Counter = Counter()
+
+        for item in lamaran_list:
+            status = str(item.get("status", "Pending"))
+            status_counter[status] += 1
+
+            tanggal = str(item.get("tanggal_daftar", "")).strip()
+            month_key = "Unknown"
+
+            if tanggal:
+                try:
+                    dt = datetime.strptime(tanggal, "%Y-%m-%d")
+                    month_key = dt.strftime("%Y-%m")
+                except ValueError:
+                    if len(tanggal) >= 7:
+                        month_key = tanggal[:7]
+
+            month_counter[month_key] += 1
+
+        month_dict = dict(sorted(month_counter.items(), key=lambda x: (x[0] == "Unknown", x[0])))
+        return dict(status_counter), month_dict
