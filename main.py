@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTabWidget, QStatusBar,
     QMessageBox, QComboBox, QTableWidget, QHeaderView, QDialog,
-    QFormLayout, QTextEdit
+    QFormLayout, QTextEdit, QScrollArea
 )
 from PyQt6.QtCore import Qt, QSize, QTimer
 from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap
@@ -430,15 +430,29 @@ class TrackerTab(QWidget):
     def init_ui(self):
         """Initialize tracker tab UI"""
         layout = QVBoxLayout()
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(16)
 
         title = QLabel("📋 Tracker Lamaran")
         title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-        layout.addWidget(title)
+        content_layout.addWidget(title)
 
         try:
             tracker_canvases = build_tracker_canvases(self.user_id)
-            layout.addWidget(tracker_canvases["canvas_lamaran_status"])
-            layout.addWidget(tracker_canvases["canvas_lamaran_bulanan"])
+            tracker_status_canvas = tracker_canvases["canvas_lamaran_status"]
+            tracker_month_canvas = tracker_canvases["canvas_lamaran_bulanan"]
+            tracker_status_canvas.setMinimumHeight(320)
+            tracker_month_canvas.setMinimumHeight(320)
+            content_layout.addWidget(tracker_status_canvas)
+            content_layout.addWidget(tracker_month_canvas)
         except Exception as e:
             logger.error(f"❌ Gagal memuat chart tracker: {e}")
             error_label = QLabel(
@@ -448,7 +462,10 @@ class TrackerTab(QWidget):
             error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             error_label.setFont(QFont("Arial", 11))
             error_label.setStyleSheet("padding: 40px; background-color: #f8d7da; border-radius: 5px;")
-            layout.addWidget(error_label)
+            content_layout.addWidget(error_label)
+
+        scroll_area.setWidget(content)
+        layout.addWidget(scroll_area)
 
         self.setLayout(layout)
 
@@ -464,16 +481,32 @@ class StatistikTab(QWidget):
     def init_ui(self):
         """Initialize statistik tab UI"""
         layout = QVBoxLayout()
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(16)
 
         title = QLabel("📊 Statistik & Grafik")
         title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-        layout.addWidget(title)
+        content_layout.addWidget(title)
 
         try:
             statistik_canvases = build_statistik_canvases()
-            layout.addWidget(statistik_canvases["canvas_jenjang"])
-            layout.addWidget(statistik_canvases["canvas_penyelenggara"])
-            layout.addWidget(statistik_canvases["canvas_status"])
+            canvas_jenjang = statistik_canvases["canvas_jenjang"]
+            canvas_penyelenggara = statistik_canvases["canvas_penyelenggara"]
+            canvas_status = statistik_canvases["canvas_status"]
+            canvas_jenjang.setMinimumHeight(300)
+            canvas_penyelenggara.setMinimumHeight(300)
+            canvas_status.setMinimumHeight(300)
+            content_layout.addWidget(canvas_jenjang)
+            content_layout.addWidget(canvas_penyelenggara)
+            content_layout.addWidget(canvas_status)
         except Exception as e:
             logger.error(f"❌ Gagal memuat chart statistik: {e}")
             error_label = QLabel(
@@ -483,7 +516,10 @@ class StatistikTab(QWidget):
             error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             error_label.setFont(QFont("Arial", 11))
             error_label.setStyleSheet("padding: 40px; background-color: #f8d7da; border-radius: 5px;")
-            layout.addWidget(error_label)
+            content_layout.addWidget(error_label)
+
+        scroll_area.setWidget(content)
+        layout.addWidget(scroll_area)
 
         self.setLayout(layout)
 
