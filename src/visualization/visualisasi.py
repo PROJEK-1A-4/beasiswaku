@@ -1,265 +1,349 @@
 """
-visualisasi.py - Analytics and Charts Generation
-Owner: RICHARD
-Project: BeasiswaKu - Personal Scholarship Manager
-
-Tanggung jawab:
-- Generate Matplotlib pie charts & bar charts untuk Tab Tracker & Tab Statistik
-- Handle data aggregation functions dari crud.py
-- Return FigureCanvas (QWidget) agar bisa diembed langsung ke PyQt6 layout
+Modul visualisasi Beasiswaku
+Peran:
+1. Mengambil data statistik/tracker dari CRUD.
+2. Mengubah data menjadi chart.
+3. Menampilkan chart di dashbord pengguna.
+4. Mengembalikan Figure untuk dipasang ke PyQt6.
 """
 
+from __future__ import annotations
+
 import logging
+from collections import Counter
 from datetime import datetime
-from collections import defaultdict
+from typing import Dict, List, Tuple
 
 import matplotlib
-# Konfigurasi matplotlib untuk menggunakan backend PyQt6
+# Explicitly set the backend to PyQt6 (qtagg) before importing pyplot
 matplotlib.use('qtagg')
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
 
+# Import data layer (CRUD) sebagai sumber data yang resmi
 from src.database.crud import (
-    get_lamaran_list,
     get_beasiswa_per_jenjang,
     get_top_penyelenggara,
-    get_status_availability
+    get_status_availability,
+    get_lamaran_list,
 )
 
 logger = logging.getLogger(__name__)
 
-# Standard color palette sesuai desain aplikasi
+# Menyusun variasi warna untuk chart agar tampilan seragam dan menarik.
 COLOR_PALETTE = {
-    'Pending': '#FFC107',       # Amber
-    'Submitted': '#2196F3',     # Blue
-    'Accepted': '#4CAF50',      # Green
-    'Rejected': '#F44336',      # Red
-    'Withdrawn': '#9E9E9E',     # Grey
-    'Buka': '#4CAF50',          # Green
-    'Segera Tutup': '#FFC107',  # Yellow
-    'Tutup': '#F44336'          # Red
+    # Status beasiswa
+    "Buka": "#2E7D32",
+    "Segera Tutup": "#F9A825",
+    "Tutup": "#C62828",
+    # Status lamaran
+    "Pending": "#546E7A",
+    "Submitted": "#1E88E5",
+    "Accepted": "#2E7D32",
+    "Rejected": "#C62828",
+    "Withdrawn": "#8E24AA",
+    # Utility
+    "bar_default": "#1E88E5",
+    "bar_secondary": "#26A69A",
+    "grid": "#D9D9D9",
+    "empty_text": "#777777",
 }
 
-def create_empty_canvas(message: str = "Tidak ada data") -> FigureCanvas:
-    """Helper untuk membuat canvas kosong dengan pesan (jika data belum ada)."""
-    fig = Figure(figsize=(5, 4), dpi=100)
-    ax = fig.add_subplot(111)
-    ax.text(0.5, 0.5, message, ha='center', va='center', fontsize=12, color='gray')
-    ax.axis('off')
+
+def _apply_axis_style(ax: plt.Axes) -> None:
+    """
+    Fungsi helper internal untuk merapikan style sumbu chart.
+    Agar semua chart memiliki style yang konsisten dan menghindari duplikasi.
+    """
+    ax.grid(axis="y", linestyle="--", alpha=0.35, color=COLOR_PALETTE["grid"])
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+
+def _style_chart_title(ax: plt.Axes, title: str) -> None:
+    """Disimpan untuk kompatibilitas; judul ditampilkan di UI, bukan di dalam chart."""
+    pass
+
+
+def _render_empty_state(ax: plt.Axes, title: str, message: str = "Data tidak tersedia") -> None:
+    """
+    Menampilkan tampilan fallback apabila data kosong.
+    Aplikasi tidak crash saat database belum ada data.
+    """
+    _style_chart_title(ax, title)
+    ax.set_facecolor("#f8fafc")
+    ax.text(
+        0.5, 0.50, message,
+        ha="center", va="center",
+        fontsize=11, color="#5f6b7a",
+        bbox={
+            "boxstyle": "round,pad=0.35",
+            "facecolor": "white",
+            "edgecolor": "#d7dee8",
+            "linewidth": 1.0,
+        },
+        transform=ax.transAxes
+    )
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+
+
+def create_bar_chart_beasiswa_per_jenjang(
+    data: Dict[str, int],
+    title: str = "Jumlah Beasiswa per Jenjang",
+) -> Tuple[plt.Figure, plt.Axes]:
+    """Membuat bar chart jumlah beasiswa per jenjang."""
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+
+    if not data:
+        _render_empty_state(ax, title)
+        fig.tight_layout()
+        return fig, ax
+
+    labels = list(data.keys())
+    values = [int(v) for v in data.values()]
+
+    bars = ax.bar(labels, values, color=COLOR_PALETTE["bar_default"], alpha=0.9)
+    _style_chart_title(ax, title)
+    ax.set_xlabel("Jenjang")
+    ax.set_ylabel("Jumlah Beasiswa")
+    _apply_axis_style(ax)
+
+    for bar, value in zip(bars, values):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            value + 0.05,
+            str(value),
+            ha="center",
+            va="bottom",
+            fontsize=10,
+        )
+
+    fig.tight_layout(rect=[0, 0.02, 1, 0.92])
+    return fig, ax
+
+
+def create_bar_chart_top_penyelenggara(
+    data: List[Dict],
+    title: str = "Top Penyelenggara Beasiswa",
+    limit: int = 5,
+) -> Tuple[plt.Figure, plt.Axes]:
+    """Membuat bar horizontal untuk top penyelenggara."""
+    fig, ax = plt.subplots(figsize=(9, 5))
+
+    if not data:
+        _render_empty_state(ax, title)
+        fig.tight_layout()
+        return fig, ax
+
+    sliced = data[: max(1, limit)]
+    names = [str(item.get("nama_penyelenggara", "Unknown")) for item in sliced]
+    totals = [int(item.get("total_beasiswa", 0)) for item in sliced]
+
+    bars = ax.barh(names, totals, color=COLOR_PALETTE["bar_secondary"], alpha=0.9)
+    _style_chart_title(ax, title)
+    ax.set_xlabel("Jumlah Beasiswa")
+    ax.set_ylabel("Penyelenggara")
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    _apply_axis_style(ax)
+    ax.invert_yaxis()  # Nilai tertinggi di atas
+
+    for bar, total in zip(bars, totals):
+        ax.text(
+            total + 0.05,
+            bar.get_y() + bar.get_height() / 2,
+            str(total),
+            va="center",
+            fontsize=10,
+        )
+
+    fig.tight_layout(rect=[0, 0.02, 1, 0.92])
+    return fig, ax
+
+
+def create_pie_chart_status_ketersediaan(
+    data: Dict[str, int],
+    title: str = "Status Ketersediaan Beasiswa",
+) -> Tuple[plt.Figure, plt.Axes]:
+    """Membuat pie chart status ketersediaan beasiswa."""
+    fig, ax = plt.subplots(figsize=(6.5, 6.5))
+
+    if not data:
+        _render_empty_state(ax, title)
+        fig.tight_layout()
+        return fig, ax
+
+    labels = list(data.keys())
+    values = [int(v) for v in data.values()]
+    colors = [COLOR_PALETTE.get(label, "#90A4AE") for label in labels]
+
+    ax.pie(
+        values,
+        labels=labels,
+        colors=colors,
+        autopct="%1.1f%%",
+        startangle=90,
+        wedgeprops={"edgecolor": "white", "linewidth": 1.0},
+        textprops={"fontsize": 10},
+    )
+    _style_chart_title(ax, title)
+    ax.axis("equal")
+    fig.tight_layout(rect=[0, 0.02, 1, 0.92])
+    return fig, ax
+
+
+def create_pie_chart_status_lamaran(
+    data: Dict[str, int],
+    title: str = "Distribusi Status Lamaran",
+) -> Tuple[plt.Figure, plt.Axes]:
+    """Membuat pie chart status lamaran user."""
+    fig, ax = plt.subplots(figsize=(6.5, 6.5))
+
+    if not data:
+        _render_empty_state(ax, title)
+        fig.tight_layout()
+        return fig, ax
+
+    labels = list(data.keys())
+    values = [int(v) for v in data.values()]
+    colors = [COLOR_PALETTE.get(label, "#90A4AE") for label in labels]
+
+    ax.pie(
+        values,
+        labels=labels,
+        colors=colors,
+        autopct="%1.1f%%",
+        startangle=90,
+        wedgeprops={"edgecolor": "white", "linewidth": 1.0},
+        textprops={"fontsize": 10},
+    )
+    _style_chart_title(ax, title)
+    ax.axis("equal")
+    fig.tight_layout(rect=[0, 0.02, 1, 0.92])
+    return fig, ax
+
+
+def create_bar_chart_lamaran_per_bulan(
+    data: Dict[str, int],
+    title: str = "Jumlah Lamaran per Bulan",
+) -> Tuple[plt.Figure, plt.Axes]:
+    """Membuat bar chart jumlah lamaran per bulan."""
+    fig, ax = plt.subplots(figsize=(10, 5.5))
+
+    if not data:
+        _render_empty_state(ax, title)
+        fig.tight_layout()
+        return fig, ax
+
+    months = sorted(data.keys())
+    values = [int(data[m]) for m in months]
+
+    bars = ax.bar(months, values, color=COLOR_PALETTE["bar_default"], alpha=0.9)
+    _style_chart_title(ax, title)
+    ax.set_xlabel("Bulan")
+    ax.set_ylabel("Jumlah Lamaran")
+    _apply_axis_style(ax)
+
+    for bar, value in zip(bars, values):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            value + 0.05,
+            str(value),
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
+
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
+    fig.tight_layout(rect=[0, 0.02, 1, 0.90])
+    return fig, ax
+
+
+def load_statistik_data() -> Tuple[Dict[str, int], List[Dict], Dict[str, int]]:
+    """Mengambil data statistik dari CRUD (data real database)."""
+    jenjang_data = get_beasiswa_per_jenjang() or {}
+    top_penyelenggara_data = get_top_penyelenggara(limit=5) or []
+    status_data = get_status_availability() or {}
+
+    return jenjang_data, top_penyelenggara_data, status_data
+
+
+def load_tracker_data(user_id: int) -> Tuple[Dict[str, int], Dict[str, int]]:
+    """Mengambil daftar lamaran user dari database, lalu mengelompokkan berdasarkan status dan bulan."""
+    lamaran_list, _ = get_lamaran_list(filter_user_id=user_id)
+
+    if not lamaran_list:
+        return {}, {}
+
+    status_counter: Counter = Counter()
+    month_counter: Counter = Counter()
+
+    for item in lamaran_list:
+        status = str(item.get("status", "Pending"))
+        status_counter[status] += 1
+
+        tanggal = str(item.get("tanggal_daftar", "")).strip()
+        month_key = "Unknown"
+
+        if tanggal:
+            try:
+                dt = datetime.strptime(tanggal, "%Y-%m-%d")
+                month_key = dt.strftime("%Y-%m")
+            except ValueError:
+                if len(tanggal) >= 7:
+                    month_key = tanggal[:7]
+
+        month_counter[month_key] += 1
+
+    month_dict = dict(sorted(month_counter.items(), key=lambda x: (x[0] == "Unknown", x[0])))
+    return dict(status_counter), month_dict
+
+
+def figure_to_canvas(fig: plt.Figure) -> FigureCanvas:
+    """Mengubah matplotlib figure menjadi canvas PyQt6."""
     return FigureCanvas(fig)
 
 
-# ============================================================================
-# CHARTS UNTUK TAB TRACKER LAMARAN
-# ============================================================================
+def build_statistik_canvases() -> Dict[str, FigureCanvas]:
+    """Membuat paket canvas untuk Tab Statistik."""
+    jenjang_data, top_org_data, status_data = load_statistik_data()
 
-def create_pie_chart_lamaran(user_id: int) -> FigureCanvas:
-    """
-    Pie chart: Proporsi status lamaran user (Pending / Accepted / Rejected / etc).
-    """
-    try:
-        lamarans, total = get_lamaran_list(filter_user_id=user_id)
-        
-        if total == 0:
-            return create_empty_canvas("Belum ada data lamaran")
+    fig_jenjang, _ = create_bar_chart_beasiswa_per_jenjang(jenjang_data)
+    fig_org, _ = create_bar_chart_top_penyelenggara(top_org_data)
+    fig_status, _ = create_pie_chart_status_ketersediaan(status_data)
 
-        # Agregasi data
-        status_counts = defaultdict(int)
-        for lamaran in lamarans:
-            status = lamaran.get('status', 'Pending')
-            status_counts[status] += 1
-
-        labels = list(status_counts.keys())
-        sizes = list(status_counts.values())
-        colors = [COLOR_PALETTE.get(status, '#CCCCCC') for status in labels]
-
-        # Generate grafik
-        fig = Figure(figsize=(5, 4), dpi=100)
-        ax = fig.add_subplot(111)
-        
-        wedges, texts, autotexts = ax.pie(
-            sizes, labels=labels, colors=colors, 
-            autopct='%1.1f%%', startangle=90,
-            wedgeprops={'edgecolor': 'white', 'linewidth': 1}
-        )
-        
-        ax.set_title('Proporsi Status Lamaran', fontsize=12, pad=15, fontweight='bold')
-        fig.tight_layout()
-        
-        logger.info(f"Pie chart lamaran berhasil di-generate untuk user {user_id}")
-        return FigureCanvas(fig)
-        
-    except Exception as e:
-        logger.error(f"Error generating pie chart lamaran: {e}")
-        return create_empty_canvas("Gagal memuat grafik")
+    return {
+        "canvas_jenjang": figure_to_canvas(fig_jenjang),
+        "canvas_penyelenggara": figure_to_canvas(fig_org),
+        "canvas_status": figure_to_canvas(fig_status),
+    }
 
 
-def create_bar_chart_lamaran_per_bulan(user_id: int) -> FigureCanvas:
-    """
-    Bar chart: Tren jumlah lamaran per bulan.
-    """
-    try:
-        lamarans, total = get_lamaran_list(filter_user_id=user_id)
-        
-        if total == 0:
-            return create_empty_canvas("Belum ada data lamaran")
+def build_tracker_canvases(user_id: int) -> Dict[str, FigureCanvas]:
+    """Membuat paket canvas untuk Tab Tracker user tertentu."""
+    status_counts, month_counts = load_tracker_data(user_id)
 
-        # Agregasi data by YYYY-MM
-        monthly_counts = defaultdict(int)
-        for lamaran in lamarans:
-            tgl_daftar = lamaran.get('tanggal_daftar')
-            if tgl_daftar:
-                # Ambil YYYY-MM
-                bulan = tgl_daftar[:7]
-                monthly_counts[bulan] += 1
+    fig_status, _ = create_pie_chart_status_lamaran(status_counts)
+    fig_month, _ = create_bar_chart_lamaran_per_bulan(month_counts)
 
-        if not monthly_counts:
-            return create_empty_canvas("Data tanggal tidak valid")
-
-        # Sortir secara kronologis
-        sorted_months = sorted(monthly_counts.keys())
-        counts = [monthly_counts[m] for m in sorted_months]
-
-        # Ubah format YYYY-MM ke format yang lebih mudah dibaca (e.g. "Jan 2026")
-        formatted_months = []
-        for m in sorted_months:
-            dt = datetime.strptime(m, "%Y-%m")
-            formatted_months.append(dt.strftime("%b %Y"))
-
-        # Generate grafik
-        fig = Figure(figsize=(6, 4), dpi=100)
-        ax = fig.add_subplot(111)
-        
-        bars = ax.bar(formatted_months, counts, color='#2196F3', width=0.6)
-        
-        # Tambahkan label angka di atas tiap bar
-        for bar in bars:
-            height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2., height,
-                    f'{int(height)}',
-                    ha='center', va='bottom')
-
-        ax.set_title('Tren Lamaran per Bulan', fontsize=12, pad=15, fontweight='bold')
-        ax.set_ylabel('Jumlah Beasiswa')
-        
-        # Rotate x labels if there are too many
-        if len(formatted_months) > 4:
-            ax.tick_params(axis='x', rotation=45)
-            
-        fig.tight_layout()
-        
-        logger.info(f"Bar chart tren lamaran berhasil di-generate untuk user {user_id}")
-        return FigureCanvas(fig)
-
-    except Exception as e:
-        logger.error(f"Error generating bar chart lamaran: {e}")
-        return create_empty_canvas("Gagal memuat grafik")
-    
-# ============================================================================
-# CHARTS UNTUK TAB STATISTIK
-# ============================================================================
-
-def create_bar_chart_jenjang() -> FigureCanvas:
-    """
-    Bar chart: Jumlah beasiswa berdasarkan jenjang pendidikan (D3, D4, S1, S2).
-    """
-    try:
-        data_jenjang = get_beasiswa_per_jenjang()
-        
-        if not data_jenjang:
-            return create_empty_canvas("Data beasiswa kosong")
-
-        labels = list(data_jenjang.keys())
-        counts = list(data_jenjang.values())
-
-        fig = Figure(figsize=(6, 4), dpi=100)
-        ax = fig.add_subplot(111)
-        
-        bars = ax.bar(labels, counts, color=['#9C27B0', '#673AB7', '#3F51B5', '#009688'])
-        
-        for bar in bars:
-            height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2., height,
-                    f'{int(height)}',
-                    ha='center', va='bottom')
-
-        ax.set_title('Distribusi Beasiswa per Jenjang', fontsize=12, pad=15, fontweight='bold')
-        ax.set_ylabel('Jumlah Ketersediaan')
-        fig.tight_layout()
-
-        return FigureCanvas(fig)
-
-    except Exception as e:
-        logger.error(f"Error generating chart jenjang: {e}")
-        return create_empty_canvas("Gagal memuat grafik")
+    return {
+        "canvas_lamaran_status": figure_to_canvas(fig_status),
+        "canvas_lamaran_bulanan": figure_to_canvas(fig_month),
+    }
 
 
-def create_bar_chart_top_penyelenggara(limit: int = 5) -> FigureCanvas:
-    """
-    Horizontal bar chart: Top N penyelenggara beasiswa terbanyak.
-    """
-    try:
-        top_orgs = get_top_penyelenggara(limit=limit)
-        
-        if not top_orgs:
-            return create_empty_canvas("Data penyelenggara kosong")
+if __name__ == "__main__":
+    """Demo lokal cepat untuk cek visual sebelum integrasi ke main.py."""
+    statistik_canvases = build_statistik_canvases()
 
-        # Data datang terurut desc, kita reverse agar yang paling besar ada di paling atas (horizontal bar)
-        top_orgs.reverse()
-        
-        labels = [org['nama_penyelenggara'][:20] + ('...' if len(org['nama_penyelenggara']) > 20 else '') for org in top_orgs]
-        counts = [org['total_beasiswa'] for org in top_orgs]
+    # Preview figure statistik
+    for canvas in statistik_canvases.values():
+        canvas.figure.show()
 
-        fig = Figure(figsize=(6, 4), dpi=100)
-        ax = fig.add_subplot(111)
-        
-        bars = ax.barh(labels, counts, color='#00BCD4')
-        
-        for bar in bars:
-            width = bar.get_width()
-            ax.text(width, bar.get_y() + bar.get_height()/2.,
-                    f' {int(width)}',
-                    ha='left', va='center')
-
-        ax.set_title(f'Top {limit} Penyelenggara Beasiswa', fontsize=12, pad=15, fontweight='bold')
-        ax.set_xlabel('Jumlah Beasiswa')
-        fig.tight_layout()
-
-        return FigureCanvas(fig)
-
-    except Exception as e:
-        logger.error(f"Error generating chart top penyelenggara: {e}")
-        return create_empty_canvas("Gagal memuat grafik")
-
-
-def create_pie_chart_status() -> FigureCanvas:
-    """
-    Pie chart: Proporsi ketersediaan (Buka / Segera Tutup / Tutup).
-    """
-    try:
-        data_status = get_status_availability()
-        
-        if not data_status:
-            return create_empty_canvas("Data beasiswa kosong")
-
-        labels = list(data_status.keys())
-        sizes = list(data_status.values())
-        colors = [COLOR_PALETTE.get(status, '#CCCCCC') for status in labels]
-
-        fig = Figure(figsize=(5, 4), dpi=100)
-        ax = fig.add_subplot(111)
-        
-        ax.pie(
-            sizes, labels=labels, colors=colors, 
-            autopct='%1.1f%%', startangle=140,
-            wedgeprops={'edgecolor': 'white', 'linewidth': 1}
-        )
-        
-        ax.set_title('Status Ketersediaan Beasiswa', fontsize=12, pad=15, fontweight='bold')
-        fig.tight_layout()
-
-        return FigureCanvas(fig)
-
-    except Exception as e:
-        logger.error(f"Error generating chart status ketersediaan: {e}")
-        return create_empty_canvas("Gagal memuat grafik")
+    plt.show()
