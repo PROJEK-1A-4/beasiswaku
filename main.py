@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTabWidget, QStatusBar,
     QMessageBox, QComboBox, QTableWidget, QHeaderView, QDialog,
-    QFormLayout, QTextEdit
+    QFormLayout, QTextEdit, QFrame
 )
 from PyQt6.QtCore import Qt, QSize, QTimer
 from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap
@@ -30,6 +30,9 @@ from src.gui.tab_beranda import BerandaTab
 from src.gui.gui_beasiswa import BeasiswaTab
 from src.gui.tab_tracker import TrackerTab
 from src.gui.tab_statistik import StatistikTab
+from src.gui.tab_profil import ProfileTab
+from src.gui.sidebar import Sidebar
+from src.gui.sidebar import Sidebar
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -305,9 +308,25 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         
         # Main layout
-        layout = QVBoxLayout()
+        main_container_layout = QHBoxLayout()
+        main_container_layout.setContentsMargins(0, 0, 0, 0)
+        main_container_layout.setSpacing(0)
         
-        # ===== TOP BAR =====
+        # ===== SIDEBAR =====
+        self.sidebar = Sidebar()
+        self.sidebar.setMinimumWidth(220)
+        self.sidebar.setMaximumWidth(220)
+        self.sidebar.nav_clicked.connect(self.on_sidebar_nav_clicked)
+        self.sidebar.settings_clicked.connect(self.open_settings)
+        self.sidebar.logout_clicked.connect(self.handle_logout)
+        main_container_layout.addWidget(self.sidebar)
+        
+        # ===== RIGHT PANEL (Top bar + Tabs) =====
+        right_panel_layout = QVBoxLayout()
+        right_panel_layout.setContentsMargins(0, 0, 0, 0)
+        right_panel_layout.setSpacing(0)
+        
+        # Top bar
         top_bar_layout = QHBoxLayout()
         
         # App logo/title
@@ -323,20 +342,12 @@ class MainWindow(QMainWindow):
         user_label.setFont(QFont("Arial", 10))
         top_bar_layout.addWidget(user_label)
         
-        # Settings button (placeholder)
-        settings_btn = QPushButton("⚙️ Pengaturan")
-        settings_btn.setMaximumWidth(120)
-        settings_btn.clicked.connect(self.open_settings)
-        top_bar_layout.addWidget(settings_btn)
-        
-        # Logout button
-        logout_btn = QPushButton("🚪 Logout")
-        logout_btn.setMaximumWidth(100)
-        logout_btn.setStyleSheet("background-color: #f44336; color: white;")
-        logout_btn.clicked.connect(self.handle_logout)
-        top_bar_layout.addWidget(logout_btn)
-        
-        layout.addLayout(top_bar_layout)
+        top_bar_layout.setContentsMargins(16, 12, 16, 12)
+        top_bar_frame = QFrame()
+        top_bar_frame.setStyleSheet("border-bottom: 1px solid #e0e0e0;")
+        top_bar_frame.setLayout(top_bar_layout)
+        top_bar_frame.setMaximumHeight(50)
+        right_panel_layout.addWidget(top_bar_frame)
         
         # ===== TAB WIDGET =====
         self.tabs = QTabWidget()
@@ -357,12 +368,37 @@ class MainWindow(QMainWindow):
         self.statistik_tab = StatistikTab(self.user_id)
         self.tabs.addTab(self.statistik_tab, "📊 Statistik")
         
-        layout.addWidget(self.tabs)
+        # Tab 4: Profil
+        self.profil_tab = ProfileTab(self.user_id, self.username)
+        self.tabs.addTab(self.profil_tab, "👤 Profil")
+        
+        # Hide tab bar (navigation is in sidebar)
+        self.tabs.tabBar().hide()
+        
+        right_panel_layout.addWidget(self.tabs)
+        
+        # Create right panel widget
+        right_panel_widget = QWidget()
+        right_panel_widget.setLayout(right_panel_layout)
+        main_container_layout.addWidget(right_panel_widget)
+        
+        # Set main container as central widget
+        main_container = QWidget()
+        main_container.setLayout(main_container_layout)
+        central_widget = main_container
+        
+        # Create wrapper for layout
+        wrapper_layout = QVBoxLayout()
+        wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        wrapper_layout.setSpacing(0)
+        wrapper_layout.addWidget(central_widget)
+        
+        real_central = QWidget()
+        real_central.setLayout(wrapper_layout)
+        self.setCentralWidget(real_central)
         
         # ===== STATUS BAR =====
         self.statusBar().showMessage("✅ Aplikasi siap digunakan | Database: beasiswaku.db")
-        
-        central_widget.setLayout(layout)
         
     def center_window(self):
         """Center window di layar"""
@@ -373,6 +409,11 @@ class MainWindow(QMainWindow):
         center_point = screen_geometry.center()
         window_geometry.moveCenter(center_point)
         self.move(window_geometry.topLeft())
+    
+    def on_sidebar_nav_clicked(self, tab_index: int):
+        """Handle sidebar navigation click."""
+        self.tabs.setCurrentIndex(tab_index)
+        logger.info(f"Switched to tab {tab_index}")
     
     def open_settings(self):
         """Open settings dialog"""
