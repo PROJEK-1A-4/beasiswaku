@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTabWidget, QStatusBar,
     QMessageBox, QComboBox, QTableWidget, QHeaderView, QDialog,
-    QFormLayout, QTextEdit
+    QFormLayout, QTextEdit, QFrame
 )
 from PyQt6.QtCore import Qt, QSize, QTimer
 from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap
@@ -26,10 +26,44 @@ from PyQt6.QtCore import pyqtSignal
 from src.database.crud import (
     init_db, login_user, register_user, get_connection
 )
+from src.gui.tab_beranda import BerandaTab
+from src.gui.gui_beasiswa import BeasiswaTab
+from src.gui.tab_tracker import TrackerTab
+from src.gui.tab_statistik import StatistikTab
+from src.gui.tab_profil import ProfileTab
+from src.gui.sidebar import Sidebar
+from src.gui.sidebar import Sidebar
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _create_chart_section(section_title: str, canvas, min_height: int) -> QWidget:
+    """Bungkus canvas chart dalam kartu dengan judul yang jelas."""
+    section = QWidget()
+    section.setStyleSheet("""
+        QWidget {
+            background: white;
+            border: 1px solid #d7dee8;
+            border-radius: 12px;
+        }
+    """)
+
+    section_layout = QVBoxLayout(section)
+    section_layout.setContentsMargins(16, 14, 16, 16)
+    section_layout.setSpacing(8)
+
+    heading = QLabel(section_title)
+    heading.setFont(QFont("Arial", 13, QFont.Weight.Bold))
+    heading.setStyleSheet("color: #203040;")
+    section_layout.addWidget(heading)
+
+    canvas.setMinimumHeight(min_height)
+    canvas.setStyleSheet("background: transparent;")
+    section_layout.addWidget(canvas)
+
+    return section
 
 # ==================== LOGIN WINDOW ====================
 
@@ -126,7 +160,7 @@ class LoginWindow(QDialog):
         if success:
             user_id = user_data['id']
             self.current_user_id = user_id
-            logger.info(f"✅ User '{username}' berhasil login")
+            logger.info(f"[SUCCESS] User '{username}' berhasil login")
             self.login_success.emit(user_id, username)
             self.accept()  # Close dialog
         else:
@@ -264,8 +298,8 @@ class RegisterWindow(QDialog):
         if success:
             self.new_username = username
             self.new_password = password
-            logger.info(f"✅ Akun '{username}' berhasil dibuat")
-            QMessageBox.information(self, "Sukses", "✅ Akun berhasil dibuat!\n\nSilakan login dengan akun baru Anda.")
+            logger.info(f"[SUCCESS] Akun '{username}' berhasil dibuat")
+            QMessageBox.information(self, "Sukses", "Akun berhasil dibuat!\n\nSilakan login dengan akun baru Anda.")
             self.accept()
         else:
             self.error_label.setText(f"❌ {message}")
@@ -295,20 +329,72 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"BeasiswaKu - {self.username}")
         self.setGeometry(0, 0, 1200, 700)
         self.center_window()
+        self.setStyleSheet("""
+            QMainWindow {
+                background: #f5f7fb;
+            }
+            QWidget {
+                font-family: Arial;
+            }
+            QTabWidget::pane {
+                border: 1px solid #d7dee8;
+                background: white;
+                top: -1px;
+            }
+            QTabBar::tab {
+                background: #e9eef5;
+                color: #2b2b2b;
+                padding: 8px 14px;
+                margin-right: 4px;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
+            }
+            QTabBar::tab:selected {
+                background: white;
+                border: 1px solid #d7dee8;
+                border-bottom-color: white;
+            }
+            QPushButton {
+                padding: 7px 12px;
+                border-radius: 6px;
+                border: 1px solid #c7d0db;
+                background: #ffffff;
+            }
+            QPushButton:hover {
+                background: #f0f4f8;
+            }
+        """)
         
         # Central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
         # Main layout
-        layout = QVBoxLayout()
+        main_container_layout = QHBoxLayout()
+        main_container_layout.setContentsMargins(0, 0, 0, 0)
+        main_container_layout.setSpacing(0)
         
-        # ===== TOP BAR =====
+        # ===== SIDEBAR =====
+        self.sidebar = Sidebar()
+        self.sidebar.setMinimumWidth(220)
+        self.sidebar.setMaximumWidth(220)
+        self.sidebar.nav_clicked.connect(self.on_sidebar_nav_clicked)
+        self.sidebar.settings_clicked.connect(self.open_settings)
+        self.sidebar.logout_clicked.connect(self.handle_logout)
+        main_container_layout.addWidget(self.sidebar)
+        
+        # ===== RIGHT PANEL (Top bar + Tabs) =====
+        right_panel_layout = QVBoxLayout()
+        right_panel_layout.setContentsMargins(0, 0, 0, 0)
+        right_panel_layout.setSpacing(0)
+        
+        # Top bar
         top_bar_layout = QHBoxLayout()
         
         # App logo/title
         app_title = QLabel("🎓 BeasiswaKu - Personal Scholarship Manager")
-        app_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        app_title.setFont(QFont("Arial", 13, QFont.Weight.Bold))
+        app_title.setStyleSheet("color: #203040;")
         top_bar_layout.addWidget(app_title)
         
         # Spacer
@@ -317,25 +403,24 @@ class MainWindow(QMainWindow):
         # User info
         user_label = QLabel(f"👤 {self.username}")
         user_label.setFont(QFont("Arial", 10))
+        user_label.setStyleSheet("color: #4c5a6b;")
         top_bar_layout.addWidget(user_label)
         
-        # Settings button (placeholder)
-        settings_btn = QPushButton("⚙️ Pengaturan")
-        settings_btn.setMaximumWidth(120)
-        settings_btn.clicked.connect(self.open_settings)
-        top_bar_layout.addWidget(settings_btn)
-        
-        # Logout button
-        logout_btn = QPushButton("🚪 Logout")
-        logout_btn.setMaximumWidth(100)
-        logout_btn.setStyleSheet("background-color: #f44336; color: white;")
-        logout_btn.clicked.connect(self.handle_logout)
-        top_bar_layout.addWidget(logout_btn)
-        
-        layout.addLayout(top_bar_layout)
+        top_bar_layout.setContentsMargins(16, 12, 16, 12)
+        top_bar_frame = QFrame()
+        top_bar_frame.setStyleSheet("border-bottom: 1px solid #e0e0e0;")
+        top_bar_frame.setLayout(top_bar_layout)
+        top_bar_frame.setMaximumHeight(50)
+        right_panel_layout.addWidget(top_bar_frame)
         
         # ===== TAB WIDGET =====
         self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)
+        self.tabs.setStyleSheet(self.tabs.styleSheet() + "QTabBar::tab { min-width: 110px; }")
+        
+        # Tab 0: Beranda (Home/Dashboard)
+        self.beranda_tab = BerandaTab(self.user_id, self.username)
+        self.tabs.addTab(self.beranda_tab, "🏠 Beranda")
         
         # Tab 1: Beasiswa
         self.beasiswa_tab = BeasiswaTab(self.user_id)
@@ -348,13 +433,40 @@ class MainWindow(QMainWindow):
         # Tab 3: Statistik
         self.statistik_tab = StatistikTab(self.user_id)
         self.tabs.addTab(self.statistik_tab, "📊 Statistik")
+        self.tabs.setDocumentMode(True)
+        self.tabs.setStyleSheet("QTabBar::tab { min-width: 110px; }")
         
-        layout.addWidget(self.tabs)
+        # Tab 4: Profil
+        self.profil_tab = ProfileTab(self.user_id, self.username)
+        self.tabs.addTab(self.profil_tab, "👤 Profil")
+        
+        # Hide tab bar (navigation is in sidebar)
+        self.tabs.tabBar().hide()
+        
+        right_panel_layout.addWidget(self.tabs)
+        
+        # Create right panel widget
+        right_panel_widget = QWidget()
+        right_panel_widget.setLayout(right_panel_layout)
+        main_container_layout.addWidget(right_panel_widget)
+        
+        # Set main container as central widget
+        main_container = QWidget()
+        main_container.setLayout(main_container_layout)
+        central_widget = main_container
+        
+        # Create wrapper for layout
+        wrapper_layout = QVBoxLayout()
+        wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        wrapper_layout.setSpacing(0)
+        wrapper_layout.addWidget(central_widget)
+        
+        real_central = QWidget()
+        real_central.setLayout(wrapper_layout)
+        self.setCentralWidget(real_central)
         
         # ===== STATUS BAR =====
         self.statusBar().showMessage("✅ Aplikasi siap digunakan | Database: beasiswaku.db")
-        
-        central_widget.setLayout(layout)
         
     def center_window(self):
         """Center window di layar"""
@@ -365,6 +477,11 @@ class MainWindow(QMainWindow):
         center_point = screen_geometry.center()
         window_geometry.moveCenter(center_point)
         self.move(window_geometry.topLeft())
+    
+    def on_sidebar_nav_clicked(self, tab_index: int):
+        """Handle sidebar navigation click."""
+        self.tabs.setCurrentIndex(tab_index)
+        logger.info(f"Switched to tab {tab_index}")
     
     def open_settings(self):
         """Open settings dialog"""
@@ -381,98 +498,14 @@ class MainWindow(QMainWindow):
         )
         
         if reply == QMessageBox.StandardButton.Yes:
-            logger.info(f"✅ User '{self.username}' logout")
+            logger.info(f"[SUCCESS] User '{self.username}' logout")
             self.close()
-
-
-# ==================== PLACEHOLDER TABS ====================
-
-class BeasiswaTab(QWidget):
-    """Tab untuk daftar beasiswa - akan diimplement di gui_beasiswa.py"""
-    
-    def __init__(self, user_id: int):
-        super().__init__()
-        self.user_id = user_id
-        self.init_ui()
-    
-    def init_ui(self):
-        """Initialize beasiswa tab UI"""
-        layout = QVBoxLayout()
-        
-        # Placeholder content
-        label = QLabel("📚 Daftar Beasiswa\n\n" + 
-                      "Fitur ini akan menampilkan:\n" +
-                      "• Tabel beasiswa dengan filter & search\n" +
-                      "• Highlight deadline (merah/kuning)\n" +
-                      "• CRUD beasiswa (tambah, edit, hapus)\n" +
-                      "• Export CSV\n" +
-                      "• Refresh data")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setFont(QFont("Arial", 11))
-        label.setStyleSheet("padding: 50px; background-color: #f0f0f0; border-radius: 5px;")
-        
-        layout.addWidget(label)
-        self.setLayout(layout)
-
-
-class TrackerTab(QWidget):
-    """Tab untuk tracking lamaran - akan diimplement di crud.py"""
-    
-    def __init__(self, user_id: int):
-        super().__init__()
-        self.user_id = user_id
-        self.init_ui()
-    
-    def init_ui(self):
-        """Initialize tracker tab UI"""
-        layout = QVBoxLayout()
-        
-        # Placeholder content
-        label = QLabel("📋 Tracker Lamaran\n\n" +
-                      "Fitur ini akan menampilkan:\n" +
-                      "• Tabel riwayat lamaran pribadi\n" +
-                      "• CRUD lamaran (tambah, edit, hapus)\n" +
-                      "• Pie chart proporsi status\n" +
-                      "• Bar chart lamaran per bulan")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setFont(QFont("Arial", 11))
-        label.setStyleSheet("padding: 50px; background-color: #f0f0f0; border-radius: 5px;")
-        
-        layout.addWidget(label)
-        self.setLayout(layout)
-
-
-class StatistikTab(QWidget):
-    """Tab untuk statistik - akan diimplement di visualisasi.py"""
-    
-    def __init__(self, user_id: int):
-        super().__init__()
-        self.user_id = user_id
-        self.init_ui()
-    
-    def init_ui(self):
-        """Initialize statistik tab UI"""
-        layout = QVBoxLayout()
-        
-        # Placeholder content
-        label = QLabel("📊 Statistik & Grafik\n\n" +
-                      "Fitur ini akan menampilkan:\n" +
-                      "• Bar chart beasiswa per jenjang\n" +
-                      "• Bar chart top 5 penyelenggara\n" +
-                      "• Pie chart status ketersediaan\n" +
-                      "• Filter dan customization grafik")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setFont(QFont("Arial", 11))
-        label.setStyleSheet("padding: 50px; background-color: #f0f0f0; border-radius: 5px;")
-        
-        layout.addWidget(label)
-        self.setLayout(layout)
 
 
 # ==================== SETTINGS WINDOW ====================
 
 class SettingsWindow(QDialog):
-    """Dialog untuk pengaturan user"""
+    """Dialog untuk pengaturan user dengan Password change & Profile edit"""
     
     def __init__(self, user_id: int, username: str):
         super().__init__()
@@ -482,45 +515,121 @@ class SettingsWindow(QDialog):
     
     def init_ui(self):
         """Initialize settings window UI"""
-        self.setWindowTitle("Pengaturan")
+        self.setWindowTitle("⚙️ Pengaturan Akun")
         self.setGeometry(200, 200, 500, 400)
         self.setModal(True)
         
         layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
         
         # Title
         title = QLabel("⚙️ Pengaturan Akun")
         title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        title.setStyleSheet("color: #1e3a8a;")
         layout.addWidget(title)
         
         layout.addSpacing(10)
         
         # Info user
-        info_label = QLabel(f"Username: {self.username}\nUser ID: {self.user_id}")
+        info_label = QLabel(f"👤 Username: {self.username}\n📌 User ID: {self.user_id}")
         info_label.setFont(QFont("Arial", 10))
-        info_label.setStyleSheet("padding: 10px; background-color: #e3f2fd; border-radius: 5px;")
+        info_label.setStyleSheet("padding: 10px; background-color: #f0f7ff; border-left: 4px solid #f59e0b; border-radius: 5px; color: #1e3a8a;")
         layout.addWidget(info_label)
         
         layout.addSpacing(15)
         
-        # Features coming soon
-        features_label = QLabel("Fitur yang akan datang:\n" +
-                               "• Ganti password\n" +
-                               "• Edit profil\n" +
-                               "• Preferensi aplikasi\n" +
-                               "• Backup & restore data")
-        features_label.setFont(QFont("Arial", 10))
-        layout.addWidget(features_label)
+        # Ganti Password Section
+        pwd_label = QLabel("🔐 Ganti Password")
+        pwd_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
+        pwd_label.setStyleSheet("color: #1e3a8a;")
+        layout.addWidget(pwd_label)
+        
+        pwd_layout = QFormLayout()
+        self.old_pwd = QLineEdit()
+        self.old_pwd.setPlaceholderText("Password lama")
+        self.old_pwd.setEchoMode(QLineEdit.EchoMode.Password)
+        pwd_layout.addRow("Password Lama:", self.old_pwd)
+        
+        self.new_pwd = QLineEdit()
+        self.new_pwd.setPlaceholderText("Password baru (min 6 karakter)")
+        self.new_pwd.setEchoMode(QLineEdit.EchoMode.Password)
+        pwd_layout.addRow("Password Baru:", self.new_pwd)
+        
+        layout.addLayout(pwd_layout)
+        
+        # Button layout
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        
+        save_pwd_btn = QPushButton("💾 Simpan Password")
+        save_pwd_btn.setStyleSheet("background-color: #1e3a8a; color: white; padding: 8px 16px; border-radius: 4px; font-weight: bold;")
+        save_pwd_btn.clicked.connect(self.save_password)
+        btn_layout.addWidget(save_pwd_btn)
+        
+        layout.addLayout(btn_layout)
+        layout.addSpacing(15)
+        
+        # Message label
+        self.message_label = QLabel("")
+        self.message_label.setStyleSheet("font-weight: bold;")
+        layout.addWidget(self.message_label)
         
         layout.addStretch()
         
         # Close button
-        close_btn = QPushButton("Tutup")
-        close_btn.setStyleSheet("background-color: #2196F3; color: white; padding: 8px;")
+        close_btn = QPushButton("✖️ Tutup")
+        close_btn.setStyleSheet("background-color: #9ca3af; color: white; padding: 8px 16px; border-radius: 4px;")
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn)
         
         self.setLayout(layout)
+    
+    def save_password(self):
+        """Save new password"""
+        old_pwd = self.old_pwd.text()
+        new_pwd = self.new_pwd.text()
+        
+        if not old_pwd or not new_pwd:
+            self.message_label.setText("❌ Password tidak boleh kosong!")
+            self.message_label.setStyleSheet("color: red; font-weight: bold;")
+            return
+        
+        if len(new_pwd) < 6:
+            self.message_label.setText("❌ Password minimal 6 karakter!")
+            self.message_label.setStyleSheet("color: red; font-weight: bold;")
+            return
+        
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            
+            # Check old password
+            cursor.execute("SELECT password FROM akun WHERE id_akun = ?", (self.user_id,))
+            result = cursor.fetchone()
+            
+            if result is None or result[0] != old_pwd:
+                self.message_label.setText("❌ Password lama salah!")
+                self.message_label.setStyleSheet("color: red; font-weight: bold;")
+                return
+            
+            # Update password
+            cursor.execute("UPDATE akun SET password = ? WHERE id_akun = ?", (new_pwd, self.user_id))
+            conn.commit()
+            
+            self.message_label.setText("✅ Password berhasil diubah!")
+            self.message_label.setStyleSheet("color: green; font-weight: bold;")
+            
+            # Clear inputs
+            self.old_pwd.clear()
+            self.new_pwd.clear()
+            
+            logger.info(f"[SUCCESS] Password for user {self.username} changed")
+        
+        except Exception as e:
+            self.message_label.setText(f"❌ Error: {str(e)}")
+            self.message_label.setStyleSheet("color: red; font-weight: bold;")
+            logger.error(f"Error changing password: {e}")
 
 
 # ==================== APPLICATION ENTRY POINT ====================
