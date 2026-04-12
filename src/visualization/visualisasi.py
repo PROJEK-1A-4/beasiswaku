@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
 # FigureCanvas untuk integrasi Matplotlib ke PyQt6
 try:
@@ -172,6 +173,7 @@ def create_bar_chart_top_penyelenggara(
         _style_chart_title(ax, title)
         ax.set_xlabel("Jumlah Beasiswa")
         ax.set_ylabel("Penyelenggara")
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         _apply_axis_style(ax)
         ax.invert_yaxis()  # Nilai tertinggi di atas
 
