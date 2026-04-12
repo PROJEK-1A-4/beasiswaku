@@ -303,10 +303,45 @@ class BerandaTab(QWidget):
     
     def init_ui(self):
         """Initialize Beranda Tab UI."""
-        # Main layout
-        main_layout = QVBoxLayout(self)
+        # Create scroll area untuk enable scrolling
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setStyleSheet(f"""
+            QScrollArea {{
+                background-color: {COLOR_GRAY_BACKGROUND};
+                border: none;
+            }}
+            QScrollBar:vertical {{
+                width: 8px;
+                background-color: {COLOR_GRAY_200};
+            }}
+            QScrollBar::handle:vertical {{
+                background-color: {COLOR_GRAY_400};
+                border-radius: 4px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background-color: {COLOR_GRAY_500};
+            }}
+        """)
+        
+        # Content widget dengan main layout
+        content_widget = QWidget()
+        main_layout = QVBoxLayout(content_widget)
         main_layout.setContentsMargins(16, 16, 16, 16)  # SPACING_4
         main_layout.setSpacing(12)  # SPACING_3
+        
+        # Set scroll area
+        self.setStyleSheet(f"""
+            QWidget {{
+                background-color: {COLOR_GRAY_BACKGROUND};
+            }}
+        """)
+        scroll_area.setWidget(content_widget)
+        
+        # Tambah scroll area ke main widget
+        main_parent_layout = QVBoxLayout(self)
+        main_parent_layout.setContentsMargins(0, 0, 0, 0)
+        main_parent_layout.addWidget(scroll_area)
         
         # ===== HEADER SECTION =====
         header_layout = QHBoxLayout()

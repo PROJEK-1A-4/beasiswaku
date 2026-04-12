@@ -9,7 +9,7 @@ from datetime import datetime
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QPushButton, QGridLayout, QSpacerItem, QSizePolicy
+    QPushButton, QGridLayout, QSpacerItem, QSizePolicy, QScrollArea
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -93,33 +93,67 @@ class StatistikTab(QWidget):
         self.load_statistics()
     
     def init_ui(self):
-        """Initialize Statistik Tab UI."""
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(16, 16, 16, 16)  # SPACING_4
-        main_layout.setSpacing(12)  # SPACING_3
+        """Initialize Statistik Tab UI dengan scroll area."""
+        # Create scroll area untuk enable scrolling
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setStyleSheet(f"""
+            QScrollArea {{
+                background-color: {COLOR_GRAY_BACKGROUND};
+                border: none;
+            }}
+            QScrollBar:vertical {{
+                width: 8px;
+                background-color: {COLOR_GRAY_200};
+            }}
+            QScrollBar::handle:vertical {{
+                background-color: {COLOR_GRAY_400};
+                border-radius: 4px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background-color: {COLOR_GRAY_500};
+            }}
+        """)
+        
+        # Content widget dengan main layout
+        content_widget = QWidget()
+        main_layout = QVBoxLayout(content_widget)
+        main_layout.setContentsMargins(24, 20, 24, 20)  # Better margins
+        main_layout.setSpacing(0)  # Control spacing manually
+        
+        # Set scroll area
+        self.setStyleSheet(f"background-color: {COLOR_GRAY_BACKGROUND};")
+        scroll_area.setWidget(content_widget)
+        
+        # Tambah scroll area ke main widget
+        main_parent_layout = QVBoxLayout(self)
+        main_parent_layout.setContentsMargins(0, 0, 0, 0)
+        main_parent_layout.addWidget(scroll_area)
         
         # ===== HEADER SECTION =====
         header_layout = QVBoxLayout()
         header_layout.setSpacing(4)
+        header_layout.setContentsMargins(0, 0, 0, 0)
         
         title_label = QLabel("Dashboard Statistik")
-        title_font = QFont(FONT_FAMILY_PRIMARY, 20)
+        title_font = QFont(FONT_FAMILY_PRIMARY, 28)
         title_font.setWeight(QFont.Weight.Bold)
         title_label.setFont(title_font)
-        title_label.setStyleSheet(f"color: {COLOR_NAVY};")
+        title_label.setStyleSheet(f"color: {COLOR_NAVY}; line-height: 1.2; padding: 0px;")
         header_layout.addWidget(title_label)
         
         subtitle_label = QLabel("Data real-time hasil scraping indbeasiswa.com")
         subtitle_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
-        subtitle_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
+        subtitle_label.setStyleSheet(f"color: {COLOR_GRAY_500}; padding: 0px;")
         header_layout.addWidget(subtitle_label)
         
         main_layout.addLayout(header_layout)
-        main_layout.addSpacing(8)  # SPACING_2
+        main_layout.addSpacing(16)  # Better spacing after header
         
         # ===== STAT CARDS SECTION =====
         stats_layout = QGridLayout()
-        stats_layout.setSpacing(12)  # SPACING_3
+        stats_layout.setSpacing(16)  # SPACING_4
+        stats_layout.setContentsMargins(0, 0, 0, 0)
         
         stat_configs = [
             {"number": "48", "label": "Total Beasiswa", "icon": "📚"},
@@ -130,232 +164,316 @@ class StatistikTab(QWidget):
         
         for idx, config in enumerate(stat_configs):
             card = self._create_stat_card(config["icon"], config["number"], config["label"])
+            card.setMinimumHeight(100)  # Consistent height
             stats_layout.addWidget(card, 0, idx)
         
         main_layout.addLayout(stats_layout)
-        main_layout.addSpacing(8)  # SPACING_2
+        main_layout.addSpacing(16)  # SPACING_4
         
-        # ===== CHARTS SECTION =====
-        charts_layout = QGridLayout()
-        charts_layout.setSpacing(12)  # SPACING_3
-        
+        # ===== CHARTS SECTION (Vertical Stack, Scrollable) =====
         # Chart 1: Beasiswa per Jenjang (Bar Chart)
-        chart1 = self._create_chart_frame(
-            self._create_bar_chart(),
-            "Beasiswa per Jenjang Pendidikan"
-        )
-        charts_layout.addWidget(chart1, 0, 0)
+        chart1_frame = QFrame()
+        chart1_frame.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Plain)
+        chart1_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLOR_WHITE};
+                border: 1px solid {COLOR_GRAY_200};
+                border-radius: {BORDER_RADIUS_MD};
+            }}
+        """)
+        chart1_layout = QVBoxLayout(chart1_frame)
+        chart1_layout.setContentsMargins(20, 20, 20, 20)
+        chart1_layout.setSpacing(12)
+        
+        chart1_title = QLabel("Beasiswa per Jenjang Pendidikan")
+        chart1_title_font = QFont(FONT_FAMILY_PRIMARY, 16)
+        chart1_title_font.setWeight(QFont.Weight.Bold)
+        chart1_title.setFont(chart1_title_font)
+        chart1_title.setStyleSheet(f"color: {COLOR_NAVY};")
+        chart1_layout.addWidget(chart1_title)
+        
+        chart1_layout.addWidget(self._create_bar_chart())
+        
+        main_layout.addWidget(chart1_frame)
+        main_layout.addSpacing(24)  # More spacing between charts
         
         # Chart 2: Status Ketersediaan (Donut Chart)
-        chart2 = self._create_chart_frame(
-            self._create_donut_chart(),
-            "Status Ketersediaan Beasiswa"
-        )
-        charts_layout.addWidget(chart2, 0, 1)
+        chart2_frame = QFrame()
+        chart2_frame.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Plain)
+        chart2_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLOR_WHITE};
+                border: 1px solid {COLOR_GRAY_200};
+                border-radius: {BORDER_RADIUS_MD};
+            }}
+        """)
+        chart2_layout = QVBoxLayout(chart2_frame)
+        chart2_layout.setContentsMargins(20, 20, 20, 20)
+        chart2_layout.setSpacing(12)
         
-        # Chart 3: Top 5 Penyelenggara (Horizontal Bar Chart)
-        chart3 = self._create_chart_frame(
-            self._create_horizontal_bar_chart(),
-            "Top 5 Penyelenggara Beasiswa",
-            full_width=True
-        )
-        charts_layout.addWidget(chart3, 1, 0, 1, 2)
+        chart2_title = QLabel("Status Ketersediaan Beasiswa")
+        chart2_title_font = QFont(FONT_FAMILY_PRIMARY, 16)
+        chart2_title_font.setWeight(QFont.Weight.Bold)
+        chart2_title.setFont(chart2_title_font)
+        chart2_title.setStyleSheet(f"color: {COLOR_NAVY};")
+        chart2_layout.addWidget(chart2_title)
         
-        main_layout.addLayout(charts_layout)
+        chart2_layout.addWidget(self._create_donut_chart())
+        
+        main_layout.addWidget(chart2_frame)
+        main_layout.addSpacing(24)  # More spacing between charts
+        
+        # ===== TOP PENYELENGGARA SECTION (Full Width) =====
+        chart3_frame = QFrame()
+        chart3_frame.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Plain)
+        chart3_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLOR_WHITE};
+                border: 1px solid {COLOR_GRAY_200};
+                border-radius: {BORDER_RADIUS_MD};
+            }}
+        """)
+        chart3_layout = QVBoxLayout(chart3_frame)
+        chart3_layout.setContentsMargins(20, 20, 20, 20)
+        chart3_layout.setSpacing(12)
+        
+        chart3_title = QLabel("Top 5 Penyelenggara Beasiswa")
+        chart3_title_font = QFont(FONT_FAMILY_PRIMARY, 16)
+        chart3_title_font.setWeight(QFont.Weight.Bold)
+        chart3_title.setFont(chart3_title_font)
+        chart3_title.setStyleSheet(f"color: {COLOR_NAVY};")
+        chart3_layout.addWidget(chart3_title)
+        
+        chart3_layout.addWidget(self._create_horizontal_bar_chart())
+        
+        main_layout.addWidget(chart3_frame)
+        main_layout.addSpacing(16)  # SPACING_4
         main_layout.addStretch()
         
-        # Apply stylesheet
+        # Apply stylesheet to main widget
         self.setStyleSheet(f"background-color: {COLOR_GRAY_BACKGROUND};")
     
     def _create_stat_card(self, icon: str, number: str, label: str) -> QFrame:
-        """Create a stat card widget."""
+        """Create a stat card widget dengan left border colored dan consistem height."""
         card = QFrame()
         card.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Plain)
+        card.setMinimumHeight(100)
         
         layout = QHBoxLayout(card)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(12)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         
-        # Icon
+        # Tentukan warna border berdasarkan icon/label
+        if "Total" in label:
+            border_color = COLOR_NAVY
+        elif "Buka" in label:
+            border_color = "#10b981"  # Green
+        elif "Tutup" in label and "Segera" in label:
+            border_color = COLOR_ORANGE
+        else:
+            border_color = COLOR_GRAY_400
+        
+        # Left border
+        left_border = QFrame()
+        left_border.setMaximumWidth(5)
+        left_border.setStyleSheet(f"background-color: {border_color}; border: none;")
+        layout.addWidget(left_border)
+        
+        # Content area
+        content_frame = QFrame()
+        content_frame.setStyleSheet(f"background-color: {COLOR_WHITE};")
+        content_layout = QHBoxLayout(content_frame)
+        content_layout.setContentsMargins(16, 16, 16, 16)
+        content_layout.setSpacing(14)
+        
+        # Icon dengan background circle - improved sizing
         icon_label = QLabel(icon)
-        icon_label.setFont(QFont(FONT_FAMILY_PRIMARY, 24))
-        layout.addWidget(icon_label)
+        icon_label.setFont(QFont(FONT_FAMILY_PRIMARY, 28))
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_frame = QFrame()
+        icon_frame.setMaximumWidth(56)
+        icon_frame.setMaximumHeight(56)
+        icon_frame.setMinimumWidth(56)
+        icon_frame.setMinimumHeight(56)
+        icon_frame.setStyleSheet(f"background-color: #f3f4f6; border-radius: 8px; border: none;")
+        icon_layout = QHBoxLayout(icon_frame)
+        icon_layout.setContentsMargins(0, 0, 0, 0)
+        icon_layout.addWidget(icon_label)
+        content_layout.addWidget(icon_frame)
         
-        # Number + Label
+        # Text layout
         text_layout = QVBoxLayout()
+        text_layout.setSpacing(4)
+        text_layout.setContentsMargins(0, 0, 0, 0)
         
         num_label = QLabel(number)
         num_font = QFont(FONT_FAMILY_PRIMARY, 24)
         num_font.setWeight(QFont.Weight.Bold)
         num_label.setFont(num_font)
-        num_label.setStyleSheet(f"color: {COLOR_NAVY};")
+        num_label.setStyleSheet(f"color: {COLOR_NAVY}; padding: 0px;")
         text_layout.addWidget(num_label)
         
-        text_label = QLabel(label)
-        text_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
-        text_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
-        text_layout.addWidget(text_label)
+        label_widget = QLabel(label)
+        label_widget.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        label_widget.setStyleSheet(f"color: {COLOR_GRAY_600}; padding: 0px;")
+        text_layout.addWidget(label_widget)
         
-        layout.addLayout(text_layout)
-        layout.addStretch()
+        content_layout.addLayout(text_layout)
+        content_layout.addStretch()
+        
+        layout.addWidget(content_frame, 1)
         
         card.setStyleSheet(f"""
             QFrame {{
                 background-color: {COLOR_WHITE};
                 border: 1px solid {COLOR_GRAY_200};
+                border-left: none;
                 border-radius: {BORDER_RADIUS_MD};
             }}
         """)
         
         return card
     
-    def _create_chart_frame(self, canvas: FigureCanvas, title: str, full_width: bool = False) -> QFrame:
-        """Create chart frame dengan title."""
-        frame = QFrame()
-        frame.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Plain)
-        frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLOR_WHITE};
-                border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_MD};
-            }}
-        """)
-        
-        layout = QVBoxLayout(frame)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(8)
-        
-        # Title
-        title_label = QLabel(title)
-        title_font = QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_LG)
-        title_font.setWeight(QFont.Weight.Medium)
-        title_label.setFont(title_font)
-        title_label.setStyleSheet(f"color: {COLOR_NAVY};")
-        layout.addWidget(title_label)
-        
-        # Canvas
-        layout.addWidget(canvas)
-        
-        return frame
-    
     def _create_bar_chart(self) -> FigureCanvas:
-        """Create bar chart: Beasiswa per Jenjang Pendidikan."""
-        figure = Figure(figsize=(5, 3.5), dpi=100)
+        """Create bar chart: Beasiswa per Jenjang Pendidikan dengan sizing yang lebih besar."""
+        figure = Figure(figsize=(10, 4), dpi=100)
         ax = figure.add_subplot(111)
         
-        # Data
+        # Data dengan label yang lebih jelas
         jenjang = ['D3', 'D4', 'S1', 'S2']
         values = [8, 6, 28, 6]
         colors = [CHART_COLORS["navy"] if v != 28 else CHART_COLORS["orange"] for v in values]
         
-        # Create bar chart
-        bars = ax.bar(jenjang, values, color=colors, edgecolor='none', width=0.6)
+        # Create bar chart dengan styling yang lebih baik
+        bars = ax.bar(jenjang, values, color=colors, edgecolor='none', width=0.65, alpha=0.85)
         
-        # Add value labels on bars
+        # Add value labels dengan positioning yang lebih rapi
         for bar, value in zip(bars, values):
             height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2., height,
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.5,
                    f'{int(value)}',
-                   ha='center', va='bottom', fontsize=10, fontweight='bold', color=CHART_COLORS["navy"])
+                   ha='center', va='bottom', fontsize=9, fontweight='bold', 
+                   color=CHART_COLORS["navy"])
+        
+        # Improve label styling
+        ax.tick_params(axis='x', labelsize=9, colors=CHART_COLORS["navy"])
+        ax.tick_params(axis='y', labelsize=8, colors=CHART_COLORS["gray"])
         
         # Styling
-        ax.set_ylabel('Jumlah Beasiswa', fontsize=10, color=CHART_COLORS["gray"], fontweight='bold')
-        ax.set_xlabel('Jenjang Pendidikan', fontsize=10, color=CHART_COLORS["gray"], fontweight='bold')
-        ax.set_ylim(0, max(values) * 1.15)
+        ax.set_ylabel('Jumlah Beasiswa', fontsize=9, color=CHART_COLORS["gray"], fontweight='bold', labelpad=8)
+        ax.set_xlabel('Jenjang Pendidikan', fontsize=9, color=CHART_COLORS["gray"], fontweight='bold', labelpad=8)
+        ax.set_ylim(0, max(values) * 1.2)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.spines['left'].set_color(CHART_COLORS["light_gray"])
         ax.spines['bottom'].set_color(CHART_COLORS["light_gray"])
+        ax.spines['left'].set_linewidth(0.5)
+        ax.spines['bottom'].set_linewidth(0.5)
         ax.set_facecolor('white')
         figure.patch.set_facecolor('white')
         
-        # Grid
-        ax.grid(axis='y', alpha=0.3, linestyle='--', color=CHART_COLORS["light_gray"])
+        # Grid styling
+        ax.grid(axis='y', alpha=0.25, linestyle='-', color=CHART_COLORS["light_gray"], linewidth=0.5)
         ax.set_axisbelow(True)
         
-        figure.tight_layout()
+        # Better layout
+        figure.tight_layout(pad=0.8)
         return FigureCanvas(figure)
     
     def _create_donut_chart(self) -> FigureCanvas:
-        """Create donut chart: Status Ketersediaan Beasiswa."""
-        figure = Figure(figsize=(5, 3.5), dpi=100)
+        """Create donut chart: Status Ketersediaan Beasiswa dengan sizing yang lebih besar."""
+        figure = Figure(figsize=(10, 4), dpi=100)
         ax = figure.add_subplot(111)
         
-        # Data
+        # Data dengan label yang jelas
         statuses = ['Buka', 'Segera Tutup', 'Tutup']
         values = [30, 8, 10]  # 63%, 17%, 20% of 48
         colors = [CHART_COLORS["success"], CHART_COLORS["orange"], CHART_COLORS["gray"]]
         
-        # Create donut chart
+        # Create donut chart dengan styling lebih baik
         wedges, texts, autotexts = ax.pie(values, labels=statuses, colors=colors,
                                            autopct='%1.0f%%', startangle=90,
-                                           textprops={'fontsize': 9, 'weight': 'bold'},
-                                           wedgeprops=dict(width=0.5, edgecolor='white', linewidth=2))
+                                           textprops={'fontsize': 9, 'weight': 'bold', 'color': CHART_COLORS["navy"]},
+                                           wedgeprops=dict(width=0.5, edgecolor='white', linewidth=2.5))
         
-        # Style percentage text
+        # Style percentage text dengan lebih baik
         for autotext in autotexts:
             autotext.set_color('white')
             autotext.set_fontweight('bold')
-            autotext.set_fontsize(10)
+            autotext.set_fontsize(9)
         
-        # Add center text
-        centre_circle = plt.Circle((0, 0), 0.70, fc='white', edgecolor='white')
+        # Style labels
+        for text in texts:
+            text.set_fontsize(8)
+            text.set_fontweight('bold')
+            text.set_color(CHART_COLORS["navy"])
+        
+        # Add center circle dan text yang lebih rapi
+        centre_circle = plt.Circle((0, 0), 0.70, fc='white', edgecolor='white', linewidth=0)
         ax.add_artist(centre_circle)
         
-        # Center text
-        ax.text(0, 0.15, '48', ha='center', va='center',
-               fontsize=24, fontweight='bold', color=CHART_COLORS["navy"])
-        ax.text(0, -0.15, 'total', ha='center', va='center',
-               fontsize=10, color=CHART_COLORS["gray"], fontweight='bold')
+        # Center text dengan styling lebih baik
+        ax.text(0, 0.18, '48', ha='center', va='center',
+               fontsize=26, fontweight='bold', color=CHART_COLORS["navy"])
+        ax.text(0, -0.18, 'Scholarship', ha='center', va='center',
+               fontsize=9, color=CHART_COLORS["gray"], fontweight='bold')
         
         ax.set_facecolor('white')
         figure.patch.set_facecolor('white')
         
-        figure.tight_layout()
+        figure.tight_layout(pad=0.8)
         return FigureCanvas(figure)
     
     def _create_horizontal_bar_chart(self) -> FigureCanvas:
-        """Create horizontal bar chart: Top 5 Penyelenggara Beasiswa."""
-        figure = Figure(figsize=(10, 2.5), dpi=100)
+        """Create horizontal bar chart: Top 5 Penyelenggara Beasiswa dengan full width."""
+        figure = Figure(figsize=(10, 4), dpi=100)
         ax = figure.add_subplot(111)
         
-        # Data
+        # Data dengan nama yang lebih rapi
         penyelenggara = [
-            'Kemendikbud',
-            'LPDP',
+            'Kemendikbud RI',
+            'LPDP (Kemenkeu)',
             'Tanoto Foundation',
             'Bank Indonesia',
-            'Djarum Foundation'
+            'Djarum Plus'
         ]
         values = [8, 6, 5, 4, 3]
         
-        # Create horizontal bar chart
-        bars = ax.barh(penyelenggara, values, color=CHART_COLORS["orange"], edgecolor='none', height=0.6)
+        # Create horizontal bar chart dengan styling yang lebih baik
+        bars = ax.barh(penyelenggara, values, color=CHART_COLORS["orange"], 
+                      edgecolor='none', height=0.65, alpha=0.85)
         
-        # Add value labels
+        # Add value labels dengan background yang cleaner
         for bar, value in zip(bars, values):
             width = bar.get_width()
-            ax.text(width, bar.get_y() + bar.get_height()/2.,
+            # Label di dalam/di tepi bar
+            ax.text(width + 0.2, bar.get_y() + bar.get_height()/2.,
                    f'{int(value)}',
-                   ha='left', va='center', fontsize=9, fontweight='bold',
-                   color=CHART_COLORS["navy"], bbox=dict(boxstyle='round,pad=0.3',
-                                                          facecolor='white', edgecolor='none', alpha=0.8))
+                   ha='left', va='center', fontsize=8, fontweight='bold',
+                   color=CHART_COLORS["navy"])
+        
+        # Improve label styling
+        ax.tick_params(axis='y', labelsize=8, colors=CHART_COLORS["navy"])
+        ax.tick_params(axis='x', labelsize=8, colors=CHART_COLORS["gray"])
         
         # Styling
-        ax.set_xlabel('Jumlah Beasiswa', fontsize=10, color=CHART_COLORS["gray"], fontweight='bold')
-        ax.set_xlim(0, max(values) * 1.3)
+        ax.set_xlabel('Jumlah Beasiswa', fontsize=9, color=CHART_COLORS["gray"], fontweight='bold', labelpad=8)
+        ax.set_xlim(0, max(values) * 1.35)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.spines['left'].set_color(CHART_COLORS["light_gray"])
         ax.spines['bottom'].set_color(CHART_COLORS["light_gray"])
+        ax.spines['left'].set_linewidth(0.5)
+        ax.spines['bottom'].set_linewidth(0.5)
         ax.set_facecolor('white')
         figure.patch.set_facecolor('white')
         
-        # Grid
-        ax.grid(axis='x', alpha=0.3, linestyle='--', color=CHART_COLORS["light_gray"])
+        # Grid styling - improve visibility
+        ax.grid(axis='x', alpha=0.25, linestyle='-', color=CHART_COLORS["light_gray"], linewidth=0.5)
         ax.set_axisbelow(True)
         
-        figure.tight_layout()
+        # Better layout
+        figure.tight_layout(pad=0.8)
         return FigureCanvas(figure)
     
     def load_statistics(self):

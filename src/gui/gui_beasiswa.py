@@ -1,2549 +1,563 @@
 """
-gui_beasiswa.py - Beasiswa Tab UI Implementation
-BeasiswaKu - Personal Scholarship Manager
-
-Komponen:
-1. BeasiswaTab - Main beasiswa tab widget
-2. AddBeasiswaDialog - Dialog untuk tambah beasiswa baru
-3. EditBeasiswaDialog - Dialog untuk edit beasiswa existing
-4. DeleteConfirmationDialog - Dialog untuk konfirmasi hapus
-5. BeasiswaDetailDialog - Dialog untuk tampil detail beasiswa
-
-PIC: Kyla (UI/UX Specialist - Beasiswa Tab)
+Beasiswa (Scholarship List) Tab for BeasiswaKu
+Professional scholarship listing with search, filters, and actions
 """
 
 import logging
+from typing import Optional, Dict, List, Any
+from datetime import datetime
 import csv
-from pathlib import Path
-from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Tuple
+import os
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
-    QTableWidget, QTableWidgetItem, QComboBox, QLineEdit, QPushButton,
-    QLabel, QMessageBox, QDialog, QHeaderView, QFileDialog,
-    QSpinBox, QDoubleSpinBox, QTextEdit, QDateEdit
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QLineEdit,
+    QPushButton, QComboBox, QTableWidget, QTableWidgetItem, QHeaderView,
+    QAbstractItemView, QFileDialog, QSpacerItem, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QDate, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont, QColor, QBrush
+from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QFont, QIcon, QColor
 
-from src.database.crud import (
-    get_beasiswa_list, add_beasiswa, edit_beasiswa,
-    delete_beasiswa, get_connection
-)
 from src.gui.design_tokens import *
-from src.gui.styles import get_stylesheet, get_button_solid_stylesheet, get_button_outlined_stylesheet, get_button_icon_stylesheet, get_dialog_stylesheet
-from src.gui.components import AlertBanner, StatusBadge, create_alert, create_status_badge
+from src.gui.styles import get_button_solid_stylesheet
+from src.database.crud import get_connection
 
 # Setup logging
 logger = logging.getLogger(__name__)
 
 
-# ==================== MAIN BEASISWA TAB ====================
-
 class BeasiswaTab(QWidget):
     """
-    Tab untuk menampilkan daftar beasiswa dengan fitur:
-    - Tabel display dengan 6 kolom
-    - Filter by jenjang (D3, D4, S1, S2)
-    - Filter by status (Buka, Segera Tutup, Tutup)
-    - Real-time search with Navy styling
-    - CRUD operations (Tambah, Edit, Hapus) with modern icon design
-    - Highlight deadline (merah ≤3 hari, kuning ≤7 hari)
-    - Detail popup (double-click)
-    - Export to CSV
-    - Responsive UI with Navy + Orange color scheme
+    Beasiswa (Scholarship List) Tab dengan professional data table.
     
-    Components Available (Tasks 3 & 6):
-    
-    - AlertBanner: Non-blocking in-tab alerts (Task 3)
-      * Types: info, success, warning, error
-      * Auto-close capable with close button
-      * Integrated with CRUD operations
-    
-    - StatusBadge: Reusable pill-shaped status indicator (Task 6)
-      * Use: create_status_badge('approved', 'Status Approved')
-      * Statuses: pending, approved, rejected, draft, open, closing-soon, closed
-      * Pill-shaped with emoji support
-    
-    UI Enhancements (Tasks 1-11):
-    - Task 1: Design tokens system (colors, typography, spacing)
-    - Task 2: Navy + Orange color scheme applied throughout
-    - Task 3: AlertBanner for success/error messages
-    - Task 4: Modern filter section with Navy styling (36px dropdowns)
-    - Task 5: Table left-border accent effect with deadline highlighting
-    - Task 6: StatusBadge pill-shaped component with emoji
-    - Task 7: Icon-only buttons for Edit (✏️) and Hapus (🗑️) - compact 36x36px
-    - Task 8: Button styling variants - solid/outlined with hover/active states
-      * Helper functions: get_button_solid_stylesheet(), get_button_outlined_stylesheet(), get_button_icon_stylesheet()
-      * Applied to all buttons: Tambah, Edit, Hapus, Refresh, Export, and dialog buttons
-      * Variants: Navy (primary), Orange (accent), Error (danger), Gray (secondary)
-    - Task 9: CTA button "Lihat Semua Beasiswa" with orange styling
-      * Prominent button to view all scholarships
-      * Resets filters and shows complete beasiswa list
-      * Encourages user exploration
-      * One-click action to clear search/filters
-    - Task 10: Dialog styling updates for Navy + Orange scheme
-      * Applied get_dialog_stylesheet() to all 4 dialogs
-      * Proper padding (20px margins) and consistent spacing
-      * Navy labels with medium weight
-      * Rounded input fields with focus borders
-      * Improved visual hierarchy and form clarity
-    - Task 11: Spacing & padding refinement for visual hierarchy
-      * Standardized margins: 16px (SPACING_4) for main container
-      * Standardized section spacing: 12px (SPACING_3) between segments
-      * Small separators: 8px (SPACING_2) after headers/tables
-      * All layouts use design token constants for consistency
-      * Better visual breathing room and improved readability
+    Features:
+    - Search bar untuk cari beasiswa
+    - Filters: Status, Jenjang
+    - Action buttons: Deadline Dekat, Refresh, Export CSV
+    - Professional table dengan 7 columns
+    - Status badges (Buka, Segera Tutup, Tutup)
+    - Action icons: View, Bookmark, Apply
     """
     
-    # Signal untuk refresh data
-    data_changed = pyqtSignal()
-    
-    def __init__(self, user_id: int):
-        super().__init__()
+    def __init__(self, user_id: int, parent=None):
+        super().__init__(parent)
         self.user_id = user_id
+        self.beasiswa_data: List[Dict[str, Any]] = []
         
-        # ===== DATA VARIABLES =====
-        self.beasiswa_list: List[Dict] = []
-        self.filtered_list: List[Dict] = []
-        self.last_scrape_time: Optional[str] = None
-        
-        # ===== UI WIDGETS (akan diinisialisasi di init_ui) =====
-        # Top bar widgets
-        self.lbl_title: Optional[QLabel] = None
-        self.lbl_timestamp: Optional[QLabel] = None
-        
-        # Filter widgets
-        self.combo_jenjang: Optional[QComboBox] = None
-        self.combo_status: Optional[QComboBox] = None
-        self.entry_search: Optional[QLineEdit] = None
-        
-        # Table widget
-        self.tbl_beasiswa: Optional[QTableWidget] = None
-        self.lbl_row_count: Optional[QLabel] = None
-        
-        # CRUD buttons
-        self.btn_tambah: Optional[QPushButton] = None
-        self.btn_edit: Optional[QPushButton] = None
-        self.btn_hapus: Optional[QPushButton] = None
-        self.btn_refresh: Optional[QPushButton] = None
-        self.btn_export_csv: Optional[QPushButton] = None
-        
-        # CTA button (Task 9)
-        self.btn_lihat_semua: Optional[QPushButton] = None
-        
-        # Alert banner
-        self.alert_banner: Optional[AlertBanner] = None
-        
-        # Initialize UI
+        logger.info(f"Initializing BeasiswaTab")
         self.init_ui()
-        
-        # Load initial data
         self.load_beasiswa_data()
-        self.populate_table()
-    
-    # =====================================================================
-    # SECTION 1: UI INITIALIZATION (Tasks 3-10)
-    # =====================================================================
     
     def init_ui(self):
-        """
-        Initialize Beasiswa Tab UI with complete layout hierarchy.
+        """Initialize Beasiswa Tab UI dengan search, filters, dan table."""
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(24, 20, 24, 20)
+        main_layout.setSpacing(0)
         
-        Layout Structure:
-        ├── Top Bar (Title + Timestamp) - SPACING_4
-        ├── Alert Banner - SPACING_4
-        ├── Filter Section - SPACING_4
-        ├── Search Section - SPACING_4
-        ├── Table Widget - SPACING_3
-        ├── Row Count Label - SPACING_4
-        ├── CTA Section - SPACING_4
-        └── CRUD Buttons - SPACING_4
+        self.setStyleSheet(f"background-color: {COLOR_GRAY_BACKGROUND};")
         
-        Task 11: Refined spacing using design tokens for consistency and visual hierarchy.
-        """
-        logger.info("Initializing BeasiswaTab UI...")
+        # ===== HEADER SECTION =====
+        header_layout = QVBoxLayout()
+        header_layout.setSpacing(4)
+        header_layout.setContentsMargins(0, 0, 0, 0)
         
-        # ===== MAIN LAYOUT (Task 11: Refined spacing) =====
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(16, 16, 16, 16)  # SPACING_4 (16px) - better breathing room
-        main_layout.setSpacing(12)  # SPACING_3 (12px) - consistent section spacing
+        title_label = QLabel("Daftar Beasiswa")
+        title_font = QFont(FONT_FAMILY_PRIMARY, 28)
+        title_font.setWeight(QFont.Weight.Bold)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet(f"color: {COLOR_NAVY}; padding: 0px;")
+        header_layout.addWidget(title_label)
         
-        # ===== SECTION 1: TOP BAR (Task 4) =====
-        # Display title and last scraping timestamp
-        top_bar_layout = self._create_top_bar_layout()
-        if top_bar_layout:
-            main_layout.addLayout(top_bar_layout)
-            main_layout.addSpacing(8)  # SPACING_2 (8px) - small separator after title
+        # Subtitle dengan last updated time
+        self.subtitle_label = QLabel(f"Terakhir diperbaharui: {datetime.now().strftime('%d %b %Y %H:%M')}")
+        self.subtitle_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        self.subtitle_label.setStyleSheet(f"color: {COLOR_GRAY_400}; padding: 0px;")
+        header_layout.addWidget(self.subtitle_label)
         
-        # ===== SECTION 1.5: ALERT BANNER (Task 3) =====
-        # Alert banner untuk info, success, warning, error messages
-        self.alert_banner = AlertBanner(
-            alert_type='info',
-            message='🔄 Memuat data beasiswa...',
-            closable=True
-        )
-        self.alert_banner.closed.connect(self._on_alert_closed)
-        self.alert_banner.hide()  # Hidden by default, show ketika perlu
-        main_layout.addWidget(self.alert_banner)
-        main_layout.addSpacing(12)  # SPACING_3 (12px) - standard section spacing
+        main_layout.addLayout(header_layout)
+        main_layout.addSpacing(20)
         
-        # ===== SECTION 2: FILTER SECTION (Tasks 5-7, 15, updated Task 4) =====
-        # Filter by jenjang and status with modern styling
-        filter_layout = self._create_filter_layout()
-        if filter_layout:
-            main_layout.addLayout(filter_layout)
-            main_layout.addSpacing(12)  # SPACING_3 (12px) - standard section spacing
+        # ===== TOOLBAR SECTION =====
+        toolbar_layout = QHBoxLayout()
+        toolbar_layout.setSpacing(12)
+        toolbar_layout.setContentsMargins(0, 0, 0, 0)
         
-        # ===== TASK 15: CONNECT FILTER DROPDOWN SIGNALS =====
-        # Connect jenjang dropdown currentTextChanged to apply_filters
-        if self.combo_jenjang:
-            self.combo_jenjang.currentTextChanged.connect(self.apply_filters)
-            logger.debug("✅ Jenjang dropdown signal connected to apply_filters()")
-        
-        # Connect status dropdown currentTextChanged to apply_filters
-        if self.combo_status:
-            self.combo_status.currentTextChanged.connect(self.apply_filters)
-            logger.debug("✅ Status dropdown signal connected to apply_filters()")
-        
-        # ===== TASK 7: SEARCH SECTION (Task 7, updated Task 4) =====
-        # Real-time search with modern styling
-        search_layout = QHBoxLayout()
-        search_layout.setContentsMargins(0, 0, 0, 0)
-        search_layout.setSpacing(12)  # SPACING_3 (12px) - consistent with filter layout
-        
-        search_label = QLabel("🔎 Cari:")
-        search_label.setFont(QFont("Arial", 10))
-        search_label.setStyleSheet(f"color: {COLOR_GRAY_700}; font-weight: bold;")
-        search_layout.addWidget(search_label)
-        
-        self.entry_search = QLineEdit()
-        self.entry_search.setPlaceholderText("Ketik nama beasiswa, penyelenggara, atau deskripsi...")
-        self.entry_search.setMinimumHeight(36)
-        self.entry_search.setStyleSheet(f"""
+        # Search box
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Cari nama beasiswa...")
+        self.search_input.setMinimumHeight(44)
+        self.search_input.setMinimumWidth(350)
+        self.search_input.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        self.search_input.setStyleSheet(f"""
             QLineEdit {{
                 background-color: {COLOR_WHITE};
-                color: {COLOR_GRAY_900};
-                border: 1px solid {COLOR_GRAY_300};
-                border-radius: 6px;
-                padding: 8px 12px;
-                font-size: 11px;
-            }}
-            QLineEdit:hover {{
-                border: 1px solid {COLOR_NAVY};
-                background-color: {COLOR_GRAY_50};
-            }}
-            QLineEdit:focus {{
-                border: 2px solid {COLOR_NAVY};
-                outline: none;
+                border: 1px solid {COLOR_GRAY_200};
+                border-radius: {BORDER_RADIUS_MD};
+                padding: 10px 14px;
+                color: {COLOR_NAVY};
+                font-size: {FONT_SIZE_BASE}px;
             }}
             QLineEdit::placeholder {{
                 color: {COLOR_GRAY_400};
             }}
+            QLineEdit:focus {{
+                border: 2px solid {COLOR_ORANGE};
+                padding: 9px 13px;
+            }}
         """)
-        search_layout.addWidget(self.entry_search)
-        main_layout.addLayout(search_layout)
-        main_layout.addSpacing(12)  # SPACING_3 (12px) - standard section spacing
+        self.search_input.textChanged.connect(self.filter_table)
+        toolbar_layout.addWidget(self.search_input)
         
-        # ===== TASK 7: CONNECT SEARCH KEYRELEASE SIGNAL =====
-        # Connect search entry KeyRelease event to apply filters
-        if self.entry_search:
-            self.entry_search.keyReleaseEvent = self._on_search_key_release
-            logger.debug("✅ Search entry KeyRelease signal connected to apply_filters()")
+        # Filter dropdown 1 - Status
+        status_label = QLabel("Status")
+        status_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        status_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
         
-        # ===== SECTION 3: TABLE WIDGET (Task 8) =====
-        # Display beasiswa data in table format
-        self.tbl_beasiswa = self._create_table_widget()
-        if self.tbl_beasiswa:
-            main_layout.addWidget(self.tbl_beasiswa)
-            main_layout.addSpacing(8)  # SPACING_2 (8px) - small spacing after table
-        
-        # ===== TASK 28: CONNECT TABLE DOUBLE-CLICK EVENT =====
-        # Connect double-click to show detail dialog
-        if self.tbl_beasiswa:
-            self.tbl_beasiswa.itemDoubleClicked.connect(self.on_table_double_click)
-            logger.debug("✅ Table double-click signal connected to on_table_double_click()")
-        
-        # ===== SECTION 4: ROW COUNT LABEL (Task 13) =====
-        # Display total number of rows displayed
-        self.lbl_row_count = QLabel("Total: 0 Beasiswa")
-        self.lbl_row_count.setFont(QFont("Arial", 9))
-        self.lbl_row_count.setStyleSheet(f"color: {COLOR_GRAY_600}; font-style: italic;")
-        main_layout.addWidget(self.lbl_row_count)
-        main_layout.addSpacing(12)  # SPACING_3 (12px) - standard section spacing
-        
-        # ===== SECTION 4.5: CTA SECTION (Task 9) =====
-        # Call-to-action button to view all beasiswa
-        cta_layout = self._create_cta_section()
-        if cta_layout:
-            main_layout.addLayout(cta_layout)
-            main_layout.addSpacing(12)  # SPACING_3 (12px) - standard section spacing
-        
-        # ===== SECTION 5: CRUD BUTTONS (Tasks 9-10) =====
-        # Action buttons for CRUD operations
-        crud_layout = self._create_crud_buttons_layout()
-        if crud_layout:
-            main_layout.addLayout(crud_layout)
-        
-        # ===== TASK 20: CONNECT TAMBAH BUTTON SIGNAL =====
-        if self.btn_tambah:
-            self.btn_tambah.clicked.connect(self.on_tambah_clicked)
-            logger.debug("✅ Tambah button clicked signal connected to on_tambah_clicked()")
-        
-        # ===== TASK 21: CONNECT EDIT BUTTON SIGNAL =====
-        if self.btn_edit:
-            self.btn_edit.clicked.connect(self.on_edit_clicked)
-            logger.debug("✅ Edit button clicked signal connected to on_edit_clicked()")
-        
-        # ===== TASK 23: CONNECT HAPUS BUTTON SIGNAL =====
-        if self.btn_hapus:
-            self.btn_hapus.clicked.connect(self.on_hapus_clicked)
-            logger.debug("✅ Hapus button clicked signal connected to on_hapus_clicked()")
-        
-        # ===== TASK 16: CONNECT REFRESH BUTTON SIGNAL (Task 10) =====
-        if self.btn_refresh:
-            self.btn_refresh.clicked.connect(self.on_refresh_clicked)
-            logger.debug("✅ Refresh button clicked signal connected to on_refresh_clicked()")
-        
-        # ===== TASK 30: CONNECT EXPORT CSV BUTTON SIGNAL (Task 10) =====
-        if self.btn_export_csv:
-            self.btn_export_csv.clicked.connect(self.on_export_csv_clicked)
-            logger.debug("✅ Export CSV button clicked signal connected to on_export_csv_clicked()")
-        
-        # ===== TASK 9: CONNECT CTA BUTTON SIGNAL =====
-        # Connect "Lihat Semua Beasiswa" button to show all beasiswa view
-        if self.btn_lihat_semua:
-            self.btn_lihat_semua.clicked.connect(self.on_lihat_semua_clicked)
-            logger.debug("✅ Lihat Semua button clicked signal connected to on_lihat_semua_clicked()")
-        
-        # ===== FINALIZE LAYOUT =====
-        self.setLayout(main_layout)
-        
-        # ===== APPLY STYLESHEET (Task 2: Update color scheme) =====
-        self.setStyleSheet(get_stylesheet())
-        
-        # ===== TASK 6: STATUS BADGE COMPONENT NOW AVAILABLE =====
-        # StatusBadge widget created in src/gui/components.py
-        # Usage: badge = create_status_badge('approved', 'Approved')
-        # Supports: pending, approved, rejected, draft, open, closing-soon, closed
-        # Features: Pill-shaped, emoji, color-coded, responsive font
-        # Helper in this class: self.create_status_badge_for_beasiswa(status_text)
-        
-        logger.info("✅ BeasiswaTab UI initialized with all sections")
-    
-    def _create_top_bar_layout(self) -> QHBoxLayout:
-        """
-        Create top bar with title and timestamp (Task 4).
-        
-        Display:
-        - Left: Title label with emoji (📚 Beasiswa Tab)
-        - Right: Last scraping timestamp
-        
-        Returns:
-            QHBoxLayout: Layout containing title label and timestamp label
-        """
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
-        
-        # ===== TITLE LABEL (Left side) =====
-        self.lbl_title = QLabel("📚 Daftar Beasiswa")
-        self.lbl_title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-        self.lbl_title.setStyleSheet(f"color: {COLOR_NAVY}; padding: 5px 0px;")
-        layout.addWidget(self.lbl_title)
-        
-        # ===== SPACER (Center) =====
-        layout.addStretch()
-        
-        # ===== TIMESTAMP LABEL (Right side) =====
-        # Display "Scraping terakhir: [timestamp]" or "Belum ada data"
-        timestamp_text = "Scraping terakhir: -"
-        if self.last_scrape_time:
-            timestamp_text = f"Scraping terakhir: {self.last_scrape_time}"
-        
-        self.lbl_timestamp = QLabel(timestamp_text)
-        self.lbl_timestamp.setFont(QFont("Arial", 9))
-        self.lbl_timestamp.setStyleSheet(f"color: {COLOR_GRAY_600}; font-style: italic;")
-        self.lbl_timestamp.setAlignment(Qt.AlignmentFlag.AlignRight)
-        layout.addWidget(self.lbl_timestamp)
-        
-        logger.debug("✅ Top bar layout created (title + timestamp)")
-        
-        return layout
-    
-    def update_timestamp_label(self):
-        """
-        Update timestamp label dengan last scrape time (Helper untuk Task 4).
-        Called setelah load_beasiswa_data() untuk refresh timestamp display.
-        """
-        if not self.lbl_timestamp:
-            return
-        
-        if self.last_scrape_time:
-            timestamp_text = f"Scraping terakhir: {self.last_scrape_time}"
-        else:
-            timestamp_text = "Scraping terakhir: -"
-        
-        self.lbl_timestamp.setText(timestamp_text)
-        logger.debug(f"Timestamp label updated: {timestamp_text}")
-    
-    def _create_filter_layout(self) -> QHBoxLayout:
-        """
-        Create filter section with modern styling (Task 4 - Redesign filter section).
-        
-        Features:
-        - Filter icon + label at the start
-        - Jenjang and Status dropdowns with Navy styling
-        - Rounded corners and hover/focus effects
-        - Better spacing and typography
-        - Search entry di bawah
-        
-        Returns:
-            QHBoxLayout: Layout containing filter section
-        """
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
-        
-        # ===== FILTER ICON & LABEL =====
-        filter_label = QLabel("🔍 Filter:")
-        filter_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
-        filter_label.setStyleSheet(f"color: {COLOR_NAVY};")
-        layout.addWidget(filter_label)
-        
-        # ===== JENJANG DROPDOWN WITH MODERN STYLING =====
-        lbl_jenjang = QLabel("Jenjang:")
-        lbl_jenjang.setFont(QFont("Arial", 10))
-        lbl_jenjang.setStyleSheet(f"color: {COLOR_GRAY_700}; font-weight: bold;")
-        layout.addWidget(lbl_jenjang)
-        
-        self.combo_jenjang = QComboBox()
-        self.combo_jenjang.addItems(["Semua", "D3", "D4", "S1", "S2"])
-        self.combo_jenjang.setMinimumHeight(36)
-        self.combo_jenjang.setMinimumWidth(140)
-        self.combo_jenjang.setStyleSheet(f"""
+        self.status_filter = QComboBox()
+        self.status_filter.addItems(["Semua", "Buka", "Segera Tutup", "Tutup"])
+        self.status_filter.setMinimumHeight(40)
+        self.status_filter.setMaximumWidth(150)
+        self.status_filter.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        self.status_filter.setStyleSheet(f"""
             QComboBox {{
                 background-color: {COLOR_WHITE};
-                color: {COLOR_GRAY_900};
-                border: 1px solid {COLOR_GRAY_300};
-                border-radius: 6px;
-                padding: 6px 10px;
-                font-size: 11px;
-                font-weight: 500;
-            }}
-            QComboBox:hover {{
-                border: 1px solid {COLOR_NAVY};
-                background-color: {COLOR_GRAY_50};
-            }}
-            QComboBox:focus {{
-                border: 2px solid {COLOR_NAVY};
-                outline: none;
+                border: 1px solid {COLOR_GRAY_200};
+                border-radius: {BORDER_RADIUS_MD};
+                padding: 8px 12px;
+                color: {COLOR_NAVY};
             }}
             QComboBox::drop-down {{
                 border: none;
-                background: transparent;
             }}
-            QComboBox QAbstractItemView {{
-                background-color: {COLOR_WHITE};
-                color: {COLOR_GRAY_900};
-                selection-background-color: {COLOR_NAVY};
-                selection-color: {COLOR_WHITE};
-                border: 1px solid {COLOR_GRAY_200};
-                padding: 4px;
+            QComboBox::down-arrow {{
+                image: none;
             }}
         """)
-        layout.addWidget(self.combo_jenjang)
+        self.status_filter.currentTextChanged.connect(self.filter_table)
+        toolbar_layout.addWidget(self.status_filter)
         
-        # ===== STATUS DROPDOWN WITH MODERN STYLING =====
-        lbl_status = QLabel("Status:")
-        lbl_status.setFont(QFont("Arial", 10))
-        lbl_status.setStyleSheet(f"color: {COLOR_GRAY_700}; font-weight: bold;")
-        layout.addWidget(lbl_status)
+        # Filter dropdown 2 - Jenjang
+        jenjang_label = QLabel("Jenjang")
+        jenjang_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        jenjang_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
         
-        self.combo_status = QComboBox()
-        self.combo_status.addItems(["Semua", "Buka", "Segera Tutup", "Tutup"])
-        self.combo_status.setMinimumHeight(36)
-        self.combo_status.setMinimumWidth(160)
-        self.combo_status.setStyleSheet(f"""
+        self.jenjang_filter = QComboBox()
+        self.jenjang_filter.addItems(["Semua", "D3", "D4", "S1", "S2"])
+        self.jenjang_filter.setMinimumHeight(40)
+        self.jenjang_filter.setMaximumWidth(150)
+        self.jenjang_filter.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        self.jenjang_filter.setStyleSheet(f"""
             QComboBox {{
                 background-color: {COLOR_WHITE};
-                color: {COLOR_GRAY_900};
-                border: 1px solid {COLOR_GRAY_300};
-                border-radius: 6px;
-                padding: 6px 10px;
-                font-size: 11px;
-                font-weight: 500;
-            }}
-            QComboBox:hover {{
-                border: 1px solid {COLOR_NAVY};
-                background-color: {COLOR_GRAY_50};
-            }}
-            QComboBox:focus {{
-                border: 2px solid {COLOR_NAVY};
-                outline: none;
+                border: 1px solid {COLOR_GRAY_200};
+                border-radius: {BORDER_RADIUS_MD};
+                padding: 8px 12px;
+                color: {COLOR_NAVY};
             }}
             QComboBox::drop-down {{
                 border: none;
-                background: transparent;
             }}
-            QComboBox QAbstractItemView {{
+            QComboBox::down-arrow {{
+                image: none;
+            }}
+        """)
+        self.jenjang_filter.currentTextChanged.connect(self.filter_table)
+        toolbar_layout.addWidget(self.jenjang_filter)
+        
+        toolbar_layout.addStretch()
+        
+        # Deadline Dekat button
+        deadline_btn = QPushButton("⚠ Deadline Dekat")
+        deadline_btn.setMinimumHeight(40)
+        deadline_btn.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        deadline_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: 2px solid {COLOR_ERROR};
+                border-radius: {BORDER_RADIUS_MD};
+                color: {COLOR_ERROR};
+                padding: 8px 16px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_ERROR_LIGHT};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_ERROR_LIGHT};
+                border: 2px solid {COLOR_ERROR_DARK};
+            }}
+        """)
+        deadline_btn.clicked.connect(self.filter_by_deadline)
+        toolbar_layout.addWidget(deadline_btn)
+        
+        # Refresh button
+        refresh_btn = QPushButton("↻ Refresh")
+        refresh_btn.setMinimumHeight(40)
+        refresh_btn.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        refresh_btn.setStyleSheet(f"""
+            QPushButton {{
                 background-color: {COLOR_WHITE};
-                color: {COLOR_GRAY_900};
-                selection-background-color: {COLOR_NAVY};
-                selection-color: {COLOR_WHITE};
                 border: 1px solid {COLOR_GRAY_200};
-                padding: 4px;
-            }}
-        """)
-        layout.addWidget(self.combo_status)
-        
-        # ===== SPACER =====
-        layout.addStretch()
-        
-        logger.debug("✅ Filter layout created with modern Navy styling (Jenjang + Status dropdowns)")
-        
-        return layout
-        """
-        Create filter section (Task 5-7).
-        
-        Contains:
-        - Dropdown for jenjang filter (Task 5)
-        - Dropdown for status filter (Task 6)
-        - Search entry (Task 7)
-        
-        Returns:
-            QHBoxLayout: Layout containing all filter widgets
-        """
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)  # SPACING_3 (12px) - consistent spacing
-        
-        # ===== TASK 5: JENJANG DROPDOWN =====
-        # Filter dropdown untuk education level
-        lbl_jenjang = QLabel("Jenjang:")
-        lbl_jenjang.setFont(QFont("Arial", 10))
-        layout.addWidget(lbl_jenjang)
-        
-        self.combo_jenjang = QComboBox()
-        self.combo_jenjang.setFont(QFont("Arial", 10))
-        self.combo_jenjang.setMinimumWidth(100)
-        self.combo_jenjang.addItems([
-            "Semua",      # Default: show all
-            "D3",
-            "D4",
-            "S1",
-            "S2"
-        ])
-        self.combo_jenjang.setCurrentIndex(0)  # Default to "Semua"
-        layout.addWidget(self.combo_jenjang)
-        
-        logger.debug("✅ Jenjang dropdown created with options: Semua, D3, D4, S1, S2")
-        
-        # ===== TASK 6: STATUS DROPDOWN =====
-        # Filter dropdown untuk status ketersediaan beasiswa
-        lbl_status = QLabel("Status:")
-        lbl_status.setFont(QFont("Arial", 10))
-        layout.addWidget(lbl_status)
-        
-        self.combo_status = QComboBox()
-        self.combo_status.setFont(QFont("Arial", 10))
-        self.combo_status.setMinimumWidth(120)
-        self.combo_status.addItems([
-            "Semua",           # Default: show all
-            "Buka",
-            "Segera Tutup",
-            "Tutup"
-        ])
-        self.combo_status.setCurrentIndex(0)  # Default to "Semua"
-        layout.addWidget(self.combo_status)
-        
-        logger.debug("✅ Status dropdown created with options: Semua, Buka, Segera Tutup, Tutup")
-        
-        # ===== TASK 7: SEARCH ENTRY =====
-        # Real-time search entry untuk filter by judul
-        lbl_search = QLabel("Cari:")
-        lbl_search.setFont(QFont("Arial", 10))
-        layout.addWidget(lbl_search)
-        
-        self.entry_search = QLineEdit()
-        self.entry_search.setFont(QFont("Arial", 10))
-        self.entry_search.setPlaceholderText("Cari beasiswa...")
-        self.entry_search.setMinimumWidth(200)
-        layout.addWidget(self.entry_search)
-        
-        logger.debug("✅ Search entry created with placeholder 'Cari beasiswa...'")
-        
-        # Add stretch to push remaining space to the right
-        layout.addStretch()
-        
-        return layout
-    
-    def _create_table_widget(self) -> QTableWidget:
-        """
-        Create and configure QTableWidget (Task 8).
-        
-        Columns:
-        1. No (index) - width: 50px
-        2. Nama (judul) - width: 250px
-        3. Penyelenggara - width: 150px
-        4. Jenjang - width: 80px
-        5. Deadline - width: 120px
-        6. Status - width: 100px
-        
-        Features:
-        - Single row selection
-        - Alternating row colors
-        - Read-only cells (editing via dialog)
-        - Double-click event (Task 28)
-        
-        Returns:
-            QTableWidget: Configured table widget
-        """
-        table = QTableWidget()
-        
-        # ===== SETUP COLUMNS =====
-        table.setColumnCount(6)
-        table.setHorizontalHeaderLabels([
-            "No", "Nama", "Penyelenggara", 
-            "Jenjang", "Deadline", "Status"
-        ])
-        
-        # ===== COLUMN WIDTH SETTINGS =====
-        table.setColumnWidth(0, 50)      # No
-        table.setColumnWidth(1, 250)     # Nama (widest)
-        table.setColumnWidth(2, 150)     # Penyelenggara
-        table.setColumnWidth(3, 80)      # Jenjang
-        table.setColumnWidth(4, 120)     # Deadline
-        table.setColumnWidth(5, 100)     # Status
-        
-        # ===== HEADER CONFIGURATION =====
-        header = table.horizontalHeader()
-        header.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-        header.setStyleSheet(f"background-color: {COLOR_NAVY}; color: {COLOR_WHITE};")
-        header.setStretchLastSection(False)
-        header.setMinimumHeight(40)  # Increase header height for better spacing
-        header.setDefaultAlignment(Qt.AlignmentFlag.AlignVCenter)
-        
-        # ===== SELECTION BEHAVIOR =====
-        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        table.setSelectionModel(table.selectionModel())
-        table.verticalHeader().setDefaultSectionSize(36)  # Increase row height untuk better readability dan spacing
-        
-        # ===== ROW APPEARANCE =====
-        table.setAlternatingRowColors(True)
-        table.setStyleSheet(f"""
-            QTableWidget {{
-                background-color: {COLOR_WHITE};
-                alternate-background-color: {COLOR_GRAY_50};
-                gridline-color: {COLOR_GRAY_200};
-            }}
-            QTableWidget::item {{
-                padding: 8px 10px;
-                border: none;
-                border-left: 4px solid transparent;
-            }}
-            QTableWidget::item:selected {{
-                background-color: {COLOR_NAVY};
-                color: {COLOR_WHITE};
-            }}
-        """)
-        
-        # ===== RESIZE BEHAVIOR =====
-        table.setSortingEnabled(False)  # Will be enabled in Task 8 extension
-        table.setColumnCount(6)
-        
-        # ===== TASK 5: MODERN TABLE STYLING WITH LEFT BORDER ACCENT =====
-        # Instead of full-row background colors, use subtle background + deadline text color
-        # This creates visual hierarchy:
-        # - Deadline cell: Bold colored text (Red/Orange/Green) untuk strong signal
-        # - Row background: Subtle light color (error-light, warning-light, white)
-        # - Combined effect: Looks like left border accent while maintaining readability
-        
-        # ===== READ-ONLY CELLS =====
-        # Cells will be set as read-only in Task 12 during population
-        
-        logger.debug("✅ QTableWidget created with 6 columns: No, Nama, Penyelenggara, Jenjang, Deadline, Status")
-        
-        return table
-    
-    def _clear_table(self):
-        """
-        Clear all rows from table (Helper for Task 12).
-        Used before populating with new data.
-        """
-        if not self.tbl_beasiswa:
-            return
-        
-        self.tbl_beasiswa.setRowCount(0)
-        logger.debug("Table cleared (all rows removed)")
-    
-    def _create_cta_section(self) -> QHBoxLayout:
-        """
-        Create Call-to-Action section with prominent orange button (Task 9).
-        
-        Purpose: Encourage users to explore all available scholarships
-        
-        Button: "🚀 Lihat Semua Beasiswa"
-        - Orange color (accent/CTA styling)
-        - Prominent width and height
-        - Hover effect with darker orange
-        - Action: Show all beasiswa with extended filtering/sorting options
-        
-        Layout: Centered CTA button with spacers
-        
-        Returns:
-            QHBoxLayout: Layout containing the CTA button
-        """
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
-        
-        # Left spacer
-        layout.addStretch()
-        
-        # ===== TASK 9: LIHAT SEMUA BEASISWA CTA BUTTON =====
-        self.btn_lihat_semua = QPushButton("🚀 Lihat Semua Beasiswa")
-        self.btn_lihat_semua.setFont(QFont("Arial", 11, QFont.Weight.Bold))
-        self.btn_lihat_semua.setMinimumHeight(40)
-        self.btn_lihat_semua.setMinimumWidth(200)
-        self.btn_lihat_semua.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_lihat_semua.setStyleSheet(get_button_solid_stylesheet("orange"))
-        layout.addWidget(self.btn_lihat_semua)
-        
-        # Right spacer
-        layout.addStretch()
-        
-        logger.debug("✅ CTA section created (Task 9: Lihat Semua Beasiswa button)")
-        
-        return layout
-    
-    def _create_crud_buttons_layout(self) -> QHBoxLayout:
-        """
-        Create CRUD buttons section with modern button variants (Task 8).
-        
-        Layout:
-        - Tambah button (solid Navy with darker hover)
-        - Spacer
-        - Edit icon (✏️) - transparent with border
-        - Hapus icon (🗑️) - transparent with red border
-        - Refresh button (solid Gray)
-        - Export CSV button (solid Orange)
-        
-        Task 7: Icon-only buttons for compact design
-        Task 8: Applied button styling variants:
-        - Solid buttons: Navy (Tambah), Gray (Refresh), Orange (Export)
-        - Icon buttons: Edit (Navy), Hapus (Error) with transparent bg
-        - All buttons have hover/pressed/disabled states
-        - Consistent spacing and sizing (36px height)
-        """
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
-        
-        # ===== TASK 8: TAMBAH BUTTON (Solid Navy) =====
-        self.btn_tambah = QPushButton("➕ Tambah Beasiswa")
-        self.btn_tambah.setFont(QFont("Arial", 11, QFont.Weight.Bold))
-        self.btn_tambah.setMinimumHeight(36)
-        self.btn_tambah.setMinimumWidth(160)
-        self.btn_tambah.setStyleSheet(get_button_solid_stylesheet("navy"))
-        layout.addWidget(self.btn_tambah)
-        
-        # ===== SPACER UNTUK PUSH ICONS KE KANAN =====
-        layout.addStretch()
-        
-        # ===== TASK 8: EDIT BUTTON (Icon-only with Navy) =====
-        self.btn_edit = QPushButton("✏️")
-        self.btn_edit.setFont(QFont("Arial", 14))
-        self.btn_edit.setFixedSize(36, 36)
-        self.btn_edit.setToolTip("Edit beasiswa yang dipilih")
-        self.btn_edit.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_edit.setStyleSheet(get_button_icon_stylesheet("navy", has_border=True))
-        layout.addWidget(self.btn_edit)
-        
-        # ===== TASK 8: HAPUS BUTTON (Icon-only with Error) =====
-        self.btn_hapus = QPushButton("🗑️")
-        self.btn_hapus.setFont(QFont("Arial", 14))
-        self.btn_hapus.setFixedSize(36, 36)
-        self.btn_hapus.setToolTip("Hapus beasiswa yang dipilih")
-        self.btn_hapus.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_hapus.setStyleSheet(get_button_icon_stylesheet("error", has_border=True))
-        layout.addWidget(self.btn_hapus)
-        
-        # ===== TASK 8: REFRESH BUTTON (Solid Gray) =====
-        self.btn_refresh = QPushButton("🔄")
-        self.btn_refresh.setFont(QFont("Arial", 12))
-        self.btn_refresh.setMinimumHeight(36)
-        self.btn_refresh.setMinimumWidth(100)
-        self.btn_refresh.setToolTip("Refresh data beasiswa dari database")
-        self.btn_refresh.setStyleSheet(get_button_solid_stylesheet("gray"))
-        layout.addWidget(self.btn_refresh)
-        
-        # ===== TASK 8: EXPORT CSV BUTTON (Solid Orange) =====
-        self.btn_export_csv = QPushButton("📥 Export CSV")
-        self.btn_export_csv.setFont(QFont("Arial", 11, QFont.Weight.Bold))
-        self.btn_export_csv.setMinimumHeight(36)
-        self.btn_export_csv.setMinimumWidth(120)
-        self.btn_export_csv.setStyleSheet(get_button_solid_stylesheet("orange"))
-        layout.addWidget(self.btn_export_csv)
-        
-        logger.debug("✅ CRUD buttons layout created with Task 8 styling variants (solid/icon)")
-        
-        return layout
-        """
-        Create CRUD buttons section (Task 9-10).
-        
-        Buttons (Task 9):
-        - Tambah (green) - Add new beasiswa
-        - Edit (blue) - Edit selected beasiswa
-        - Hapus (red) - Delete selected beasiswa
-        
-        Additional (Task 10):
-        - Refresh (gray) - Reload data from database
-        - Export CSV (orange) - Export filtered data
-        
-        Returns:
-            QHBoxLayout: Layout containing all CRUD buttons
-        """
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)  # SPACING_3 (12px) - consistent spacing
-        
-        # ===== TASK 9: TAMBAH BUTTON (Green) =====
-        self.btn_tambah = QPushButton("➕ Tambah")
-        self.btn_tambah.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-        self.btn_tambah.setMinimumHeight(35)
-        self.btn_tambah.setMinimumWidth(100)
-        self.btn_tambah.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLOR_NAVY};
-                color: {COLOR_WHITE};
-                border: none;
-                border-radius: 5px;
-                padding: 8px 15px;
+                border-radius: {BORDER_RADIUS_MD};
+                color: {COLOR_NAVY};
+                padding: 8px 16px;
                 font-weight: bold;
             }}
             QPushButton:hover {{
-                background-color: {COLOR_NAVY_DARK};
+                background-color: {COLOR_GRAY_100};
+                border: 1px solid {COLOR_GRAY_300};
             }}
             QPushButton:pressed {{
-                background-color: {COLOR_NAVY_DARK};
+                background-color: {COLOR_GRAY_200};
             }}
         """)
-        layout.addWidget(self.btn_tambah)
-        logger.debug(f"✅ Tambah button created (navy, {COLOR_NAVY})")
+        refresh_btn.clicked.connect(self.refresh_data)
+        toolbar_layout.addWidget(refresh_btn)
         
-        # ===== TASK 9: EDIT BUTTON (Blue) =====
-        self.btn_edit = QPushButton("✏️ Edit")
-        self.btn_edit.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-        self.btn_edit.setMinimumHeight(35)
-        self.btn_edit.setMinimumWidth(100)
-        self.btn_edit.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLOR_NAVY};
-                color: {COLOR_WHITE};
-                border: none;
-                border-radius: 5px;
-                padding: 8px 15px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: {COLOR_NAVY_DARK};
-            }}
-            QPushButton:pressed {{
-                background-color: {COLOR_NAVY_DARK};
-            }}
-        """)
-        layout.addWidget(self.btn_edit)
-        logger.debug(f"✅ Edit button created (navy, {COLOR_NAVY})")
-        
-        # ===== TASK 9: HAPUS BUTTON (Red) =====
-        self.btn_hapus = QPushButton("🗑️ Hapus")
-        self.btn_hapus.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-        self.btn_hapus.setMinimumHeight(35)
-        self.btn_hapus.setMinimumWidth(100)
-        self.btn_hapus.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLOR_ERROR};
-                color: {COLOR_WHITE};
-                border: none;
-                border-radius: 5px;
-                padding: 8px 15px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: {COLOR_ERROR_DARK};
-            }}
-            QPushButton:pressed {{
-                background-color: {COLOR_ERROR_DARK};
-            }}
-        """)
-        layout.addWidget(self.btn_hapus)
-        logger.debug(f"✅ Hapus button created (error red, {COLOR_ERROR})")
-        
-        # ===== TASK 10: REFRESH BUTTON (Gray) =====
-        self.btn_refresh = QPushButton("🔄 Refresh")
-        self.btn_refresh.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-        self.btn_refresh.setMinimumHeight(35)
-        self.btn_refresh.setMinimumWidth(100)
-        self.btn_refresh.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLOR_GRAY_500};
-                color: {COLOR_WHITE};
-                border: none;
-                border-radius: 5px;
-                padding: 8px 15px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: {COLOR_GRAY_600};
-            }}
-            QPushButton:pressed {{
-                background-color: {COLOR_GRAY_600};
-            }}
-        """)
-        layout.addWidget(self.btn_refresh)
-        logger.debug(f"✅ Refresh button created (gray, {COLOR_GRAY_500})")
-        
-        # ===== TASK 10: EXPORT CSV BUTTON (Orange) =====
-        self.btn_export_csv = QPushButton("📊 Export CSV")
-        self.btn_export_csv.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-        self.btn_export_csv.setMinimumHeight(35)
-        self.btn_export_csv.setMinimumWidth(120)
-        self.btn_export_csv.setStyleSheet(f"""
+        # Export CSV button
+        export_btn = QPushButton("⬇ Export CSV")
+        export_btn.setMinimumHeight(40)
+        export_btn.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        export_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLOR_ORANGE};
-                color: {COLOR_WHITE};
                 border: none;
-                border-radius: 5px;
-                padding: 8px 15px;
+                border-radius: {BORDER_RADIUS_MD};
+                color: white;
+                padding: 8px 16px;
                 font-weight: bold;
             }}
             QPushButton:hover {{
                 background-color: {COLOR_ORANGE_DARK};
             }}
             QPushButton:pressed {{
-                background-color: {COLOR_ORANGE_DARK};
+                background-color: {COLOR_ORANGE_LIGHT};
+                color: {COLOR_NAVY};
             }}
         """)
-        layout.addWidget(self.btn_export_csv)
-        logger.debug(f"✅ Export CSV button created (orange, {COLOR_ORANGE})")
+        export_btn.clicked.connect(self.export_to_csv)
+        toolbar_layout.addWidget(export_btn)
         
-        # ===== SPACER =====
-        layout.addStretch()
+        main_layout.addLayout(toolbar_layout)
+        main_layout.addSpacing(16)
         
-        return layout
+        # ===== TABLE SECTION =====
+        self.table = QTableWidget()
+        self.table.setColumnCount(7)
+        self.table.setHorizontalHeaderLabels([
+            "NO", "NAMA BEASISWA", "PENYELENGGARA", 
+            "JENJANG", "DEADLINE", "STATUS", "AKSI"
+        ])
+        
+        # Table styling
+        self.table.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        self.table.setStyleSheet(f"""
+            QTableWidget {{
+                background-color: {COLOR_WHITE};
+                gridline-color: {COLOR_GRAY_200};
+                border: 1px solid {COLOR_GRAY_200};
+                border-radius: {BORDER_RADIUS_MD};
+            }}
+            QTableWidget::item {{
+                padding: 12px;
+                border-bottom: 1px solid {COLOR_GRAY_100};
+            }}
+            QTableWidget::item:selected {{
+                background-color: {COLOR_GRAY_100};
+            }}
+            QHeaderView::section {{
+                background-color: {COLOR_GRAY_50};
+                padding: 12px;
+                border: none;
+                border-bottom: 1px solid {COLOR_GRAY_200};
+                font-weight: bold;
+                color: {COLOR_GRAY_700};
+                font-size: 10px;
+            }}
+        """)
+        
+        # Table configuration
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setAlternatingRowColors(False)
+        self.table.setShowGrid(True)
+        
+        # Column widths
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # NO
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # NAMA
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # PENYELENGGARA
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # JENJANG
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # DEADLINE
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # STATUS
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # AKSI
+        
+        self.table.setMinimumHeight(400)
+        main_layout.addWidget(self.table)
+        main_layout.addStretch()
     
-    def _get_selected_row_index(self) -> Optional[int]:
-        """
-        Get index of selected row in table (Helper for Task 9).
+    def _create_status_badge(self, status: str) -> QWidget:
+        """Create a styled status badge."""
+        badge_frame = QFrame()
+        badge_layout = QHBoxLayout(badge_frame)
+        badge_layout.setContentsMargins(8, 4, 8, 4)
+        badge_layout.setSpacing(0)
         
-        Returns:
-            Optional[int]: Row index if selected, None otherwise
-        """
-        if not self.tbl_beasiswa:
-            return None
+        # Determine colors based on status
+        if status == "Buka":
+            bg_color = "#d1fae5"  # Light green
+            text_color = COLOR_SUCCESS
+            border_color = COLOR_SUCCESS
+        elif status == "Segera Tutup":
+            bg_color = COLOR_WARNING_LIGHT
+            text_color = COLOR_ORANGE
+            border_color = COLOR_ORANGE
+        else:  # Tutup
+            bg_color = "#e5e7eb"
+            text_color = COLOR_GRAY_500
+            border_color = COLOR_GRAY_400
         
-        selected_rows = self.tbl_beasiswa.selectedIndexes()
-        if not selected_rows:
-            return None
+        badge_label = QLabel(status)
+        badge_label.setFont(QFont(FONT_FAMILY_PRIMARY, 9))
+        badge_label.setStyleSheet(f"""
+            color: {text_color};
+            font-weight: bold;
+            padding: 4px 8px;
+        """)
         
-        # Get the row from first selected index
-        return selected_rows[0].row()
+        badge_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {bg_color};
+                border: 1px solid {border_color};
+                border-radius: 4px;
+            }}
+        """)
+        
+        badge_layout.addWidget(badge_label)
+        return badge_frame
     
-    # =====================================================================
-    # SECTION 1.5: ALERT BANNER HELPERS (Task 3)
-    # =====================================================================
-    
-    def show_alert(self, alert_type: str, message: str, auto_close: bool = False, duration: int = 3000):
-        """
-        Tampilkan alert banner dengan pesan tertentu (Task 3).
+    def _create_action_buttons(self, row_id: int) -> QWidget:
+        """Create action buttons (View, Bookmark, Apply)."""
+        action_frame = QFrame()
+        action_layout = QHBoxLayout(action_frame)
+        action_layout.setContentsMargins(0, 0, 0, 0)
+        action_layout.setSpacing(8)
         
-        Args:
-            alert_type (str): 'info', 'success', 'warning', 'error'
-            message (str): Pesan yang akan ditampilkan
-            auto_close (bool): Apakah alert akan ditutup otomatis
-            duration (int): Durasi dalam milliseconds sebelum auto close (default: 3000ms)
-        """
-        if not self.alert_banner:
-            return
+        # View button
+        view_btn = QPushButton("👁")
+        view_btn.setMaximumSize(32, 32)
+        view_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: none;
+                font-size: 16px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_GRAY_100};
+                border-radius: 4px;
+            }}
+        """)
+        view_btn.clicked.connect(lambda: self.view_beasiswa(row_id))
+        action_layout.addWidget(view_btn)
         
-        # Update banner dengan type dan message baru
-        self.alert_banner.alert_type = alert_type
-        self.alert_banner.message = message
+        # Bookmark button
+        bookmark_btn = QPushButton("🔖")
+        bookmark_btn.setMaximumSize(32, 32)
+        bookmark_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: none;
+                font-size: 16px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_GRAY_100};
+                border-radius: 4px;
+            }}
+        """)
+        bookmark_btn.clicked.connect(lambda: self.toggle_bookmark(row_id))
+        action_layout.addWidget(bookmark_btn)
         
-        # Recreate UI dengan warna yang sesuai
-        # Clear existing layout
-        while self.alert_banner.layout().count():
-            item = self.alert_banner.layout().takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        # Apply button
+        apply_btn = QPushButton("✓")
+        apply_btn.setMaximumSize(32, 32)
+        apply_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: none;
+                font-size: 18px;
+                color: {COLOR_SUCCESS};
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_SUCCESS_LIGHT};
+                border-radius: 4px;
+            }}
+        """)
+        apply_btn.clicked.connect(lambda: self.apply_beasiswa(row_id))
+        action_layout.addWidget(apply_btn)
         
-        # Rebuild UI dengan type baru
-        self.alert_banner.init_ui()
-        
-        # Show banner
-        self.alert_banner.show_alert()
-        
-        # Auto close jika diperlukan
-        if auto_close:
-            QTimer.singleShot(duration, lambda: self._close_alert_if_visible())
-    
-    def _close_alert_if_visible(self):
-        """Helper untuk menutup alert jika masih visible"""
-        if self.alert_banner and self.alert_banner.isVisible():
-            self.alert_banner.close_alert()
-    
-    def _on_alert_closed(self):
-        """Callback ketika alert banner ditutup"""
-        logger.debug("Alert banner closed by user")
-    
-    def create_status_badge_for_beasiswa(self, status_text: str) -> StatusBadge:
-        """
-        Helper method untuk create status badge untuk beasiswa status (Task 6).
-        
-        Mapping status text ke badge status:
-        - "Buka" -> "open"
-        - "Segera Tutup" -> "closing-soon"
-        - "Tutup" -> "closed"
-        - Anything else -> auto-map
-        
-        Args:
-            status_text (str): Status text dari beasiswa data
-        
-        Returns:
-            StatusBadge: Widget dengan status badge styling
-        """
-        # Map status text ke badge status key
-        status_map = {
-            "Buka": "open",
-            "Segera Tutup": "closing-soon",
-            "Tutup": "closed",
-        }
-        
-        badge_status = status_map.get(status_text, status_text.lower())
-        
-        # Create dan return badge
-        badge = StatusBadge(status=badge_status, text=status_text, show_emoji=True)
-        logger.debug(f"✅ Status badge created untuk: {status_text} → {badge_status}")
-        
-        return badge
-    
-    # =====================================================================
-    # SECTION 2: DATA LOADING (Tasks 11-13)
-    # =====================================================================
+        action_layout.addStretch()
+        return action_frame
     
     def load_beasiswa_data(self):
-        """
-        Load beasiswa data dari database (Task 11).
-        Called saat tab dibuka atau refresh button diklik.
-        
-        Retrieves:
-        - List of beasiswa from database using get_beasiswa_list()
-        - Total count of records
-        - Last scraping timestamp from first record
-        
-        Returns:
-            bool: True if successful, False otherwise
-        """
+        """Load beasiswa data dari database."""
         try:
-            self.beasiswa_list, total_count = get_beasiswa_list()
-            logger.info(f"✅ Loaded {len(self.beasiswa_list)} beasiswa from database (Total: {total_count})")
+            conn = get_connection()
+            cursor = conn.cursor()
             
-            # Update last scrape time from first record
-            if self.beasiswa_list and 'scrape_date' in self.beasiswa_list[0]:
-                self.last_scrape_time = self.beasiswa_list[0]['scrape_date']
-                logger.debug(f"Last scrape time: {self.last_scrape_time}")
-            else:
-                self.last_scrape_time = None
+            # Query semua beasiswa dari database dengan join penyelenggara
+            cursor.execute("""
+                SELECT b.id, b.judul, p.nama, b.jenjang, b.deadline, b.status 
+                FROM beasiswa b
+                LEFT JOIN penyelenggara p ON b.penyelenggara_id = p.id
+                ORDER BY b.deadline ASC
+            """)
             
-            return True
-        except Exception as e:
-            logger.error(f"❌ Error loading beasiswa data: {e}")
-            self.beasiswa_list = []
-            self.last_scrape_time = None
-            return False
-    
-    def populate_table(self):
-        """
-        Populate QTableWidget dengan data dari beasiswa_list (Task 12).
-        Fills rows dengan beasiswa data dan apply formatting.
-        """
-        if not self.tbl_beasiswa:
-            logger.warning("❌ Table widget not initialized")
-            return
-        
-        self._clear_table()
-        
-        if not self.beasiswa_list:
-            self.update_row_count(0)
-            logger.info("No beasiswa data to populate")
-            return
-        
-        for row_num, beasiswa in enumerate(self.beasiswa_list, 1):
-            # Insert new row at end of table
-            row_position = self.tbl_beasiswa.rowCount()
-            self.tbl_beasiswa.insertRow(row_position)
-            
-            # Column 0: No (Row number)
-            no_item = QTableWidgetItem(str(row_num))
-            no_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.tbl_beasiswa.setItem(row_position, 0, no_item)
-            
-            # Column 1: Nama (judul beasiswa)
-            nama_item = QTableWidgetItem(beasiswa.get('judul', ''))
-            self.tbl_beasiswa.setItem(row_position, 1, nama_item)
-            
-            # Column 2: Penyelenggara (dari penyelenggara_name atau penyelenggara_id)
-            penyelenggara = beasiswa.get('penyelenggara_name', str(beasiswa.get('penyelenggara_id', '')))
-            penyelenggara_item = QTableWidgetItem(penyelenggara)
-            self.tbl_beasiswa.setItem(row_position, 2, penyelenggara_item)
-            
-            # Column 3: Jenjang
-            jenjang_item = QTableWidgetItem(beasiswa.get('jenjang', ''))
-            jenjang_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.tbl_beasiswa.setItem(row_position, 3, jenjang_item)
-            
-            # Column 4: Deadline
-            deadline_str = beasiswa.get('deadline', '')
-            deadline_item = QTableWidgetItem(deadline_str)
-            deadline_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.tbl_beasiswa.setItem(row_position, 4, deadline_item)
-            
-            # Column 5: Status
-            status = beasiswa.get('status', '')
-            status_item = QTableWidgetItem(status)
-            status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.tbl_beasiswa.setItem(row_position, 5, status_item)
-        
-        # Update row count label
-        self.update_row_count(len(self.beasiswa_list))
-        
-        # Apply deadline highlighting to all rows (Task 25)
-        self.apply_row_formatting()
-        
-        logger.info(f"✅ Table populated with {len(self.beasiswa_list)} rows")
-    
-    def update_row_count(self, count: int):
-        """
-        Update row count label (Task 13).
-        
-        Args:
-            count: Number of rows displayed
-        """
-        if not self.lbl_row_count:
-            logger.warning("❌ Row count label not initialized")
-            return
-        
-        # Format: "Total: X Beasiswa" (pluralize)
-        beasiswa_text = "Beasiswa" if count == 1 else "Beasiswa"
-        total_text = f"Total: {count} {beasiswa_text}"
-        
-        self.lbl_row_count.setText(total_text)
-        logger.debug(f"Row count updated: {total_text}")
-    
-    # =====================================================================
-    # SECTION 3: FILTERING & SEARCH (Tasks 14-16)
-    # =====================================================================
-    
-    def apply_filters(self):
-        """
-        Apply filters (jenjang, status, search) to beasiswa list (Task 14).
-        Combines all active filters and updates table display.
-        
-        Process:
-        1. Get filter values from dropdowns and search entry
-        2. Call get_beasiswa_list() with filter parameters for server-side filtering
-        3. Update filtered_list with results
-        4. Refresh table display with filtered data
-        5. Update row count label
-        """
-        try:
-            # Get filter values
-            filter_jenjang = self._get_filter_jenjang()
-            filter_status = self._get_filter_status()
-            search_text = self._get_search_text()
-            
-            logger.debug(f"Applying filters - Jenjang: {filter_jenjang}, Status: {filter_status}, Search: {search_text}")
-            
-            # Call get_beasiswa_list with filter parameters for server-side filtering
-            self.filtered_list, total_filtered = get_beasiswa_list(
-                filter_jenjang=filter_jenjang,
-                filter_status=filter_status,
-                search_judul=search_text if search_text else None
-            )
-            
-            logger.info(f"✅ Filters applied: {len(self.filtered_list)} beasiswa matched")
-            
-            # Clear and repopulate table with filtered data
-            self._clear_table()
-            
-            if not self.filtered_list:
-                self.update_row_count(0)
-                logger.info("No beasiswa matches applied filters")
-                return
-            
-            # Populate table with filtered data
-            for row_num, beasiswa in enumerate(self.filtered_list, 1):
-                row_position = self.tbl_beasiswa.rowCount()
-                self.tbl_beasiswa.insertRow(row_position)
-                
-                # Column 0: No
-                no_item = QTableWidgetItem(str(row_num))
-                no_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.tbl_beasiswa.setItem(row_position, 0, no_item)
-                
-                # Column 1: Nama (judul)
-                nama_item = QTableWidgetItem(beasiswa.get('judul', ''))
-                self.tbl_beasiswa.setItem(row_position, 1, nama_item)
-                
-                # Column 2: Penyelenggara
-                penyelenggara = beasiswa.get('penyelenggara_name', str(beasiswa.get('penyelenggara_id', '')))
-                penyelenggara_item = QTableWidgetItem(penyelenggara)
-                self.tbl_beasiswa.setItem(row_position, 2, penyelenggara_item)
-                
-                # Column 3: Jenjang
-                jenjang_item = QTableWidgetItem(beasiswa.get('jenjang', ''))
-                jenjang_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.tbl_beasiswa.setItem(row_position, 3, jenjang_item)
-                
-                # Column 4: Deadline
-                deadline_str = beasiswa.get('deadline', '')
-                deadline_item = QTableWidgetItem(deadline_str)
-                deadline_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.tbl_beasiswa.setItem(row_position, 4, deadline_item)
-                
-                # Column 5: Status
-                status = beasiswa.get('status', '')
-                status_item = QTableWidgetItem(status)
-                status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.tbl_beasiswa.setItem(row_position, 5, status_item)
-            
-            # Update row count with filtered result count
-            self.update_row_count(len(self.filtered_list))
-            
-            # Apply deadline highlighting to all rows (Task 25)
-            self.apply_row_formatting()
-            
-        except Exception as e:
-            logger.error(f"❌ Error applying filters: {e}")
-            self._clear_table()
-            self.update_row_count(0)
-    
-    def _on_search_key_release(self, event):
-        """
-        Handle search entry KeyRelease event (Helper for Task 7).
-        Triggered when user types in search box.
-        
-        Args:
-            event: QKeyEvent object
-        """
-        # Call parent's keyReleaseEvent first
-        super(QLineEdit, self.entry_search).keyReleaseEvent(event)
-        
-        # Trigger apply_filters() on key release
-        self.apply_filters()
-        logger.debug(f"Search key released: '{self._get_search_text()}'")
-    
-    def _get_filter_jenjang(self) -> Optional[str]:
-        """
-        Get selected jenjang filter value (Helper method for Task 5).
-        
-        Returns:
-            Optional[str]: Selected value ("D3", "D4", "S1", "S2") or None if "Semua" is selected
-        """
-        if not self.combo_jenjang:
-            return None
-        
-        selected = self.combo_jenjang.currentText()
-        
-        # Return None if "Semua" is selected (means no filter)
-        if selected == "Semua":
-            return None
-        
-        return selected
-    
-    def _get_filter_status(self) -> Optional[str]:
-        """
-        Get selected status filter value (Helper method for Task 6).
-        
-        Returns:
-            Optional[str]: Selected value ("Buka", "Segera Tutup", "Tutup") or None if "Semua" is selected
-        """
-        if not self.combo_status:
-            return None
-        
-        selected = self.combo_status.currentText()
-        
-        # Return None if "Semua" is selected (means no filter)
-        if selected == "Semua":
-            return None
-        
-        return selected
-    
-    def _get_search_text(self) -> str:
-        """
-        Get search entry text (Helper method for Task 7).
-        
-        Returns:
-            str: Text from search entry (empty string if no text)
-        """
-        if not self.entry_search:
-            return ""
-        
-        search_text = self.entry_search.text().strip()
-        return search_text
-    
-    def on_refresh_clicked(self):
-        """
-        Handle Refresh button click (Task 16).
-        Reload data from database and refresh table.
-        
-        Steps:
-        1. Load fresh data from database
-        2. Update timestamp label
-        3. Apply current filters
-        4. Show success message
-        """
-        logger.info("Refresh button clicked - reloading data from database")
-        self.refresh_after_crud()
-        QMessageBox.information(self, "Sukses", "✅ Data beasiswa berhasil di-refresh!")
-        logger.info("✅ Data refresh completed successfully")
-    
-    # =====================================================================
-    # SECTION 4: CRUD OPERATIONS (Tasks 17-24)
-    # =====================================================================
-    
-    def on_tambah_clicked(self):
-        """
-        Handle Tambah button click (Task 20) -> open AddBeasiswaDialog.
-        
-        Called when user clicks Tambah button.
-        Opens dialog to add new beasiswa and saves if confirmed.
-        """
-        logger.info("Tambah button clicked - opening AddBeasiswaDialog")
-        
-        try:
-            # Create and show AddBeasiswaDialog
-            dialog = AddBeasiswaDialog(parent=self)
-            
-            if dialog.exec() == QDialog.DialogCode.Accepted:
-                # User clicked OK button
-                logger.info("AddBeasiswaDialog accepted - saving new beasiswa")
-                
-                try:
-                    # Get form data from dialog
-                    form_data = dialog.get_form_data()
-                    
-                    # Call add_beasiswa() from CRUD
-                    result = add_beasiswa(
-                        judul=form_data['judul'],
-                        jenjang=form_data['jenjang'],
-                        deadline=form_data['deadline'],
-                        penyelenggara_id=form_data['penyelenggara_id'],
-                        deskripsi=form_data['deskripsi'],
-                        benefit=form_data['benefit'],
-                        persyaratan=form_data['persyaratan'],
-                        minimal_ipk=form_data['minimal_ipk'],
-                        coverage=form_data['coverage'],
-                        status=form_data['status'],
-                        link_aplikasi=form_data['link_aplikasi']
-                    )
-                    
-                    logger.info(f"✅ Beasiswa berhasil ditambahkan: {form_data['judul']}")
-                    
-                    # Show success alert (Task 3)
-                    self.show_alert(
-                        alert_type='success',
-                        message=f"✅ Beasiswa '{form_data['judul']}' berhasil ditambahkan!",
-                        auto_close=True,
-                        duration=4000
-                    )
-                    
-                    # Refresh table with new data
-                    self.refresh_after_crud()
-                    
-                except ValueError as ve:
-                    # Validation error from get_form_data()
-                    logger.error(f"❌ Form validation error: {ve}")
-                    self.show_alert(
-                        alert_type='warning',
-                        message=f"⚠️ Input tidak valid: {str(ve)}",
-                        auto_close=True,
-                        duration=5000
-                    )
-                    
-                except Exception as e:
-                    # Database or other error
-                    logger.error(f"❌ Error adding beasiswa: {e}")
-                    self.show_alert(
-                        alert_type='error',
-                        message=f"❌ Gagal menambahkan beasiswa: {str(e)}",
-                        auto_close=True,
-                        duration=5000
-                    )
-            else:
-                # User clicked Cancel
-                logger.info("AddBeasiswaDialog cancelled")
-                
-        except Exception as e:
-            logger.error(f"❌ Error opening AddBeasiswaDialog: {e}")
-            QMessageBox.critical(self, "❌ Error", f"Gagal membuka dialog tambah:\n{str(e)}")
-    
-    def on_edit_clicked(self):
-        """
-        Handle Edit button click (Task 21) -> get selected row and open EditBeasiswaDialog.
-        
-        Called when user clicks Edit button.
-        Validates row selection, retrieves data, opens edit dialog.
-        """
-        logger.info("Edit button clicked - validating row selection")
-        
-        # Check if a row is selected
-        selected_rows = self.tbl_beasiswa.selectedIndexes()
-        if not selected_rows:
-            logger.warning("No row selected for edit")
-            QMessageBox.warning(self, "⚠️ Peringatan", "Silakan pilih beasiswa yang ingin diedit!")
-            return
-        
-        try:
-            # Get selected row index
-            row_index = selected_rows[0].row()
-            
-            # Get beasiswa data from filtered list
-            if row_index >= len(self.filtered_list):
-                logger.error(f"Row index {row_index} out of range")
-                QMessageBox.critical(self, "❌ Error", "Data beasiswa tidak ditemukan!")
-                return
-            
-            beasiswa_data = self.filtered_list[row_index]
-            logger.info(f"Selected beasiswa for edit: {beasiswa_data.get('judul')}")
-            
-            # Open EditBeasiswaDialog with selected data (Task 22)
-            self.on_edit(beasiswa_data)
-            
-        except Exception as e:
-            logger.error(f"❌ Error getting selected row: {e}")
-            QMessageBox.critical(self, "❌ Error", f"Gagal memilih baris untuk diedit:\n{str(e)}")
-    
-    def on_edit(self, beasiswa_data: Dict):
-        """
-        Open EditBeasiswaDialog and handle edit confirmation (Task 22).
-        
-        Args:
-            beasiswa_data: Dictionary with beasiswa details to edit
-        """
-        logger.info(f"Opening EditBeasiswaDialog for: {beasiswa_data.get('judul')}")
-        
-        try:
-            # Create and show EditBeasiswaDialog with current data
-            dialog = EditBeasiswaDialog(beasiswa_data=beasiswa_data, parent=self)
-            
-            if dialog.exec() == QDialog.DialogCode.Accepted:
-                # User clicked OK button
-                logger.info("EditBeasiswaDialog accepted - updating beasiswa")
-                
-                try:
-                    # Get updated form data from dialog
-                    updated_data = dialog.get_form_data()
-                    
-                    # Get beasiswa ID from original data
-                    beasiswa_id = beasiswa_data.get('id')
-                    if not beasiswa_id:
-                        raise ValueError("Beasiswa ID tidak ditemukan")
-                    
-                    # Call edit_beasiswa() from CRUD
-                    result = edit_beasiswa(
-                        beasiswa_id=beasiswa_id,
-                        judul=updated_data['judul'],
-                        jenjang=updated_data['jenjang'],
-                        deadline=updated_data['deadline'],
-                        penyelenggara_id=updated_data['penyelenggara_id'],
-                        deskripsi=updated_data['deskripsi'],
-                        benefit=updated_data['benefit'],
-                        persyaratan=updated_data['persyaratan'],
-                        minimal_ipk=updated_data['minimal_ipk'],
-                        coverage=updated_data['coverage'],
-                        status=updated_data['status'],
-                        link_aplikasi=updated_data['link_aplikasi']
-                    )
-                    
-                    logger.info(f"✅ Beasiswa berhasil diperbarui: {updated_data['judul']}")
-                    
-                    # Show success message
-                    QMessageBox.information(
-                        self, 
-                        "Sukses", 
-                        f"✅ Beasiswa '{updated_data['judul']}' berhasil diperbarui!"
-                    )
-                    
-                    # Refresh table with updated data
-                    self.refresh_after_crud()
-                    
-                except ValueError as ve:
-                    # Validation error from get_form_data()
-                    logger.error(f"❌ Form validation error: {ve}")
-                    QMessageBox.warning(self, "⚠️ Error", f"Input tidak valid:\n{str(ve)}")
-                    
-                except Exception as e:
-                    # Database or other error
-                    logger.error(f"❌ Error updating beasiswa: {e}")
-                    QMessageBox.critical(self, "❌ Error", f"Gagal memperbarui beasiswa:\n{str(e)}")
-            else:
-                # User clicked Cancel
-                logger.info("EditBeasiswaDialog cancelled")
-                
-        except Exception as e:
-            logger.error(f"❌ Error opening EditBeasiswaDialog: {e}")
-            QMessageBox.critical(self, "❌ Error", f"Gagal membuka dialog edit:\n{str(e)}")
-    
-    def on_hapus_clicked(self):
-        """
-        Handle Hapus button click (Task 23) -> get selected row and open DeleteConfirmationDialog.
-        
-        Called when user clicks Hapus button.
-        Validates row selection, shows confirmation dialog, deletes if confirmed.
-        """
-        logger.info("Hapus button clicked - validating row selection")
-        
-        # Check if a row is selected
-        selected_rows = self.tbl_beasiswa.selectedIndexes()
-        if not selected_rows:
-            logger.warning("No row selected for delete")
-            QMessageBox.warning(self, "⚠️ Peringatan", "Silakan pilih beasiswa yang ingin dihapus!")
-            return
-        
-        try:
-            # Get selected row index
-            row_index = selected_rows[0].row()
-            
-            # Get beasiswa data from filtered list
-            if row_index >= len(self.filtered_list):
-                logger.error(f"Row index {row_index} out of range")
-                QMessageBox.critical(self, "❌ Error", "Data beasiswa tidak ditemukan!")
-                return
-            
-            beasiswa_data = self.filtered_list[row_index]
-            judul = beasiswa_data.get('judul', 'N/A')
-            logger.info(f"Selected beasiswa for delete: {judul}")
-            
-            # Open DeleteConfirmationDialog
-            dialog = DeleteConfirmationDialog(beasiswa_judul=judul, parent=self)
-            
-            if dialog.exec() == QDialog.DialogCode.Accepted:
-                # User confirmed deletion
-                logger.info("DeleteConfirmationDialog accepted - deleting beasiswa")
-                beasiswa_id = beasiswa_data.get('id')
-                if beasiswa_id:
-                    self.on_delete(beasiswa_id)
-                else:
-                    logger.error("Beasiswa ID not found in data")
-                    QMessageBox.critical(self, "❌ Error", "ID beasiswa tidak ditemukan!")
-            else:
-                # User cancelled deletion
-                logger.info("DeleteConfirmationDialog cancelled")
-                
-        except Exception as e:
-            logger.error(f"❌ Error on delete dialog: {e}")
-            QMessageBox.critical(self, "❌ Error", f"Gagal membuka dialog hapus:\n{str(e)}")
-    
-    def on_delete(self, beasiswa_id: int):
-        """
-        Delete beasiswa from database (Task 24).
-        
-        Args:
-            beasiswa_id: ID beasiswa yang akan didelete
-        """
-        logger.info(f"Deleting beasiswa with ID: {beasiswa_id}")
-        
-        try:
-            # Call delete_beasiswa() from CRUD
-            result = delete_beasiswa(beasiswa_id=beasiswa_id)
-            
-            logger.info(f"✅ Beasiswa berhasil dihapus (ID: {beasiswa_id})")
-            
-            # Show success alert (Task 3)
-            self.show_alert(
-                alert_type='success',
-                message='✅ Beasiswa berhasil dihapus!',
-                auto_close=True,
-                duration=4000
-            )
-            
-            # Refresh table with updated data
-            self.refresh_after_crud()
-            
-        except Exception as e:
-            logger.error(f"❌ Error deleting beasiswa: {e}")
-            self.show_alert(
-                alert_type='error',
-                message=f"❌ Gagal menghapus beasiswa: {str(e)}",
-                auto_close=True,
-                duration=5000
-            )
-    
-    def refresh_after_crud(self):
-        """
-        Refresh table after add/edit/delete operation.
-        Helper method untuk Tasks 20-24.
-        
-        Steps:
-        1. Reload data from database
-        2. Update timestamp label
-        3. Apply current filters
-        """
-        self.load_beasiswa_data()
-        self.update_timestamp_label()
-        self.apply_filters()
-    
-    # =====================================================================
-    # SECTION 5: FORMATTING & DISPLAY (Tasks 25-28)
-    # =====================================================================
-    
-    def highlight_deadline(self, deadline_str: str) -> Tuple[QColor, str]:
-        """
-        Determine deadline status and return matching color enum and status text (Task 25).
-        
-        Color logic:
-        - Red (#FF6B6B): overdue atau ≤ 3 hari
-        - Orange (#FFA500): 4-7 hari
-        - Green (#4CAF50): > 7 hari
-        """
-        try:
-            deadline = datetime.strptime(deadline_str, '%Y-%m-%d').date()
-            today = datetime.now().date()
-            days_remaining = (deadline - today).days
-            
-            if days_remaining < 0:
-                return QColor(COLOR_DEADLINE_CRITICAL), "LEWAT"  # Red - overdue
-            elif days_remaining <= 3:
-                return QColor(COLOR_DEADLINE_CRITICAL), f"{days_remaining}h"  # Red - urgent
-            elif days_remaining <= 7:
-                return QColor(COLOR_DEADLINE_WARNING), f"{days_remaining}h"  # Yellow - soon
-            else:
-                return QColor(COLOR_DEADLINE_SAFE), f"{days_remaining}h"  # Green - plenty of time
-        except ValueError:
-            return QColor(COLOR_WHITE), "?"
-    
-    def apply_row_formatting(self):
-        """
-        Apply deadline highlight to all table rows (Task 5 + Task 26).
-        Modern styling dengan subtle left border accent via background colors.
-        
-        Styling strategy (Task 5 - Modern left border design):
-        - Instead of full row background, use subtle color blend
-        - Deadline text color: Red/Orange/Green (strong)
-        - Row background: Light red/orange/white (subtle)
-        - Gives left-border accent effect through visual hierarchy
-        
-        Colors:
-        - Red (≤3 hari deadline): ERROR_LIGHT background
-        - Orange (≤7 hari deadline): WARNING_LIGHT background  
-        - Green (>7 hari deadline): WHITE background
-        """
-        if not self.tbl_beasiswa:
-            logger.warning("Table widget not initialized for formatting")
-            return
-        
-        try:
-            # Iterate setiap row untuk apply deadline-based styling
-            for row in range(self.tbl_beasiswa.rowCount()):
-                # Get deadline dari column 4
-                deadline_item = self.tbl_beasiswa.item(row, 4)
-                
-                if deadline_item:
-                    # Parse deadline dan get color
-                    deadline_str = deadline_item.text()
-                    color, status_text = self.highlight_deadline(deadline_str)
-                    
-                    # Apply color text to deadline cell dengan bold
-                    deadline_item.setForeground(QBrush(color))
-                    deadline_item.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-                    
-                    # Apply subtle background styling to all cells in row (Task 5 - Left border effect)
-                    for col in range(self.tbl_beasiswa.columnCount()):
-                        cell_item = self.tbl_beasiswa.item(row, col)
-                        if cell_item:
-                            cell_item.setFont(QFont("Arial", 10))
-                            
-                            # Set subtle background untuk indicate deadline urgency
-                            if color == QColor(COLOR_DEADLINE_CRITICAL):  # Red - urgent/overdue
-                                # Light red background untuk visual urgency
-                                cell_item.setBackground(QBrush(QColor(COLOR_ERROR_LIGHT)))
-                                
-                            elif color == QColor(COLOR_DEADLINE_WARNING):  # Orange - soon
-                                # Light orange background untuk visual warning
-                                cell_item.setBackground(QBrush(QColor(COLOR_WARNING_LIGHT)))
-                                
-                            else:  # Green - plenty of time
-                                # Keep white/default background untuk success state
-                                cell_item.setBackground(QBrush(QColor(COLOR_WHITE)))
-            
-            logger.info(f"✅ Row formatting applied to {self.tbl_beasiswa.rowCount()} rows (modern accent styling)")
-            
-        except Exception as e:
-            logger.error(f"❌ Error applying row formatting: {e}")
-        """
-        Determine deadline color based on days remaining (Task 25).
-        
-        Args:
-            deadline_str: Date string (YYYY-MM-DD format)
-            
-        Returns:
-            Tuple[QColor, str]: (color, status_text)
-                - Red: ≤ 3 hari
-                - Yellow: ≤ 7 hari
-                - Green: > 7 hari
-        """
-        try:
-            deadline = datetime.strptime(deadline_str, '%Y-%m-%d').date()
-            today = datetime.now().date()
-            days_remaining = (deadline - today).days
-            
-            if days_remaining < 0:
-                return QColor(COLOR_DEADLINE_CRITICAL), "LEWAT"  # Red - overdue
-            elif days_remaining <= 3:
-                return QColor(COLOR_DEADLINE_CRITICAL), f"{days_remaining}h"  # Red - urgent
-            elif days_remaining <= 7:
-                return QColor(COLOR_DEADLINE_WARNING), f"{days_remaining}h"  # Yellow - soon
-            else:
-                return QColor(COLOR_DEADLINE_SAFE), f"{days_remaining}h"  # Green - plenty of time
-        except ValueError:
-            return QColor(COLOR_WHITE), "?"
-    
-    def apply_row_formatting(self):
-        """
-        Apply deadline highlight to all table rows (Task 26).
-        Called setelah table di-populate dengan data.
-        Apply colors: Red (≤3 hari), Yellow (≤7 hari), Green (>7 hari)
-        """
-        if not self.tbl_beasiswa:
-            logger.warning("Table widget not initialized for formatting")
-            return
-        
-        try:
-            # Iterate through all rows
-            for row in range(self.tbl_beasiswa.rowCount()):
-                # Get deadline from column 4
-                deadline_item = self.tbl_beasiswa.item(row, 4)
-                if not deadline_item:
-                    continue
-                
-                deadline_str = deadline_item.text()
-                
-                # Get color and status text based on deadline
-                color, status_text = self.highlight_deadline(deadline_str)
-                
-                # Apply color to deadline cell (column 4)
-                deadline_item.setForeground(QBrush(color))
-                deadline_item.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-                
-                # Also apply color to entire row for visibility
-                for col in range(self.tbl_beasiswa.columnCount()):
-                    cell_item = self.tbl_beasiswa.item(row, col)
-                    if cell_item:
-                        if color == QColor(COLOR_DEADLINE_CRITICAL):  # Red - urgent/overdue
-                            cell_item.setBackground(QBrush(QColor(COLOR_ERROR_LIGHT)))  # Light red background
-                        elif color == QColor(COLOR_DEADLINE_WARNING):  # Yellow - soon
-                            cell_item.setBackground(QBrush(QColor(COLOR_WARNING_LIGHT)))  # Light yellow background
-                        # Green doesn't need special background, keep default
-            
-            logger.info(f"✅ Row formatting applied to {self.tbl_beasiswa.rowCount()} rows")
-            
-        except Exception as e:
-            logger.error(f"❌ Error applying row formatting: {e}")
-    
-    def on_table_double_click(self, row: int, column: int):
-        """
-        Handle table double-click to show detail popup (Task 28).
-        
-        Args:
-            row: Row index clicked
-            column: Column index clicked
-        """
-        logger.info(f"Table double-clicked at row {row}, column {column}")
-        
-        try:
-            # Get beasiswa data from filtered list
-            if row >= len(self.filtered_list):
-                logger.error(f"Row index {row} out of range")
-                return
-            
-            beasiswa_data = self.filtered_list[row]
-            logger.info(f"Opening detail dialog for: {beasiswa_data.get('judul')}")
-            
-            # Show detail dialog (Task 27)
-            self.show_detail_dialog(beasiswa_data)
-            
-        except Exception as e:
-            logger.error(f"❌ Error handling table double-click: {e}")
-    
-    def show_detail_dialog(self, beasiswa_data: Dict):
-        """
-        Show detail popup dialog with all beasiswa information (Task 27).
-        
-        Args:
-            beasiswa_data: Dictionary with beasiswa details
-        """
-        logger.info(f"Opening detail dialog for: {beasiswa_data.get('judul')}")
-        
-        try:
-            dialog = BeasiswaDetailDialog(beasiswa_data=beasiswa_data, parent=self)
-            dialog.exec()
-            
-        except Exception as e:
-            logger.error(f"❌ Error showing detail dialog: {e}")
-            QMessageBox.critical(self, "❌ Error", f"Gagal membuka detail beasiswa:\n{str(e)}")
-    
-    # =====================================================================
-    # SECTION 6: EXPORT (Tasks 29-30)
-    # =====================================================================
-    
-    def on_export_csv_clicked(self):
-        """
-        Handle Export CSV button click (Task 30).
-        Open file dialog and export filtered data to CSV file.
-        
-        Steps:
-        1. Open file save dialog
-        2. Get filename from user
-        3. Export current table data to CSV
-        4. Show success/error message
-        """
-        logger.info("Export CSV button clicked - opening file save dialog")
-        
-        try:
-            # Open file save dialog
-            file_path, _ = QFileDialog.getSaveFileName(
-                self,
-                "Simpan Data Beasiswa sebagai CSV",
-                "",
-                "CSV Files (*.csv);;All Files (*.*)"
-            )
-            
-            if not file_path:
-                logger.info("Export CSV cancelled by user")
-                return
-            
-            # Ensure file has .csv extension
-            if not file_path.endswith('.csv'):
-                file_path += '.csv'
-            
-            logger.info(f"Exporting to: {file_path}")
-            
-            # Get CSV data from export_to_csv()
-            csv_data = self.export_to_csv()
-            
-            if not csv_data:
-                logger.error("Failed to prepare CSV data")
-                QMessageBox.critical(self, "❌ Error", "Gagal menyiapkan data CSV!")
-                return
-            
-            # Write to file
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(csv_data)
-            
-            logger.info(f"✅ CSV file exported successfully: {file_path}")
-            QMessageBox.information(
-                self,
-                "Sukses",
-                f"✅ Data beasiswa berhasil diekspor ke:\n{file_path}"
-            )
-            
-        except Exception as e:
-            logger.error(f"❌ Error exporting CSV: {e}")
-            QMessageBox.critical(self, "❌ Error", f"Gagal mengekspor CSV:\n{str(e)}")
-    
-    def export_to_csv(self):
-        """
-        Export filtered beasiswa data to CSV file (Task 29).
-        
-        Exports current filtered table data to CSV format with columns:
-        No, Nama, Penyelenggara, Jenjang, Deadline, Status
-        
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        logger.info("Exporting filtered beasiswa data to CSV")
-        
-        try:
-            if not self.filtered_list:
-                logger.warning("No data to export")
-                QMessageBox.warning(self, "⚠️ Peringatan", "Tidak ada data untuk diekspor!")
-                return False
-            
-            # Prepare CSV content
-            csv_content = []
-            
-            # Header row
-            header = ["No", "Nama", "Penyelenggara", "Jenjang", "Deadline", "Status"]
-            csv_content.append(",".join(header))
-            
-            # Data rows
-            for row_num, beasiswa in enumerate(self.filtered_list, 1):
-                nama = beasiswa.get('judul', '')
-                penyelenggara = beasiswa.get('penyelenggara_name', str(beasiswa.get('penyelenggara_id', '')))
-                jenjang = beasiswa.get('jenjang', '')
-                deadline = beasiswa.get('deadline', '')
-                status = beasiswa.get('status', '')
-                
-                # Format row: escape quotes and handle commas
-                row = [
-                    str(row_num),
-                    f'"{nama}"',  # Quote name in case it has commas
-                    f'"{penyelenggara}"',
-                    jenjang,
-                    deadline,
-                    status
-                ]
-                csv_content.append(",".join(row))
-            
-            # Join all rows
-            csv_data = "\n".join(csv_content)
-            
-            logger.info(f"✅ CSV data prepared: {len(self.filtered_list)} rows")
-            return csv_data
-            
-        except Exception as e:
-            logger.error(f"❌ Error preparing CSV data: {e}")
-            return False
-    
-    def on_lihat_semua_clicked(self):
-        """
-        Handle "Lihat Semua Beasiswa" CTA button click (Task 9).
-        
-        Purpose:
-        - Show all available scholarships in current view
-        - Reset filters to show complete beasiswa list
-        - Scroll table to top to show first entry
-        
-        Implementation:
-        - Clear filter dropdowns (reset to "Semua")
-        - Clear search entry (reset text)
-        - Trigger apply_filters() to show all data
-        
-        User Experience:
-        - Encourages exploration of all scholarships
-        - Quick way to see full dataset
-        - One-click reset of all filters
-        """
-        logger.info("Lihat Semua Beasiswa button clicked - resetting filters")
-        
-        try:
-            # Reset filter dropdowns to "Semua"
-            if self.combo_jenjang:
-                self.combo_jenjang.setCurrentIndex(0)  # "Semua"
-                logger.debug("✅ Jenjang filter reset to 'Semua'")
-            
-            if self.combo_status:
-                self.combo_status.setCurrentIndex(0)  # "Semua"
-                logger.debug("✅ Status filter reset to 'Semua'")
-            
-            # Clear search entry
-            if self.entry_search:
-                self.entry_search.clear()
-                logger.debug("✅ Search entry cleared")
-            
-            # Apply filters (which will show all beasiswa since filters are reset)
-            self.apply_filters()
-            
-            # Scroll table to top
-            if self.tbl_beasiswa:
-                self.tbl_beasiswa.scrollToTop()
-                logger.debug("✅ Table scrolled to top")
-            
-            # Show success alert
-            self.show_alert("success", "✅ Menampilkan semua beasiswa yang tersedia")
-            
-            logger.info("✅ Lihat Semua Beasiswa action completed")
-            
-        except Exception as e:
-            logger.error(f"❌ Error in on_lihat_semua_clicked: {e}")
-            self.show_alert("error", f"❌ Error: {str(e)}")
-
-
-# ==================== DIALOG CLASSES ====================
-
-class AddBeasiswaDialog(QDialog):
-    """
-    Dialog untuk menambah beasiswa baru (Task 16).
-    Form fields untuk semua beasiswa properties.
-    """
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.init_ui()
-    
-    def init_ui(self):
-        """Initialize Add Beasiswa Dialog UI with form fields (Task 10: Dialog styling)"""
-        self.setWindowTitle("➕ Tambah Beasiswa Baru")
-        self.setGeometry(200, 200, 700, 850)
-        self.setModal(True)
-        
-        # Apply dialog stylesheet (Task 10)
-        self.setStyleSheet(get_dialog_stylesheet())
-        
-        layout = QVBoxLayout()
-        layout.setContentsMargins(20, 20, 20, 20)  # Task 10: Proper padding
-        layout.setSpacing(10)  # Task 10: Consistent spacing
-        
-        # ===== REQUIRED FIELDS SECTION =====
-        form_layout = QFormLayout()
-        form_layout.setRowWrapPolicy(QFormLayout.RowWrapPolicy.DontWrapRows)
-        form_layout.setSpacing(12)  # Task 10: Better spacing between fields
-        
-        # Field 1: Judul Beasiswa (required)
-        self.entry_judul = QLineEdit()
-        self.entry_judul.setPlaceholderText("e.g., Beasiswa LPDP 2026")
-        form_layout.addRow("Judul Beasiswa *:", self.entry_judul)
-        
-        # Field 2: Jenjang (required) - Dropdown
-        self.combo_jenjang = QComboBox()
-        self.combo_jenjang.addItems(["D3", "D4", "S1", "S2"])
-        form_layout.addRow("Jenjang *:", self.combo_jenjang)
-        
-        # Field 3: Deadline (required) - Date picker
-        self.entry_deadline = QLineEdit()
-        self.entry_deadline.setPlaceholderText("YYYY-MM-DD (e.g., 2026-12-31)")
-        form_layout.addRow("Deadline *:", self.entry_deadline)
-        
-        # ===== OPTIONAL FIELDS SECTION =====
-        
-        # Field 4: Penyelenggara ID (optional)
-        self.entry_penyelenggara = QLineEdit()
-        self.entry_penyelenggara.setPlaceholderText("e.g., 1 (jika ada)")
-        form_layout.addRow("Penyelenggara ID:", self.entry_penyelenggara)
-        
-        # Field 5: Status (optional) - Dropdown
-        self.combo_status = QComboBox()
-        self.combo_status.addItems(["Buka", "Segera Tutup", "Tutup"])
-        self.combo_status.setCurrentText("Buka")
-        form_layout.addRow("Status:", self.combo_status)
-        
-        # Field 6: Minimal IPK (optional)
-        self.entry_ipk = QLineEdit()
-        self.entry_ipk.setPlaceholderText("e.g., 3.0 (0.0 - 4.0)")
-        form_layout.addRow("Minimal IPK:", self.entry_ipk)
-        
-        # Field 7: Deskripsi (optional) - Multi-line
-        self.text_deskripsi = QTextEdit()
-        self.text_deskripsi.setPlaceholderText("Deskripsi beasiswa...")
-        self.text_deskripsi.setMaximumHeight(80)
-        form_layout.addRow("Deskripsi:", self.text_deskripsi)
-        
-        # Field 8: Benefit (optional) - Multi-line
-        self.text_benefit = QTextEdit()
-        self.text_benefit.setPlaceholderText("Benefit/keuntungan beasiswa...")
-        self.text_benefit.setMaximumHeight(80)
-        form_layout.addRow("Benefit:", self.text_benefit)
-        
-        # Field 9: Persyaratan (optional) - Multi-line
-        self.text_persyaratan = QTextEdit()
-        self.text_persyaratan.setPlaceholderText("Persyaratan dan ketentuan...")
-        self.text_persyaratan.setMaximumHeight(80)
-        form_layout.addRow("Persyaratan:", self.text_persyaratan)
-        
-        # Field 10: Coverage (optional)
-        self.entry_coverage = QLineEdit()
-        self.entry_coverage.setPlaceholderText("e.g., Fully, Partially, Partial Tuition")
-        form_layout.addRow("Coverage:", self.entry_coverage)
-        
-        # Field 11: Link Aplikasi (optional)
-        self.entry_link = QLineEdit()
-        self.entry_link.setPlaceholderText("https://...")
-        form_layout.addRow("Link Aplikasi:", self.entry_link)
-        
-        layout.addLayout(form_layout)
-        
-        # ===== BUTTON SECTION =====
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        
-        btn_ok = QPushButton("✅ Tambah")
-        btn_ok.setStyleSheet(get_button_solid_stylesheet("navy"))
-        btn_ok.clicked.connect(self.accept)
-        button_layout.addWidget(btn_ok)
-        
-        btn_cancel = QPushButton("❌ Batal")
-        btn_cancel.setStyleSheet(get_button_solid_stylesheet("error"))
-        btn_cancel.clicked.connect(self.reject)
-        button_layout.addWidget(btn_cancel)
-        
-        layout.addLayout(button_layout)
-        
-        self.setLayout(layout)
-        logger.debug("✅ AddBeasiswaDialog UI initialized")
-    
-    def get_form_data(self) -> Dict:
-        """
-        Get form data and validate (Task 16).
-        
-        Returns:
-            Dict: Form data with keys: judul, jenjang, deadline, 
-                  penyelenggara_id, deskripsi, benefit, persyaratan,
-                  minimal_ipk, coverage, status, link_aplikasi
-        """
-        # Get required fields
-        judul = self.entry_judul.text().strip()
-        if not judul:
-            raise ValueError("Judul beasiswa tidak boleh kosong")
-        
-        jenjang = self.combo_jenjang.currentText()
-        
-        deadline = self.entry_deadline.text().strip()
-        if not deadline:
-            raise ValueError("Deadline tidak boleh kosong")
-        
-        # Validate deadline format (YYYY-MM-DD)
-        try:
-            from datetime import datetime
-            datetime.strptime(deadline, '%Y-%m-%d')
-        except ValueError:
-            raise ValueError("Format deadline harus YYYY-MM-DD (e.g., 2026-12-31)")
-        
-        # Get optional fields
-        penyelenggara_id = None
-        penyelenggara_str = self.entry_penyelenggara.text().strip()
-        if penyelenggara_str:
-            try:
-                penyelenggara_id = int(penyelenggara_str)
-            except ValueError:
-                raise ValueError("Penyelenggara ID harus berupa angka")
-        
-        deskripsi = self.text_deskripsi.toPlainText().strip()
-        benefit = self.text_benefit.toPlainText().strip()
-        persyaratan = self.text_persyaratan.toPlainText().strip()
-        coverage = self.entry_coverage.text().strip()
-        status = self.combo_status.currentText()
-        link_aplikasi = self.entry_link.text().strip()
-        
-        # Validate IPK if provided
-        minimal_ipk = None
-        ipk_str = self.entry_ipk.text().strip()
-        if ipk_str:
-            try:
-                minimal_ipk = float(ipk_str)
-                if not (0.0 <= minimal_ipk <= 4.0):
-                    raise ValueError("IPK harus antara 0.0 dan 4.0")
-            except ValueError:
-                raise ValueError("Minimal IPK harus berupa angka desimal (0.0 - 4.0)")
-        
-        return {
-            'judul': judul,
-            'jenjang': jenjang,
-            'deadline': deadline,
-            'penyelenggara_id': penyelenggara_id,
-            'deskripsi': deskripsi,
-            'benefit': benefit,
-            'persyaratan': persyaratan,
-            'minimal_ipk': minimal_ipk,
-            'coverage': coverage,
-            'status': status,
-            'link_aplikasi': link_aplikasi
-        }
-
-
-class EditBeasiswaDialog(QDialog):
-    """
-    Dialog untuk edit beasiswa existing (Task 17).
-    Form fields pre-filled dengan data existing.
-    """
-    
-    def __init__(self, beasiswa_data: Dict, parent=None):
-        super().__init__(parent)
-        self.beasiswa_data = beasiswa_data
-        self.init_ui()
-    
-    def init_ui(self):
-        """Initialize Edit Beasiswa Dialog UI with pre-filled data (Task 10: Dialog styling)"""
-        judul = self.beasiswa_data.get('judul', 'Beasiswa')
-        self.setWindowTitle(f"✏️ Edit - {judul}")
-        self.setGeometry(200, 200, 700, 850)
-        self.setModal(True)
-        
-        # Apply dialog stylesheet (Task 10)
-        self.setStyleSheet(get_dialog_stylesheet())
-        
-        layout = QVBoxLayout()
-        layout.setContentsMargins(20, 20, 20, 20)  # Task 10: Proper padding
-        layout.setSpacing(10)  # Task 10: Consistent spacing
-        
-        # ===== REQUIRED FIELDS SECTION =====
-        form_layout = QFormLayout()
-        form_layout.setRowWrapPolicy(QFormLayout.RowWrapPolicy.DontWrapRows)
-        form_layout.setSpacing(12)  # Task 10: Better spacing between fields
-        
-        # Field 1: Judul Beasiswa (required) - Pre-filled
-        self.entry_judul = QLineEdit()
-        self.entry_judul.setText(self.beasiswa_data.get('judul', ''))
-        form_layout.addRow("Judul Beasiswa *:", self.entry_judul)
-        
-        # Field 2: Jenjang (required) - Dropdown pre-filled
-        self.combo_jenjang = QComboBox()
-        self.combo_jenjang.addItems(["D3", "D4", "S1", "S2"])
-        current_jenjang = self.beasiswa_data.get('jenjang', 'S1')
-        if current_jenjang in ["D3", "D4", "S1", "S2"]:
-            self.combo_jenjang.setCurrentText(current_jenjang)
-        form_layout.addRow("Jenjang *:", self.combo_jenjang)
-        
-        # Field 3: Deadline (required) - Pre-filled
-        self.entry_deadline = QLineEdit()
-        self.entry_deadline.setText(self.beasiswa_data.get('deadline', ''))
-        self.entry_deadline.setPlaceholderText("YYYY-MM-DD (e.g., 2026-12-31)")
-        form_layout.addRow("Deadline *:", self.entry_deadline)
-        
-        # ===== OPTIONAL FIELDS SECTION =====
-        
-        # Field 4: Penyelenggara ID (optional) - Pre-filled
-        self.entry_penyelenggara = QLineEdit()
-        penyelenggara_id = self.beasiswa_data.get('penyelenggara_id')
-        if penyelenggara_id:
-            self.entry_penyelenggara.setText(str(penyelenggara_id))
-        form_layout.addRow("Penyelenggara ID:", self.entry_penyelenggara)
-        
-        # Field 5: Status (optional) - Dropdown pre-filled
-        self.combo_status = QComboBox()
-        self.combo_status.addItems(["Buka", "Segera Tutup", "Tutup"])
-        current_status = self.beasiswa_data.get('status', 'Buka')
-        if current_status in ["Buka", "Segera Tutup", "Tutup"]:
-            self.combo_status.setCurrentText(current_status)
-        form_layout.addRow("Status:", self.combo_status)
-        
-        # Field 6: Minimal IPK (optional) - Pre-filled
-        self.entry_ipk = QLineEdit()
-        minimal_ipk = self.beasiswa_data.get('minimal_ipk')
-        if minimal_ipk:
-            self.entry_ipk.setText(str(minimal_ipk))
-        form_layout.addRow("Minimal IPK:", self.entry_ipk)
-        
-        # Field 7: Deskripsi (optional) - Multi-line pre-filled
-        self.text_deskripsi = QTextEdit()
-        self.text_deskripsi.setPlainText(self.beasiswa_data.get('deskripsi', ''))
-        self.text_deskripsi.setMaximumHeight(80)
-        form_layout.addRow("Deskripsi:", self.text_deskripsi)
-        
-        # Field 8: Benefit (optional) - Multi-line pre-filled
-        self.text_benefit = QTextEdit()
-        self.text_benefit.setPlainText(self.beasiswa_data.get('benefit', ''))
-        self.text_benefit.setMaximumHeight(80)
-        form_layout.addRow("Benefit:", self.text_benefit)
-        
-        # Field 9: Persyaratan (optional) - Multi-line pre-filled
-        self.text_persyaratan = QTextEdit()
-        self.text_persyaratan.setPlainText(self.beasiswa_data.get('persyaratan', ''))
-        self.text_persyaratan.setMaximumHeight(80)
-        form_layout.addRow("Persyaratan:", self.text_persyaratan)
-        
-        # Field 10: Coverage (optional) - Pre-filled
-        self.entry_coverage = QLineEdit()
-        self.entry_coverage.setText(self.beasiswa_data.get('coverage', ''))
-        form_layout.addRow("Coverage:", self.entry_coverage)
-        
-        # Field 11: Link Aplikasi (optional) - Pre-filled
-        self.entry_link = QLineEdit()
-        self.entry_link.setText(self.beasiswa_data.get('link_aplikasi', ''))
-        form_layout.addRow("Link Aplikasi:", self.entry_link)
-        
-        layout.addLayout(form_layout)
-        
-        # ===== BUTTON SECTION =====
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        
-        btn_ok = QPushButton("✅ Simpan")
-        btn_ok.setStyleSheet(get_button_solid_stylesheet("navy"))
-        btn_ok.clicked.connect(self.accept)
-        button_layout.addWidget(btn_ok)
-        
-        btn_cancel = QPushButton("❌ Batal")
-        btn_cancel.setStyleSheet(get_button_solid_stylesheet("error"))
-        btn_cancel.clicked.connect(self.reject)
-        button_layout.addWidget(btn_cancel)
-        
-        layout.addLayout(button_layout)
-        
-        self.setLayout(layout)
-        logger.debug(f"✅ EditBeasiswaDialog UI initialized for: {judul}")
-    
-    def get_form_data(self) -> Dict:
-        """
-        Get form data and validate (Task 17).
-        
-        Returns:
-            Dict: Form data with all beasiswa fields (same as AddBeasiswaDialog)
-        """
-        # Get required fields
-        judul = self.entry_judul.text().strip()
-        if not judul:
-            raise ValueError("Judul beasiswa tidak boleh kosong")
-        
-        jenjang = self.combo_jenjang.currentText()
-        
-        deadline = self.entry_deadline.text().strip()
-        if not deadline:
-            raise ValueError("Deadline tidak boleh kosong")
-        
-        # Validate deadline format (YYYY-MM-DD)
-        try:
-            from datetime import datetime
-            datetime.strptime(deadline, '%Y-%m-%d')
-        except ValueError:
-            raise ValueError("Format deadline harus YYYY-MM-DD (e.g., 2026-12-31)")
-        
-        # Get optional fields
-        penyelenggara_id = None
-        penyelenggara_str = self.entry_penyelenggara.text().strip()
-        if penyelenggara_str:
-            try:
-                penyelenggara_id = int(penyelenggara_str)
-            except ValueError:
-                raise ValueError("Penyelenggara ID harus berupa angka")
-        
-        deskripsi = self.text_deskripsi.toPlainText().strip()
-        benefit = self.text_benefit.toPlainText().strip()
-        persyaratan = self.text_persyaratan.toPlainText().strip()
-        coverage = self.entry_coverage.text().strip()
-        status = self.combo_status.currentText()
-        link_aplikasi = self.entry_link.text().strip()
-        
-        # Validate IPK if provided
-        minimal_ipk = None
-        ipk_str = self.entry_ipk.text().strip()
-        if ipk_str:
-            try:
-                minimal_ipk = float(ipk_str)
-                if not (0.0 <= minimal_ipk <= 4.0):
-                    raise ValueError("IPK harus antara 0.0 dan 4.0")
-            except ValueError:
-                raise ValueError("Minimal IPK harus berupa angka desimal (0.0 - 4.0)")
-        
-        return {
-            'id': self.beasiswa_data.get('id'),  # Preserve original ID
-            'judul': judul,
-            'jenjang': jenjang,
-            'deadline': deadline,
-            'penyelenggara_id': penyelenggara_id,
-            'deskripsi': deskripsi,
-            'benefit': benefit,
-            'persyaratan': persyaratan,
-            'minimal_ipk': minimal_ipk,
-            'coverage': coverage,
-            'status': status,
-            'link_aplikasi': link_aplikasi
-        }
-
-
-class DeleteConfirmationDialog(QDialog):
-    """
-    Dialog untuk konfirmasi penghapusan beasiswa (Task 18).
-    Menampilkan warning dan tombol Yes/No.
-    """
-    
-    def __init__(self, beasiswa_judul: str, parent=None):
-        super().__init__(parent)
-        self.beasiswa_judul = beasiswa_judul
-        self.init_ui()
-    
-    def init_ui(self):
-        """Initialize Delete Confirmation Dialog UI (Task 10: Dialog styling)"""
-        self.setWindowTitle("⚠️ Konfirmasi Hapus")
-        self.setGeometry(300, 300, 500, 250)
-        self.setModal(True)
-        
-        # Apply dialog stylesheet (Task 10)
-        self.setStyleSheet(get_dialog_stylesheet())
-        
-        layout = QVBoxLayout()
-        layout.setContentsMargins(20, 20, 20, 20)  # Task 10: Proper padding
-        layout.setSpacing(15)
-        
-        # ===== WARNING ICON & MESSAGE =====
-        message_layout = QHBoxLayout()
-        
-        # Warning icon/emoji
-        icon_label = QLabel("⚠️")
-        icon_label.setFont(QFont("Arial", 32))
-        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        message_layout.addWidget(icon_label)
-        
-        # Warning message
-        message_text = f"""Apakah Anda yakin ingin menghapus beasiswa:
-
-"{self.beasiswa_judul}"
-
-Tindakan ini TIDAK DAPAT DIBATALKAN dan akan menghapus semua data terkait."""
-        
-        msg_label = QLabel(message_text)
-        msg_label.setFont(QFont("Arial", 10))
-        msg_label.setWordWrap(True)
-        msg_label.setStyleSheet(f"color: {COLOR_ERROR}; font-weight: bold;")
-        msg_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        message_layout.addWidget(msg_label, 1)
-        
-        layout.addLayout(message_layout)
-        layout.addSpacing(10)
-        
-        # ===== BUTTON SECTION =====
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        
-        # Yes button (Delete) - Red
-        btn_yes = QPushButton("🗑️ Ya, Hapus")
-        btn_yes.setStyleSheet(get_button_solid_stylesheet("error"))
-        btn_yes.clicked.connect(self.accept)
-        button_layout.addWidget(btn_yes)
-        
-        # No button (Cancel) - Gray
-        btn_no = QPushButton("❌ Batal")
-        btn_no.setStyleSheet(get_button_solid_stylesheet("gray"))
-        btn_no.clicked.connect(self.reject)
-        button_layout.addWidget(btn_no)
-        
-        layout.addLayout(button_layout)
-        layout.addSpacing(10)
-        
-        self.setLayout(layout)
-        logger.debug(f"✅ DeleteConfirmationDialog UI initialized for: {self.beasiswa_judul}")
-
-
-class BeasiswaDetailDialog(QDialog):
-    """
-    Dialog untuk menampilkan detail lengkap beasiswa (Task 27 & 28).
-    Dipanggil saat user double-click row di table.
-    Menampilkan semua field beasiswa dengan format readable.
-    """
-    
-    def __init__(self, beasiswa_data: Dict, parent=None):
-        super().__init__(parent)
-        self.beasiswa_data = beasiswa_data
-        self.init_ui()
-    
-    def init_ui(self):
-        """Initialize Beasiswa Detail Dialog UI dengan semua informasi beasiswa (Task 10: Dialog styling)"""
-        judul = self.beasiswa_data.get('judul', 'Beasiswa')
-        self.setWindowTitle(f"📚 Detail Beasiswa - {judul}")
-        self.setGeometry(150, 150, 850, 750)
-        self.setModal(True)
-        
-        # Apply dialog stylesheet (Task 10)
-        self.setStyleSheet(get_dialog_stylesheet())
-        
-        # Main layout
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(20, 20, 20, 20)  # Task 10: Proper padding
-        main_layout.setSpacing(10)
-        
-        # ===== TITLE SECTION =====
-        title_label = QLabel(f"📚 {judul}")
-        title_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-        title_label.setStyleSheet(f"color: {COLOR_NAVY}; padding: 10px 0px;")
-        main_layout.addWidget(title_label)
-        
-        # ===== SEPARATOR LINE =====
-        separator = QLabel("─" * 80)
-        separator.setStyleSheet(f"color: {COLOR_GRAY_200};")
-        main_layout.addWidget(separator)
-        
-        # ===== TEXT AREA FOR CONTENT =====
-        text_edit = QTextEdit()
-        text_edit.setReadOnly(True)
-        text_edit.setStyleSheet(f"""
-            QTextEdit {{
-                background-color: {COLOR_GRAY_50};
-                border: 1px solid {COLOR_GRAY_200};
-                border-radius: 5px;
-                padding: 15px;
-                font-family: 'Courier New', monospace;
-                font-size: 10px;
-                line-height: 1.6;
-            }}
-        """)
-        
-        # Build detail content as HTML
-        html_content = self._build_detail_html()
-        text_edit.setHtml(html_content)
-        
-        main_layout.addWidget(text_edit)
-        
-        # ===== BUTTON SECTION =====
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        
-        # Close button
-        btn_close = QPushButton("✅ Tutup")
-        btn_close.setStyleSheet(get_button_solid_stylesheet("navy"))
-        btn_close.clicked.connect(self.accept)
-        button_layout.addWidget(btn_close)
-        
-        main_layout.addLayout(button_layout)
-        
-        self.setLayout(main_layout)
-        logger.debug(f"✅ BeasiswaDetailDialog UI initialized for: {judul}")
-    
-    def _build_detail_html(self) -> str:
-        """
-        Build HTML content for detail display (Task 27).
-        Format: Bold label: value with proper line breaks
-        
-        Returns:
-            str: HTML formatted content with all beasiswa fields
-        """
-        try:
-            html_parts = [
-                "<div style='font-family: Arial, sans-serif; line-height: 1.8;'>"
+            rows = cursor.fetchall()
+            self.beasiswa_data = [
+                {
+                    "id": row[0],
+                    "nama": row[1],
+                    "penyelenggara": row[2] or "Tidak Ada",
+                    "jenjang": row[3] or "-",
+                    "deadline": row[4],
+                    "status": row[5] or "Buka"
+                }
+                for row in rows
             ]
             
-            # Required fields
-            judul = self.beasiswa_data.get('judul', 'N/A')
-            html_parts.append(f"<p><b>Judul Beasiswa:</b><br/>{judul}</p>")
+            logger.info(f"Loaded {len(self.beasiswa_data)} beasiswa")
+            self.populate_table(self.beasiswa_data)
             
-            jenjang = self.beasiswa_data.get('jenjang', 'N/A')
-            html_parts.append(f"<p><b>Jenjang Pendidikan:</b><br/>{jenjang}</p>")
-            
-            deadline = self.beasiswa_data.get('deadline', 'N/A')
-            html_parts.append(f"<p><b>Deadline Pendaftaran:</b><br/>{deadline}</p>")
-            
-            status = self.beasiswa_data.get('status', 'N/A')
-            html_parts.append(f"<p><b>Status Beasiswa:</b><br/>{status}</p>")
-            
-            # Optional fields - only show if not empty
-            penyelenggara = self.beasiswa_data.get('penyelenggara_name')
-            if not penyelenggara:
-                penyelenggara_id = self.beasiswa_data.get('penyelenggara_id')
-                if penyelenggara_id:
-                    penyelenggara = f"ID: {penyelenggara_id}"
-            if penyelenggara:
-                html_parts.append(f"<p><b>Penyelenggara:</b><br/>{penyelenggara}</p>")
-            
-            minimal_ipk = self.beasiswa_data.get('minimal_ipk')
-            if minimal_ipk:
-                html_parts.append(f"<p><b>Minimal IPK:</b><br/>{minimal_ipk}</p>")
-            
-            coverage = self.beasiswa_data.get('coverage')
-            if coverage:
-                html_parts.append(f"<p><b>Coverage Beasiswa:</b><br/>{coverage}</p>")
-            
-            deskripsi = self.beasiswa_data.get('deskripsi')
-            if deskripsi and deskripsi.strip():
-                html_parts.append(f"<p><b>Deskripsi:</b><br/>{deskripsi}</p>")
-            
-            benefit = self.beasiswa_data.get('benefit')
-            if benefit and benefit.strip():
-                html_parts.append(f"<p><b>Benefit/Keuntungan:</b><br/>{benefit}</p>")
-            
-            persyaratan = self.beasiswa_data.get('persyaratan')
-            if persyaratan and persyaratan.strip():
-                html_parts.append(f"<p><b>Persyaratan & Ketentuan:</b><br/>{persyaratan}</p>")
-            
-            link_aplikasi = self.beasiswa_data.get('link_aplikasi')
-            if link_aplikasi and link_aplikasi.strip():
-                html_parts.append(f"<p><b>Link Aplikasi:</b><br/><a href='{link_aplikasi}' style='color: {COLOR_NAVY};'>{link_aplikasi}</a></p>")
-            
-            html_parts.append("</div>")
-            
-            return "".join(html_parts)
-            
+            conn.close()
         except Exception as e:
-            logger.error(f"❌ Error building detail HTML: {e}")
-            return f"<p style='color: red;'>Error loading detail: {str(e)}</p>"
+            logger.error(f"Error loading beasiswa data: {e}")
+    
+    def populate_table(self, data: List[Dict[str, Any]]):
+        """Populate table dengan data."""
+        self.table.setRowCount(len(data))
+        
+        for row_idx, item in enumerate(data):
+            # NO
+            no_item = QTableWidgetItem(str(row_idx + 1))
+            no_item.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+            no_item.setForeground(QColor(COLOR_GRAY_700))
+            self.table.setItem(row_idx, 0, no_item)
+            
+            # NAMA BEASISWA
+            nama_item = QTableWidgetItem(item["nama"])
+            nama_item.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+            nama_item.setForeground(QColor(COLOR_NAVY))
+            nama_item.setFont(_make_bold_font(nama_item.font()))
+            self.table.setItem(row_idx, 1, nama_item)
+            
+            # PENYELENGGARA
+            penyelenggara_item = QTableWidgetItem(item["penyelenggara"])
+            penyelenggara_item.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+            penyelenggara_item.setForeground(QColor(COLOR_GRAY_700))
+            self.table.setItem(row_idx, 2, penyelenggara_item)
+            
+            # JENJANG
+            jenjang_item = QTableWidgetItem(item["jenjang"])
+            jenjang_item.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+            jenjang_item.setForeground(QColor(COLOR_NAVY))
+            self.table.setItem(row_idx, 3, jenjang_item)
+            
+            # DEADLINE
+            deadline_item = QTableWidgetItem(item["deadline"])
+            deadline_item.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+            deadline_item.setForeground(QColor(COLOR_GRAY_700))
+            self.table.setItem(row_idx, 4, deadline_item)
+            
+            # STATUS (Badge)
+            status_item = QTableWidgetItem()
+            badge = self._create_status_badge(item["status"])
+            self.table.setCellWidget(row_idx, 5, badge)
+            self.table.setItem(row_idx, 5, status_item)
+            
+            # AKSI (Buttons)
+            action_item = QTableWidgetItem()
+            actions = self._create_action_buttons(item["id"])
+            self.table.setCellWidget(row_idx, 6, actions)
+            self.table.setItem(row_idx, 6, action_item)
+    
+    def filter_table(self):
+        """Filter table berdasarkan search dan filters."""
+        search_text = self.search_input.text().lower()
+        status_filter = self.status_filter.currentText()
+        jenjang_filter = self.jenjang_filter.currentText()
+        
+        filtered_data = [
+            item for item in self.beasiswa_data
+            if (search_text in item["nama"].lower() or 
+                search_text in item["penyelenggara"].lower()) and
+               (status_filter == "Semua" or item["status"] == status_filter) and
+               (jenjang_filter == "Semua" or item["jenjang"] == jenjang_filter)
+        ]
+        
+        self.populate_table(filtered_data)
+    
+    def filter_by_deadline(self):
+        """Filter beasiswa yang deadline-nya dekat (dalam 7 hari)."""
+        from datetime import datetime, timedelta
+        
+        today = datetime.now().date()
+        deadline_soon = [
+            item for item in self.beasiswa_data
+            if item["status"] != "Tutup"  # Only open/closing soon
+        ]
+        
+        self.populate_table(deadline_soon)
+    
+    def refresh_data(self):
+        """Refresh data dari database."""
+        logger.info("Refreshing beasiswa data...")
+        self.load_beasiswa_data()
+        self.subtitle_label.setText(f"Terakhir diperbaharui: {datetime.now().strftime('%d %b %Y %H:%M')}")
+    
+    def export_to_csv(self):
+        """Export beasiswa data ke CSV file."""
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Export Beasiswa", "", "CSV Files (*.csv)"
+        )
+        
+        if file_path:
+            try:
+                with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+                    fieldnames = ['NO', 'NAMA BEASISWA', 'PENYELENGGARA', 'JENJANG', 'DEADLINE', 'STATUS']
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    
+                    writer.writeheader()
+                    for idx, item in enumerate(self.beasiswa_data, 1):
+                        writer.writerow({
+                            'NO': idx,
+                            'NAMA BEASISWA': item['nama'],
+                            'PENYELENGGARA': item['penyelenggara'],
+                            'JENJANG': item['jenjang'],
+                            'DEADLINE': item['deadline'],
+                            'STATUS': item['status']
+                        })
+                
+                logger.info(f"Data exported to {file_path}")
+            except Exception as e:
+                logger.error(f"Error exporting data: {e}")
+    
+    def view_beasiswa(self, beasiswa_id: int):
+        """View beasiswa details."""
+        logger.info(f"Viewing beasiswa {beasiswa_id}")
+        # TODO: Implement detail view
+    
+    def toggle_bookmark(self, beasiswa_id: int):
+        """Toggle bookmark untuk beasiswa."""
+        logger.info(f"Toggling bookmark for beasiswa {beasiswa_id}")
+        # TODO: Implement bookmark toggle
+    
+    def apply_beasiswa(self, beasiswa_id: int):
+        """Apply untuk beasiswa."""
+        logger.info(f"Applying for beasiswa {beasiswa_id}")
+        # TODO: Implement apply functionality
+
+
+def _make_bold_font(font: QFont) -> QFont:
+    """Helper function to make font bold."""
+    font.setWeight(QFont.Weight.Bold)
+    return font

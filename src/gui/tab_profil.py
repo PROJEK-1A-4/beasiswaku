@@ -1,6 +1,6 @@
 """
 Profil (Profile) Tab for BeasiswaKu
-User profile management with personal information, preferences, and activity history
+User profile management dengan layout yang rapi dan terstruktur
 """
 
 import logging
@@ -8,11 +8,10 @@ from datetime import datetime
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
-    QTextEdit, QComboBox, QDialog, QFormLayout, QMessageBox, QScrollArea,
-    QFrame, QSizePolicy
+    QFrame, QScrollArea, QGridLayout, QCheckBox
 )
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QFont, QColor, QPixmap, QIcon
+from PyQt6.QtGui import QFont, QColor
 
 from src.gui.design_tokens import *
 from src.gui.styles import get_button_solid_stylesheet
@@ -23,32 +22,9 @@ logger = logging.getLogger(__name__)
 
 class ProfileTab(QWidget):
     """
-    Profil (Profile) Tab - Manage user profile information and preferences.
-    
-    Features:
-    - User profile header with avatar/initials
-    - Editable personal information (name, email, phone)
-    - Editable contact information (address, city, province, postal code)
-    - User preferences (notification settings, theme, language)
-    - Activity history/stats
-    - Account actions (edit profile, change password, logout)
-    
-    Layout:
-    ┌──────────────────────────┐
-    │ Profile Header           │
-    │ 📦 Name | Email | Stats  │
-    ├──────────────────────────┤
-    │ Personal Information     │
-    │ [Fields] [Edit] [Save]   │
-    ├──────────────────────────┤
-    │ Contact Information      │
-    │ [Fields] [Edit] [Save]   │
-    ├──────────────────────────┤
-    │ Preferences              │
-    │ [Settings/Toggles]       │
-    ├──────────────────────────┤
-    │ [Change Password] [Logout]
-    └──────────────────────────┘
+    Profil Tab dengan 2-column layout:
+    - Left: Profile card dengan avatar, stats, info dasar
+    - Right: Detailed sections (Informasi Pribadi, Keamanan, Preferensi, Aktivitas)
     """
     
     def __init__(self, user_id: int, username: str = "", email: str = "", parent=None):
@@ -63,10 +39,30 @@ class ProfileTab(QWidget):
         self.load_user_data()
     
     def init_ui(self):
-        """Initialize Profile Tab UI."""
+        """Initialize Profile Tab dengan 2-column layout."""
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(16, 16, 16, 16)
-        main_layout.setSpacing(12)
+        main_layout.setContentsMargins(24, 20, 24, 20)
+        main_layout.setSpacing(0)
+        
+        # ===== HEADER =====
+        header_layout = QVBoxLayout()
+        header_layout.setSpacing(4)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        
+        title_label = QLabel("Profil Saya")
+        title_font = QFont(FONT_FAMILY_PRIMARY, 28)
+        title_font.setWeight(QFont.Weight.Bold)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet(f"color: {COLOR_NAVY}; padding: 0px;")
+        header_layout.addWidget(title_label)
+        
+        subtitle_label = QLabel("Kelola informasi akun dan preferensi kamu")
+        subtitle_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        subtitle_label.setStyleSheet(f"color: {COLOR_GRAY_400}; padding: 0px;")
+        header_layout.addWidget(subtitle_label)
+        
+        main_layout.addLayout(header_layout)
+        main_layout.addSpacing(20)
         
         # ===== SCROLL AREA =====
         scroll = QScrollArea()
@@ -76,880 +72,648 @@ class ProfileTab(QWidget):
         scroll_widget = QWidget()
         scroll_layout = QVBoxLayout(scroll_widget)
         scroll_layout.setContentsMargins(0, 0, 0, 0)
-        scroll_layout.setSpacing(16)
+        scroll_layout.setSpacing(0)
         
-        # ===== PROFILE HEADER SECTION =====
-        header_frame = self._create_profile_header()
-        scroll_layout.addWidget(header_frame)
+        # ===== 2-COLUMN LAYOUT =====
+        content_layout = QHBoxLayout()
+        content_layout.setSpacing(24)
+        content_layout.setContentsMargins(0, 0, 0, 0)
         
-        # ===== PERSONAL INFORMATION SECTION =====
-        personal_frame = self._create_personal_info_section()
-        scroll_layout.addWidget(personal_frame)
+        # LEFT COLUMN - Profile Card
+        left_frame = self._create_profile_card()
+        content_layout.addWidget(left_frame, 1)
         
-        # ===== CONTACT INFORMATION SECTION =====
-        contact_frame = self._create_contact_info_section()
-        scroll_layout.addWidget(contact_frame)
+        # RIGHT COLUMN - Detailed Sections
+        right_layout = QVBoxLayout()
+        right_layout.setSpacing(24)
+        right_layout.setContentsMargins(0, 0, 0, 0)
         
-        # ===== PREFERENCES SECTION =====
-        preferences_frame = self._create_preferences_section()
-        scroll_layout.addWidget(preferences_frame)
+        # Informasi Pribadi Section
+        right_layout.addWidget(self._create_informasi_pribadi())
         
-        # ===== ACTIVITY SECTION =====
-        activity_frame = self._create_activity_section()
-        scroll_layout.addWidget(activity_frame)
+        # Keamanan Akun Section
+        right_layout.addWidget(self._create_keamanan_akun())
         
+        # Preferensi Aplikasi Section
+        right_layout.addWidget(self._create_preferensi_aplikasi())
+        
+        # Aktivitas Terakhir Section
+        right_layout.addWidget(self._create_aktivitas_terakhir())
+        
+        right_layout.addStretch()
+        
+        content_layout.addLayout(right_layout, 2)
+        
+        scroll_layout.addLayout(content_layout)
         scroll_layout.addStretch()
+        
         scroll.setWidget(scroll_widget)
         main_layout.addWidget(scroll)
         
-        # ===== BOTTOM ACTION BUTTONS =====
-        action_layout = QHBoxLayout()
-        action_layout.setSpacing(12)
-        
-        # Change password button
-        password_btn = QPushButton("🔐 Ubah Password")
-        password_btn.setStyleSheet(get_button_solid_stylesheet("navy"))
-        password_btn.clicked.connect(self.on_change_password)
-        action_layout.addWidget(password_btn)
-        
-        action_layout.addStretch()
-        
-        # Logout button
-        logout_btn = QPushButton("🚪 Keluar")
-        logout_btn.setStyleSheet(get_button_solid_stylesheet("error"))
-        logout_btn.clicked.connect(self.on_logout)
-        action_layout.addWidget(logout_btn)
-        
-        main_layout.addLayout(action_layout)
-        
-        # Apply background color
         self.setStyleSheet(f"background-color: {COLOR_GRAY_BACKGROUND};")
     
-    def _create_profile_header(self) -> QFrame:
-        """Create profile header section with avatar and user info."""
+    def _create_profile_card(self) -> QFrame:
+        """Create left column profile card."""
         frame = QFrame()
         frame.setStyleSheet(f"""
             QFrame {{
                 background-color: {COLOR_WHITE};
                 border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-                padding: 20px;
+                border-radius: {BORDER_RADIUS_MD};
             }}
         """)
-        frame.setMinimumHeight(120)
         
-        layout = QHBoxLayout(frame)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
         
-        # Avatar/Initials circle
+        # ===== AVATAR & NAME =====
         avatar_label = QLabel()
         avatar_label.setText(self._get_initials())
-        avatar_label.setFont(QFont(FONT_FAMILY_PRIMARY, 24))
+        avatar_label.setFont(QFont(FONT_FAMILY_PRIMARY, 32))
         avatar_label.setStyleSheet(f"""
             QLabel {{
                 background-color: {COLOR_ORANGE};
                 color: {COLOR_WHITE};
-                border-radius: 50px;
-                width: 100px;
-                height: 100px;
+                border-radius: 64px;
                 font-weight: bold;
-                qproperty-alignment: AlignCenter;
             }}
         """)
         avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        avatar_label.setMinimumSize(QSize(100, 100))
-        avatar_label.setMaximumSize(QSize(100, 100))
-        layout.addWidget(avatar_label)
-        
-        # User info
-        info_layout = QVBoxLayout()
+        avatar_label.setMinimumSize(QSize(128, 128))
+        avatar_label.setMaximumSize(QSize(128, 128))
+        layout.addWidget(avatar_label, alignment=Qt.AlignmentFlag.AlignHCenter)
         
         # Name
-        name_label = QLabel(self.username or "User")
-        name_font = QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_LG)
+        name_label = QLabel(self.username or "Aulia Rahmi")
+        name_font = QFont(FONT_FAMILY_PRIMARY, 18)
         name_font.setWeight(QFont.Weight.Bold)
         name_label.setFont(name_font)
-        name_label.setStyleSheet(f"color: {COLOR_NAVY};")
-        info_layout.addWidget(name_label)
+        name_label.setStyleSheet(f"color: {COLOR_NAVY}; text-align: center;")
+        name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(name_label)
+        
+        # Level/status
+        level_label = QLabel("Mahasiswa D4")
+        level_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        level_label.setStyleSheet(f"color: {COLOR_GRAY_600}; text-align: center;")
+        level_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(level_label)
+        
+        # University
+        university_label = QLabel("Teknik Informatika - POLBAN")
+        university_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        university_label.setStyleSheet(f"color: {COLOR_GRAY_500}; text-align: center;")
+        university_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(university_label)
+        
+        # Divider
+        divider = QFrame()
+        divider.setStyleSheet(f"background-color: {COLOR_GRAY_200};")
+        divider.setMaximumHeight(1)
+        layout.addWidget(divider)
+        
+        # ===== STATS =====
+        stats_layout = QGridLayout()
+        stats_layout.setSpacing(16)
+        stats_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Lamaran
+        lamaran_num = QLabel("9")
+        lamaran_num.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_2XL))
+        lamaran_num.setStyleSheet(f"color: {COLOR_NAVY}; font-weight: bold;")
+        lamaran_num.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        stats_layout.addWidget(lamaran_num, 0, 0)
+        
+        lamaran_label = QLabel("Lamaran")
+        lamaran_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        lamaran_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
+        lamaran_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        stats_layout.addWidget(lamaran_label, 1, 0)
+        
+        # Diterima
+        diterima_num = QLabel("2")
+        diterima_num.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_2XL))
+        diterima_num.setStyleSheet(f"color: {COLOR_SUCCESS}; font-weight: bold;")
+        diterima_num.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        stats_layout.addWidget(diterima_num, 0, 1)
+        
+        diterima_label = QLabel("Diterima")
+        diterima_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        diterima_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
+        diterima_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        stats_layout.addWidget(diterima_label, 1, 1)
+        
+        # Favorit
+        favorit_num = QLabel("12")
+        favorit_num.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_2XL))
+        favorit_num.setStyleSheet(f"color: {COLOR_ORANGE}; font-weight: bold;")
+        favorit_num.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        stats_layout.addWidget(favorit_num, 0, 2)
+        
+        favorit_label = QLabel("Favorit")
+        favorit_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        favorit_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
+        favorit_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        stats_layout.addWidget(favorit_label, 1, 2)
+        
+        layout.addLayout(stats_layout)
+        
+        # Divider
+        divider2 = QFrame()
+        divider2.setStyleSheet(f"background-color: {COLOR_GRAY_200};")
+        divider2.setMaximumHeight(1)
+        layout.addWidget(divider2)
+        
+        # ===== DETAILS =====
+        details_layout = QVBoxLayout()
+        details_layout.setSpacing(12)
+        details_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Username
+        username_row = QHBoxLayout()
+        username_icon = QLabel("👤")
+        username_icon.setFont(QFont(FONT_FAMILY_PRIMARY, 14))
+        username_row.addWidget(username_icon)
+        username_label = QLabel("Username")
+        username_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        username_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
+        username_row.addWidget(username_label)
+        details_layout.addLayout(username_row)
+        
+        username_value = QLabel(self.username or "aulia_rahmi")
+        username_value.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        username_value.setStyleSheet(f"color: {COLOR_NAVY}; font-weight: bold; margin-left: 28px;")
+        details_layout.addWidget(username_value)
         
         # Email
-        email_label = QLabel(self.email or "email@example.com")
-        email_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        email_row = QHBoxLayout()
+        email_icon = QLabel("✉")
+        email_icon.setFont(QFont(FONT_FAMILY_PRIMARY, 14))
+        email_row.addWidget(email_icon)
+        email_label = QLabel("Email")
+        email_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
         email_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
-        info_layout.addWidget(email_label)
+        email_row.addWidget(email_label)
+        details_layout.addLayout(email_row)
         
-        info_layout.addSpacing(8)
+        email_value = QLabel(self.email or "aulia@email.com")
+        email_value.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        email_value.setStyleSheet(f"color: {COLOR_NAVY}; font-weight: bold; margin-left: 28px;")
+        details_layout.addWidget(email_value)
         
-        # Stats row
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(24)
+        # Bergabung
+        join_row = QHBoxLayout()
+        join_icon = QLabel("📅")
+        join_icon.setFont(QFont(FONT_FAMILY_PRIMARY, 14))
+        join_row.addWidget(join_icon)
+        join_label = QLabel("Bergabung")
+        join_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        join_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
+        join_row.addWidget(join_label)
+        details_layout.addLayout(join_row)
         
-        # Total applications
-        stats_layout.addWidget(self._create_stat_item("15", "Lamaran Terkirim"))
-        stats_layout.addWidget(self._create_stat_item("3", "Diterima"))
-        stats_layout.addWidget(self._create_stat_item("2", "Pending"))
-        stats_layout.addStretch()
+        join_value = QLabel("Januari 2026")
+        join_value.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        join_value.setStyleSheet(f"color: {COLOR_NAVY}; font-weight: bold; margin-left: 28px;")
+        details_layout.addWidget(join_value)
         
-        info_layout.addLayout(stats_layout)
+        # Status
+        status_row = QHBoxLayout()
+        status_icon = QLabel("🔐")
+        status_icon.setFont(QFont(FONT_FAMILY_PRIMARY, 14))
+        status_row.addWidget(status_icon)
+        status_label = QLabel("Status Akun")
+        status_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        status_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
+        status_row.addWidget(status_label)
+        details_layout.addLayout(status_row)
         
-        layout.addLayout(info_layout)
+        status_badge = QLabel("Aktif")
+        status_badge.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        status_badge.setStyleSheet(f"""
+            color: {COLOR_SUCCESS}; 
+            font-weight: bold; 
+            margin-left: 28px;
+            background-color: {COLOR_SUCCESS_LIGHT};
+            padding: 4px 8px;
+            border-radius: 4px;
+            width: fit-content;
+        """)
+        details_layout.addWidget(status_badge)
+        
+        layout.addLayout(details_layout)
         layout.addStretch()
         
         return frame
     
-    def _create_stat_item(self, number: str, label: str) -> QWidget:
-        """Create a stat item widget."""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
-        
-        num_label = QLabel(number)
-        num_font = QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_LG)
-        num_font.setWeight(QFont.Weight.Bold)
-        num_label.setFont(num_font)
-        num_label.setStyleSheet(f"color: {COLOR_NAVY};")
-        layout.addWidget(num_label)
-        
-        text_label = QLabel(label)
-        text_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
-        text_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
-        layout.addWidget(text_label)
-        
-        return widget
-    
-    def _get_initials(self) -> str:
-        """Get user initials from username."""
-        if self.username:
-            parts = self.username.split()
-            if len(parts) >= 2:
-                return (parts[0][0] + parts[-1][0]).upper()
-            elif len(parts) == 1:
-                return parts[0][0].upper()
-        return "U"
-    
-    def _create_personal_info_section(self) -> QFrame:
-        """Create personal information section."""
+    def _create_informasi_pribadi(self) -> QFrame:
+        """Create Informasi Pribadi section."""
         frame = QFrame()
         frame.setStyleSheet(f"""
             QFrame {{
                 background-color: {COLOR_WHITE};
                 border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-                padding: 20px;
+                border-radius: {BORDER_RADIUS_MD};
             }}
         """)
         
         layout = QVBoxLayout(frame)
-        layout.setSpacing(12)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
         
-        # Title
-        title = QLabel("📋 Informasi Pribadi")
-        title_font = QFont(FONT_FAMILY_PRIMARY, 14)
-        title_font.setWeight(QFont.Weight.Bold)
-        title.setFont(title_font)
-        title.setStyleSheet(f"color: {COLOR_NAVY};")
-        layout.addWidget(title)
+        # Header
+        header_layout = QHBoxLayout()
+        header_label = QLabel("Informasi Pribadi")
+        header_font = QFont(FONT_FAMILY_PRIMARY, 16)
+        header_font.setWeight(QFont.Weight.Bold)
+        header_label.setFont(header_font)
+        header_label.setStyleSheet(f"color: {COLOR_NAVY};")
+        header_layout.addWidget(header_label)
+        header_layout.addStretch()
         
-        # Divider
-        divider = QFrame()
-        divider.setStyleSheet(f"background-color: {COLOR_GRAY_200};")
-        divider.setMaximumHeight(1)
-        layout.addWidget(divider)
+        edit_btn = QPushButton("✏ Edit")
+        edit_btn.setMinimumHeight(32)
+        edit_btn.setMaximumWidth(100)
+        edit_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: 1px solid {COLOR_GRAY_300};
+                border-radius: {BORDER_RADIUS_SM};
+                color: {COLOR_NAVY};
+                font-weight: bold;
+                padding: 6px 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_GRAY_100};
+            }}
+        """)
+        header_layout.addWidget(edit_btn)
+        layout.addLayout(header_layout)
         
-        # Form layout
-        form_layout = QFormLayout()
-        form_layout.setSpacing(12)
+        # Form Grid (2 columns)
+        form_layout = QGridLayout()
+        form_layout.setSpacing(16)
+        form_layout.setContentsMargins(0, 0, 0, 0)
         
         # Nama Lengkap
-        self.nama_input = QLineEdit()
-        self.nama_input.setText(self.username or "")
-        self.nama_input.setMinimumHeight(36)
-        self.nama_input.setReadOnly(True)
-        self.nama_input.setStyleSheet(f"""
-            QLineEdit {{
-                padding: 8px 10px;
-                border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-                background-color: {COLOR_GRAY_50};
-            }}
-        """)
-        form_layout.addRow("Nama Lengkap:", self.nama_input)
+        form_layout.addWidget(QLabel("NAMA LENGKAP"), 0, 0)
+        nama_input = QLineEdit()
+        nama_input.setText("Aulia Rahmi Taufik")
+        nama_input.setReadOnly(True)
+        nama_input.setMinimumHeight(40)
+        nama_input.setStyleSheet(self._get_input_stylesheet())
+        form_layout.addWidget(nama_input, 1, 0)
+        
+        # Username
+        form_layout.addWidget(QLabel("USERNAME"), 1, 1)
+        username_input = QLineEdit()
+        username_input.setText("aulia_rahmi")
+        username_input.setReadOnly(True)
+        username_input.setMinimumHeight(40)
+        username_input.setStyleSheet(self._get_input_stylesheet())
+        form_layout.addWidget(username_input, 2, 1)
         
         # Email
-        self.email_personal_input = QLineEdit()
-        self.email_personal_input.setText(self.email or "")
-        self.email_personal_input.setMinimumHeight(36)
-        self.email_personal_input.setReadOnly(True)
-        self.email_personal_input.setStyleSheet(f"""
-            QLineEdit {{
-                padding: 8px 10px;
-                border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-                background-color: {COLOR_GRAY_50};
-            }}
-        """)
-        form_layout.addRow("Email:", self.email_personal_input)
+        form_layout.addWidget(QLabel("EMAIL"), 2, 0)
+        email_input = QLineEdit()
+        email_input.setText("aulia.rahmi@gmail.com")
+        email_input.setReadOnly(True)
+        email_input.setMinimumHeight(40)
+        email_input.setStyleSheet(self._get_input_stylesheet())
+        form_layout.addWidget(email_input, 3, 0)
         
-        # Nomor Telepon
-        self.phone_input = QLineEdit()
-        self.phone_input.setPlaceholderText("081234567890")
-        self.phone_input.setMinimumHeight(36)
-        self.phone_input.setReadOnly(True)
-        self.phone_input.setStyleSheet(f"""
-            QLineEdit {{
-                padding: 8px 10px;
-                border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-                background-color: {COLOR_GRAY_50};
-            }}
-        """)
-        form_layout.addRow("Nomor Telepon:", self.phone_input)
+        # Jenjang
+        form_layout.addWidget(QLabel("JENJANG"), 3, 1)
+        jenjang_input = QLineEdit()
+        jenjang_input.setText("D4 Sarjana Terapan")
+        jenjang_input.setReadOnly(True)
+        jenjang_input.setMinimumHeight(40)
+        jenjang_input.setStyleSheet(self._get_input_stylesheet())
+        form_layout.addWidget(jenjang_input, 4, 1)
         
-        # Tanggal Lahir
-        self.dob_input = QLineEdit()
-        self.dob_input.setPlaceholderText("YYYY-MM-DD")
-        self.dob_input.setMinimumHeight(36)
-        self.dob_input.setReadOnly(True)
-        self.dob_input.setStyleSheet(f"""
-            QLineEdit {{
-                padding: 8px 10px;
-                border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-                background-color: {COLOR_GRAY_50};
-            }}
-        """)
-        form_layout.addRow("Tanggal Lahir:", self.dob_input)
+        # Institusi
+        form_layout.addWidget(QLabel("INSTITUSI"), 4, 0)
+        institusi_input = QLineEdit()
+        institusi_input.setText("POLBAN")
+        institusi_input.setReadOnly(True)
+        institusi_input.setMinimumHeight(40)
+        institusi_input.setStyleSheet(self._get_input_stylesheet())
+        form_layout.addWidget(institusi_input, 5, 0)
         
-        layout.addLayout(form_layout)
+        # NIM
+        form_layout.addWidget(QLabel("NIM"), 5, 1)
+        nim_input = QLineEdit()
+        nim_input.setText("21524003")
+        nim_input.setReadOnly(True)
+        nim_input.setMinimumHeight(40)
+        nim_input.setStyleSheet(self._get_input_stylesheet())
+        form_layout.addWidget(nim_input, 6, 1)
         
-        # Edit button
-        edit_btn = QPushButton("✏️ Edit Informasi")
-        edit_btn.setStyleSheet(get_button_solid_stylesheet("navy"))
-        edit_btn.clicked.connect(self.on_edit_personal_info)
-        layout.addWidget(edit_btn)
+        # Semester
+        form_layout.addWidget(QLabel("SEMESTER"), 6, 0)
+        semester_input = QLineEdit()
+        semester_input.setText("Semester 2")
+        semester_input.setReadOnly(True)
+        semester_input.setMinimumHeight(40)
+        semester_input.setStyleSheet(self._get_input_stylesheet())
+        form_layout.addWidget(semester_input, 7, 0)
         
-        return frame
-    
-    def _create_contact_info_section(self) -> QFrame:
-        """Create contact information section."""
-        frame = QFrame()
-        frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLOR_WHITE};
-                border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-                padding: 20px;
-            }}
-        """)
-        
-        layout = QVBoxLayout(frame)
-        layout.setSpacing(12)
-        
-        # Title
-        title = QLabel("📍 Informasi Kontak")
-        title_font = QFont(FONT_FAMILY_PRIMARY, 14)
-        title_font.setWeight(QFont.Weight.Bold)
-        title.setFont(title_font)
-        title.setStyleSheet(f"color: {COLOR_NAVY};")
-        layout.addWidget(title)
-        
-        # Divider
-        divider = QFrame()
-        divider.setStyleSheet(f"background-color: {COLOR_GRAY_200};")
-        divider.setMaximumHeight(1)
-        layout.addWidget(divider)
-        
-        # Form layout
-        form_layout = QFormLayout()
-        form_layout.setSpacing(12)
-        
-        # Alamat
-        self.alamat_input = QLineEdit()
-        self.alamat_input.setPlaceholderText("Jalan Contoh No. 123")
-        self.alamat_input.setMinimumHeight(36)
-        self.alamat_input.setReadOnly(True)
-        self.alamat_input.setStyleSheet(f"""
-            QLineEdit {{
-                padding: 8px 10px;
-                border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-                background-color: {COLOR_GRAY_50};
-            }}
-        """)
-        form_layout.addRow("Alamat:", self.alamat_input)
-        
-        # Kota
-        self.kota_input = QLineEdit()
-        self.kota_input.setPlaceholderText("Jakarta")
-        self.kota_input.setMinimumHeight(36)
-        self.kota_input.setReadOnly(True)
-        self.kota_input.setStyleSheet(f"""
-            QLineEdit {{
-                padding: 8px 10px;
-                border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-                background-color: {COLOR_GRAY_50};
-            }}
-        """)
-        form_layout.addRow("Kota:", self.kota_input)
-        
-        # Provinsi
-        self.provinsi_input = QLineEdit()
-        self.provinsi_input.setPlaceholderText("DKI Jakarta")
-        self.provinsi_input.setMinimumHeight(36)
-        self.provinsi_input.setReadOnly(True)
-        self.provinsi_input.setStyleSheet(f"""
-            QLineEdit {{
-                padding: 8px 10px;
-                border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-                background-color: {COLOR_GRAY_50};
-            }}
-        """)
-        form_layout.addRow("Provinsi:", self.provinsi_input)
-        
-        # Kode Pos
-        self.postal_input = QLineEdit()
-        self.postal_input.setPlaceholderText("12345")
-        self.postal_input.setMinimumHeight(36)
-        self.postal_input.setReadOnly(True)
-        self.postal_input.setStyleSheet(f"""
-            QLineEdit {{
-                padding: 8px 10px;
-                border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-                background-color: {COLOR_GRAY_50};
-            }}
-        """)
-        form_layout.addRow("Kode Pos:", self.postal_input)
-        
-        layout.addLayout(form_layout)
-        
-        # Edit button
-        edit_btn = QPushButton("✏️ Edit Kontak")
-        edit_btn.setStyleSheet(get_button_solid_stylesheet("navy"))
-        edit_btn.clicked.connect(self.on_edit_contact_info)
-        layout.addWidget(edit_btn)
-        
-        return frame
-    
-    def _create_preferences_section(self) -> QFrame:
-        """Create preferences section."""
-        frame = QFrame()
-        frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLOR_WHITE};
-                border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-                padding: 20px;
-            }}
-        """)
-        
-        layout = QVBoxLayout(frame)
-        layout.setSpacing(12)
-        
-        # Title
-        title = QLabel("⚙️ Preferensi")
-        title_font = QFont(FONT_FAMILY_PRIMARY, 14)
-        title_font.setWeight(QFont.Weight.Bold)
-        title.setFont(title_font)
-        title.setStyleSheet(f"color: {COLOR_NAVY};")
-        layout.addWidget(title)
-        
-        # Divider
-        divider = QFrame()
-        divider.setStyleSheet(f"background-color: {COLOR_GRAY_200};")
-        divider.setMaximumHeight(1)
-        layout.addWidget(divider)
-        
-        # Form layout
-        form_layout = QFormLayout()
-        form_layout.setSpacing(12)
-        
-        # Bahasa
-        self.bahasa_combo = QComboBox()
-        self.bahasa_combo.addItems(["Bahasa Indonesia", "English"])
-        self.bahasa_combo.setMinimumHeight(36)
-        self.bahasa_combo.setStyleSheet(f"""
-            QComboBox {{
-                padding: 8px 10px;
-                border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-                background-color: {COLOR_WHITE};
-            }}
-            QComboBox::drop-down {{
-                border: none;
-            }}
-        """)
-        form_layout.addRow("Bahasa:", self.bahasa_combo)
-        
-        # Tema
-        self.tema_combo = QComboBox()
-        self.tema_combo.addItems(["Light (Navy + Orange)", "Dark", "Auto"])
-        self.tema_combo.setMinimumHeight(36)
-        self.tema_combo.setStyleSheet(f"""
-            QComboBox {{
-                padding: 8px 10px;
-                border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-                background-color: {COLOR_WHITE};
-            }}
-            QComboBox::drop-down {{
-                border: none;
-            }}
-        """)
-        form_layout.addRow("Tema:", self.tema_combo)
-        
-        # Notifikasi Email
-        self.notif_combo = QComboBox()
-        self.notif_combo.addItems(["Aktif", "Hanya Penting", "Nonaktif"])
-        self.notif_combo.setMinimumHeight(36)
-        self.notif_combo.setStyleSheet(f"""
-            QComboBox {{
-                padding: 8px 10px;
-                border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-                background-color: {COLOR_WHITE};
-            }}
-            QComboBox::drop-down {{
-                border: none;
-            }}
-        """)
-        form_layout.addRow("Notifikasi Email:", self.notif_combo)
+        form_layout.setColumnStretch(0, 1)
+        form_layout.setColumnStretch(1, 1)
         
         layout.addLayout(form_layout)
         
         # Save button
-        save_btn = QPushButton("💾 Simpan Preferensi")
-        save_btn.setStyleSheet(get_button_solid_stylesheet("orange"))
-        save_btn.clicked.connect(self.on_save_preferences)
+        save_btn = QPushButton("Simpan Perubahan")
+        save_btn.setMinimumHeight(40)
+        save_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_NAVY};
+                border: none;
+                border-radius: {BORDER_RADIUS_SM};
+                color: {COLOR_WHITE};
+                font-weight: bold;
+                font-size: 11px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_NAVY_DARK};
+            }}
+        """)
         layout.addWidget(save_btn)
         
         return frame
     
-    def _create_activity_section(self) -> QFrame:
-        """Create activity history section."""
+    def _create_keamanan_akun(self) -> QFrame:
+        """Create Keamanan Akun section."""
         frame = QFrame()
         frame.setStyleSheet(f"""
             QFrame {{
                 background-color: {COLOR_WHITE};
                 border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-                padding: 20px;
+                border-radius: {BORDER_RADIUS_MD};
             }}
         """)
         
         layout = QVBoxLayout(frame)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+        
+        # Header
+        title_label = QLabel("Keamanan Akun")
+        title_font = QFont(FONT_FAMILY_PRIMARY, 16)
+        title_font.setWeight(QFont.Weight.Bold)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet(f"color: {COLOR_NAVY};")
+        layout.addWidget(title_label)
+        
+        # Form
+        form_layout = QGridLayout()
+        form_layout.setSpacing(16)
+        form_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Current password
+        form_layout.addWidget(QLabel("PASSWORD SAAT INI"))
+        current_pass = QLineEdit()
+        current_pass.setEchoMode(QLineEdit.EchoMode.Password)
+        current_pass.setText("••••••••")
+        current_pass.setMinimumHeight(40)
+        current_pass.setStyleSheet(self._get_input_stylesheet())
+        form_layout.addWidget(current_pass)
+        
+        # New password
+        form_layout.addWidget(QLabel("PASSWORD BARU"))
+        new_pass = QLineEdit()
+        new_pass.setPlaceholderText("Min. 8 karakter")
+        new_pass.setMinimumHeight(40)
+        new_pass.setStyleSheet(self._get_input_stylesheet())
+        form_layout.addWidget(new_pass)
+        
+        # Confirm password
+        form_layout.addWidget(QLabel("KONFIRMASI"))
+        confirm_pass = QLineEdit()
+        confirm_pass.setPlaceholderText("Ulangi password")
+        confirm_pass.setMinimumHeight(40)
+        confirm_pass.setStyleSheet(self._get_input_stylesheet())
+        form_layout.addWidget(confirm_pass)
+        
+        layout.addLayout(form_layout)
+        
+        # Change password button
+        change_btn = QPushButton("Ubah Password")
+        change_btn.setMinimumHeight(40)
+        change_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_NAVY};
+                border: none;
+                border-radius: {BORDER_RADIUS_SM};
+                color: {COLOR_WHITE};
+                font-weight: bold;
+                font-size: 11px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_NAVY_DARK};
+            }}
+        """)
+        layout.addWidget(change_btn)
+        
+        return frame
+    
+    def _create_preferensi_aplikasi(self) -> QFrame:
+        """Create Preferensi Aplikasi section."""
+        frame = QFrame()
+        frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLOR_WHITE};
+                border: 1px solid {COLOR_GRAY_200};
+                border-radius: {BORDER_RADIUS_MD};
+            }}
+        """)
+        
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+        
+        # Header
+        title_label = QLabel("Preferensi Aplikasi")
+        title_font = QFont(FONT_FAMILY_PRIMARY, 16)
+        title_font.setWeight(QFont.Weight.Bold)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet(f"color: {COLOR_NAVY};")
+        layout.addWidget(title_label)
+        
+        # Notifikasi Deadline
+        notif_row = QHBoxLayout()
+        notif_icon = QLabel("🔔")
+        notif_icon.setFont(QFont(FONT_FAMILY_PRIMARY, 14))
+        notif_row.addWidget(notif_icon)
+        notif_label = QLabel("Notifikasi Deadline")
+        notif_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        notif_row.addWidget(notif_label)
+        notif_row.addStretch()
+        
+        toggle1 = QCheckBox()
+        toggle1.setChecked(True)
+        toggle1.setMinimumSize(40, 24)
+        notif_row.addWidget(toggle1)
+        
+        layout.addLayout(notif_row)
+        
+        notif_desc = QLabel("Peringatan beasiswa yang akan tutup")
+        notif_desc.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        notif_desc.setStyleSheet(f"color: {COLOR_GRAY_500}; margin-left: 28px;")
+        layout.addWidget(notif_desc)
+        
+        # Mode Gelap
+        dark_row = QHBoxLayout()
+        dark_icon = QLabel("🌙")
+        dark_icon.setFont(QFont(FONT_FAMILY_PRIMARY, 14))
+        dark_row.addWidget(dark_icon)
+        dark_label = QLabel("Mode Gelap")
+        dark_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        dark_row.addWidget(dark_label)
+        dark_row.addStretch()
+        
+        toggle2 = QCheckBox()
+        toggle2.setChecked(False)
+        toggle2.setMinimumSize(40, 24)
+        dark_row.addWidget(toggle2)
+        
+        layout.addWidget(QFrame())  # Spacer
+        layout.addLayout(dark_row)
+        
+        dark_desc = QLabel("Tampilan gelap untuk kenyamanan mata")
+        dark_desc.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        dark_desc.setStyleSheet(f"color: {COLOR_GRAY_500}; margin-left: 28px;")
+        layout.addWidget(dark_desc)
+        
+        # Auto-Scraping
+        scrape_row = QHBoxLayout()
+        scrape_icon = QLabel("📡")
+        scrape_icon.setFont(QFont(FONT_FAMILY_PRIMARY, 14))
+        scrape_row.addWidget(scrape_icon)
+        scrape_label = QLabel("Auto-Scraping")
+        scrape_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        scrape_row.addWidget(scrape_label)
+        scrape_row.addStretch()
+        
+        toggle3 = QCheckBox()
+        toggle3.setChecked(True)
+        toggle3.setMinimumSize(40, 24)
+        scrape_row.addWidget(toggle3)
+        
+        layout.addWidget(QFrame())  # Spacer
+        layout.addLayout(scrape_row)
+        
+        scrape_desc = QLabel("Perbarui data beasiswa otomatis saat buka app")
+        scrape_desc.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        scrape_desc.setStyleSheet(f"color: {COLOR_GRAY_500}; margin-left: 28px;")
+        layout.addWidget(scrape_desc)
+        
+        return frame
+    
+    def _create_aktivitas_terakhir(self) -> QFrame:
+        """Create Aktivitas Terakhir section."""
+        frame = QFrame()
+        frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLOR_WHITE};
+                border: 1px solid {COLOR_GRAY_200};
+                border-radius: {BORDER_RADIUS_MD};
+            }}
+        """)
+        
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(12)
         
-        # Title
-        title = QLabel("📊 Aktivitas Terbaru")
-        title_font = QFont(FONT_FAMILY_PRIMARY, 14)
+        # Header
+        title_label = QLabel("Aktivitas Terakhir")
+        title_font = QFont(FONT_FAMILY_PRIMARY, 16)
         title_font.setWeight(QFont.Weight.Bold)
-        title.setFont(title_font)
-        title.setStyleSheet(f"color: {COLOR_NAVY};")
-        layout.addWidget(title)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet(f"color: {COLOR_NAVY};")
+        layout.addWidget(title_label)
         
-        # Divider
-        divider = QFrame()
-        divider.setStyleSheet(f"background-color: {COLOR_GRAY_200};")
-        divider.setMaximumHeight(1)
-        layout.addWidget(divider)
-        
-        # Activity items
+        # Activities
         activities = [
-            ("🎯 Melamar Beasiswa LPDP", "Hari ini pukul 14:30"),
-            ("📋 Mengupdate profil", "2 hari yang lalu"),
-            ("💬 Menambah catatan pada lamaran", "5 hari yang lalu"),
-            ("⭐ Menambahkan favorit", "1 minggu yang lalu"),
+            ("Lamaran Diterima", "Beasiswa Tanoto Foundation", "3 hari lalu", COLOR_SUCCESS),
+            ("Favorit Ditambahkan", "Beasiswa Unggulan Kemendikbud", "5 hari lalu", COLOR_ORANGE),
+            ("Lamaran Dikirim", "Beasiswa Bank Indonesia", "1 minggu lalu", COLOR_NAVY),
         ]
         
-        for activity_text, time_text in activities:
+        for title, desc, time, color in activities:
             activity_layout = QHBoxLayout()
             activity_layout.setSpacing(12)
             
-            # Activity text
-            activity_label = QLabel(activity_text)
-            activity_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
-            activity_label.setStyleSheet(f"color: {COLOR_NAVY};")
-            activity_layout.addWidget(activity_label)
+            # Dot indicator
+            dot = QLabel("●")
+            dot.setFont(QFont(FONT_FAMILY_PRIMARY, 12))
+            dot.setStyleSheet(f"color: {color};")
+            activity_layout.addWidget(dot)
             
+            # Info
+            info_layout = QVBoxLayout()
+            info_layout.setSpacing(2)
+            
+            title_lbl = QLabel(title)
+            title_lbl.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+            title_lbl.setStyleSheet(f"color: {COLOR_NAVY}; font-weight: bold;")
+            info_layout.addWidget(title_lbl)
+            
+            desc_lbl = QLabel(desc)
+            desc_lbl.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+            desc_lbl.setStyleSheet(f"color: {COLOR_GRAY_600};")
+            info_layout.addWidget(desc_lbl)
+            
+            activity_layout.addLayout(info_layout)
             activity_layout.addStretch()
             
-            # Time text
-            time_label = QLabel(time_text)
-            time_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
-            time_label.setStyleSheet(f"color: {COLOR_GRAY_500};")
-            activity_layout.addWidget(time_label)
+            # Time
+            time_lbl = QLabel(time)
+            time_lbl.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+            time_lbl.setStyleSheet(f"color: {COLOR_GRAY_500};")
+            activity_layout.addWidget(time_lbl)
             
             layout.addLayout(activity_layout)
         
         return frame
+    
+    def _get_input_stylesheet(self) -> str:
+        """Get stylesheet for input fields."""
+        return f"""
+            QLineEdit {{
+                padding: 10px 12px;
+                border: 1px solid {COLOR_GRAY_200};
+                border-radius: {BORDER_RADIUS_SM};
+                background-color: {COLOR_WHITE};
+                color: {COLOR_NAVY};
+                font-size: 11px;
+            }}
+            QLineEdit:focus {{
+                border: 2px solid {COLOR_ORANGE};
+                padding: 9px 11px;
+            }}
+        """
+    
+    def _get_initials(self) -> str:
+        """Get user initials."""
+        if self.username:
+            parts = self.username.split()
+            if len(parts) >= 2:
+                return (parts[0][0] + parts[-1][0]).upper()
+            return self.username[0].upper()
+        return "AR"
     
     def load_user_data(self):
         """Load user data from database."""
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            
-            # Query user data
-            cursor.execute("""
-                SELECT username, email FROM akun WHERE id = ?
-            """, (self.user_id,))
-            
+            cursor.execute("SELECT * FROM users WHERE id = ?", (self.user_id,))
             result = cursor.fetchone()
             if result:
-                username, email = result
-                self.username = username
-                self.email = email
-                
-                # Update UI
-                self.nama_input.setText(username or "")
-                self.email_personal_input.setText(email or "")
-                
-                logger.info(f"Loaded user data for {username}")
-            
+                logger.info(f"Loaded user data for {self.username}")
+            conn.close()
         except Exception as e:
             logger.error(f"Error loading user data: {e}")
-    
-    def on_edit_personal_info(self):
-        """Handle edit personal info."""
-        dialog = EditPersonalInfoDialog(self.user_id, self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.load_user_data()
-            QMessageBox.information(self, "Sukses", "Informasi pribadi berhasil diperbarui!")
-    
-    def on_edit_contact_info(self):
-        """Handle edit contact info."""
-        dialog = EditContactInfoDialog(self.user_id, self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            QMessageBox.information(self, "Sukses", "Informasi kontak berhasil diperbarui!")
-    
-    def on_save_preferences(self):
-        """Handle save preferences."""
-        QMessageBox.information(self, "Sukses", "Preferensi berhasil disimpan!")
-        logger.info(f"User {self.user_id} preferences updated")
-    
-    def on_change_password(self):
-        """Handle change password."""
-        dialog = ChangePasswordDialog(self.user_id, self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            QMessageBox.information(self, "Sukses", "Password berhasil diubah!")
-    
-    def on_logout(self):
-        """Handle logout."""
-        reply = QMessageBox.question(
-            self,
-            "Konfirmasi Keluar",
-            "Anda yakin ingin keluar dari akun ini?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
-        if reply == QMessageBox.StandardButton.Yes:
-            logger.info(f"User {self.user_id} logged out")
-            # Emit signal or close application
-            # This would be handled by the main window
-            from PyQt6.QtWidgets import QApplication
-            QApplication.instance().quit()
-
-
-class EditPersonalInfoDialog(QDialog):
-    """Dialog untuk edit personal information."""
-    
-    def __init__(self, user_id: int, parent=None):
-        super().__init__(parent)
-        self.user_id = user_id
-        self.setWindowTitle("Edit Informasi Pribadi")
-        self.setGeometry(150, 150, 500, 400)
-        self.setModal(True)
-        self.init_ui()
-        self.load_data()
-    
-    def init_ui(self):
-        """Initialize dialog UI."""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
-        
-        # Title
-        title = QLabel("Edit Informasi Pribadi")
-        title_font = QFont(FONT_FAMILY_PRIMARY, 14)
-        title_font.setWeight(QFont.Weight.Bold)
-        title.setFont(title_font)
-        title.setStyleSheet(f"color: {COLOR_NAVY};")
-        layout.addWidget(title)
-        
-        # Form layout
-        form = QFormLayout()
-        form.setSpacing(12)
-        
-        # Phone
-        self.phone_input = QLineEdit()
-        self.phone_input.setMinimumHeight(36)
-        form.addRow("Nomor Telepon:", self.phone_input)
-        
-        # Date of birth
-        self.dob_input = QLineEdit()
-        self.dob_input.setPlaceholderText("YYYY-MM-DD")
-        self.dob_input.setMinimumHeight(36)
-        form.addRow("Tanggal Lahir:", self.dob_input)
-        
-        layout.addLayout(form)
-        
-        # Buttons
-        button_layout = QHBoxLayout()
-        
-        simpan_btn = QPushButton("✅ Simpan")
-        simpan_btn.setStyleSheet(get_button_solid_stylesheet("navy"))
-        simpan_btn.clicked.connect(self.on_simpan)
-        button_layout.addWidget(simpan_btn)
-        
-        batal_btn = QPushButton("❌ Batal")
-        batal_btn.setStyleSheet(get_button_solid_stylesheet("gray"))
-        batal_btn.clicked.connect(self.reject)
-        button_layout.addWidget(batal_btn)
-        
-        layout.addLayout(button_layout)
-        layout.addStretch()
-    
-    def load_data(self):
-        """Load user data."""
-        try:
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT phone, date_of_birth FROM akun WHERE id = ?", (self.user_id,))
-            
-            result = cursor.fetchone()
-            if result:
-                phone, dob = result
-                self.phone_input.setText(phone or "")
-                self.dob_input.setText(dob or "")
-            
-        except Exception as e:
-            logger.error(f"Error loading personal info: {e}")
-    
-    def on_simpan(self):
-        """Save changes."""
-        phone = self.phone_input.text().strip()
-        dob = self.dob_input.text().strip()
-        
-        try:
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE akun SET phone = ?, date_of_birth = ? WHERE id = ?
-            """, (phone, dob, self.user_id))
-            conn.commit()
-            
-            logger.info(f"Updated personal info for user {self.user_id}")
-            self.accept()
-            
-        except Exception as e:
-            logger.error(f"Error updating personal info: {e}")
-            QMessageBox.critical(self, "Error", f"Gagal simpan: {e}")
-
-
-class EditContactInfoDialog(QDialog):
-    """Dialog untuk edit contact information."""
-    
-    def __init__(self, user_id: int, parent=None):
-        super().__init__(parent)
-        self.user_id = user_id
-        self.setWindowTitle("Edit Informasi Kontak")
-        self.setGeometry(150, 150, 500, 450)
-        self.setModal(True)
-        self.init_ui()
-        self.load_data()
-    
-    def init_ui(self):
-        """Initialize dialog UI."""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
-        
-        # Title
-        title = QLabel("Edit Informasi Kontak")
-        title_font = QFont(FONT_FAMILY_PRIMARY, 14)
-        title_font.setWeight(QFont.Weight.Bold)
-        title.setFont(title_font)
-        title.setStyleSheet(f"color: {COLOR_NAVY};")
-        layout.addWidget(title)
-        
-        # Form layout
-        form = QFormLayout()
-        form.setSpacing(12)
-        
-        # Alamat
-        self.alamat_input = QLineEdit()
-        self.alamat_input.setMinimumHeight(36)
-        form.addRow("Alamat:", self.alamat_input)
-        
-        # Kota
-        self.kota_input = QLineEdit()
-        self.kota_input.setMinimumHeight(36)
-        form.addRow("Kota:", self.kota_input)
-        
-        # Provinsi
-        self.provinsi_input = QLineEdit()
-        self.provinsi_input.setMinimumHeight(36)
-        form.addRow("Provinsi:", self.provinsi_input)
-        
-        # Kode Pos
-        self.postal_input = QLineEdit()
-        self.postal_input.setMinimumHeight(36)
-        form.addRow("Kode Pos:", self.postal_input)
-        
-        layout.addLayout(form)
-        
-        # Buttons
-        button_layout = QHBoxLayout()
-        
-        simpan_btn = QPushButton("✅ Simpan")
-        simpan_btn.setStyleSheet(get_button_solid_stylesheet("navy"))
-        simpan_btn.clicked.connect(self.on_simpan)
-        button_layout.addWidget(simpan_btn)
-        
-        batal_btn = QPushButton("❌ Batal")
-        batal_btn.setStyleSheet(get_button_solid_stylesheet("gray"))
-        batal_btn.clicked.connect(self.reject)
-        button_layout.addWidget(batal_btn)
-        
-        layout.addLayout(button_layout)
-        layout.addStretch()
-    
-    def load_data(self):
-        """Load user data."""
-        try:
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT address, city, province, postal_code FROM akun WHERE id = ?
-            """, (self.user_id,))
-            
-            result = cursor.fetchone()
-            if result:
-                address, city, province, postal = result
-                self.alamat_input.setText(address or "")
-                self.kota_input.setText(city or "")
-                self.provinsi_input.setText(province or "")
-                self.postal_input.setText(postal or "")
-            
-        except Exception as e:
-            logger.error(f"Error loading contact info: {e}")
-    
-    def on_simpan(self):
-        """Save changes."""
-        address = self.alamat_input.text().strip()
-        city = self.kota_input.text().strip()
-        province = self.provinsi_input.text().strip()
-        postal = self.postal_input.text().strip()
-        
-        try:
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE akun SET address = ?, city = ?, province = ?, postal_code = ? WHERE id = ?
-            """, (address, city, province, postal, self.user_id))
-            conn.commit()
-            
-            logger.info(f"Updated contact info for user {self.user_id}")
-            self.accept()
-            
-        except Exception as e:
-            logger.error(f"Error updating contact info: {e}")
-            QMessageBox.critical(self, "Error", f"Gagal simpan: {e}")
-
-
-class ChangePasswordDialog(QDialog):
-    """Dialog untuk ubah password."""
-    
-    def __init__(self, user_id: int, parent=None):
-        super().__init__(parent)
-        self.user_id = user_id
-        self.setWindowTitle("Ubah Password")
-        self.setGeometry(150, 150, 450, 350)
-        self.setModal(True)
-        self.init_ui()
-    
-    def init_ui(self):
-        """Initialize dialog UI."""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
-        
-        # Title
-        title = QLabel("Ubah Password")
-        title_font = QFont(FONT_FAMILY_PRIMARY, 14)
-        title_font.setWeight(QFont.Weight.Bold)
-        title.setFont(title_font)
-        title.setStyleSheet(f"color: {COLOR_NAVY};")
-        layout.addWidget(title)
-        
-        # Form layout
-        form = QFormLayout()
-        form.setSpacing(12)
-        
-        # Password lama
-        self.old_pwd = QLineEdit()
-        self.old_pwd.setEchoMode(QLineEdit.EchoMode.Password)
-        self.old_pwd.setMinimumHeight(36)
-        form.addRow("Password Lama:", self.old_pwd)
-        
-        # Password baru
-        self.new_pwd = QLineEdit()
-        self.new_pwd.setEchoMode(QLineEdit.EchoMode.Password)
-        self.new_pwd.setMinimumHeight(36)
-        form.addRow("Password Baru:", self.new_pwd)
-        
-        # Konfirmasi password
-        self.confirm_pwd = QLineEdit()
-        self.confirm_pwd.setEchoMode(QLineEdit.EchoMode.Password)
-        self.confirm_pwd.setMinimumHeight(36)
-        form.addRow("Konfirmasi Password:", self.confirm_pwd)
-        
-        layout.addLayout(form)
-        
-        # Buttons
-        button_layout = QHBoxLayout()
-        
-        simpan_btn = QPushButton("✅ Simpan")
-        simpan_btn.setStyleSheet(get_button_solid_stylesheet("navy"))
-        simpan_btn.clicked.connect(self.on_simpan)
-        button_layout.addWidget(simpan_btn)
-        
-        batal_btn = QPushButton("❌ Batal")
-        batal_btn.setStyleSheet(get_button_solid_stylesheet("gray"))
-        batal_btn.clicked.connect(self.reject)
-        button_layout.addWidget(batal_btn)
-        
-        layout.addLayout(button_layout)
-        layout.addStretch()
-    
-    def on_simpan(self):
-        """Save new password."""
-        old_pwd = self.old_pwd.text()
-        new_pwd = self.new_pwd.text()
-        confirm_pwd = self.confirm_pwd.text()
-        
-        if not old_pwd or not new_pwd or not confirm_pwd:
-            QMessageBox.warning(self, "Validasi", "Semua field harus diisi!")
-            return
-        
-        if new_pwd != confirm_pwd:
-            QMessageBox.warning(self, "Validasi", "Password baru tidak cocok!")
-            return
-        
-        if len(new_pwd) < 6:
-            QMessageBox.warning(self, "Validasi", "Password minimal 6 karakter!")
-            return
-        
-        try:
-            QMessageBox.information(self, "Sukses", "Password berhasil diubah!")
-            logger.info(f"User {self.user_id} changed password")
-            self.accept()
-            
-        except Exception as e:
-            logger.error(f"Error changing password: {e}")
-            QMessageBox.critical(self, "Error", f"Gagal ubah password: {e}")

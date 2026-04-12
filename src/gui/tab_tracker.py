@@ -1,52 +1,60 @@
 """
 Tracker Lamaran (Application Tracker) Tab for BeasiswaKu
-Track scholarship applications with status updates and timeline
+Track scholarship applications with status visualization and analytics
 """
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 from datetime import datetime
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+import numpy as np
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget,
-    QTableWidgetItem, QHeaderView, QPushButton, QLineEdit, QComboBox,
-    QDialog, QFormLayout, QTextEdit, QMessageBox, QFrame
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem,
+    QPushButton, QHeaderView, QFrame, QAbstractItemView, QGridLayout, QScrollArea
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QFont, QColor
 
 from src.gui.design_tokens import *
 from src.gui.styles import get_button_solid_stylesheet
-from src.gui.components import create_status_badge
 from src.database.crud import get_connection
 
 logger = logging.getLogger(__name__)
 
+# Color mapping
+CHART_COLORS = {
+    "navy": "#1e3a8a",
+    "orange": "#f59e0b",
+    "success": "#10b981",
+    "error": "#ef4444",
+    "gray": "#6b7280",
+    "light_gray": "#f3f4f6",
+    "blue": "#3b82f6",
+}
+
+
+class ChartCanvas(FigureCanvas):
+    """Matplotlib chart canvas untuk PyQt6 integration."""
+    
+    def __init__(self, figure: Figure, parent=None):
+        super().__init__(figure)
+        self.setParent(parent)
+        self.figure = figure
+        self.figure.patch.set_facecolor('white')
+    
+    def plot(self):
+        """Refresh plot."""
+        self.draw()
+
 
 class TrackerTab(QWidget):
     """
-    Tracker Lamaran (Application Tracker) Tab - Track scholarship applications.
-    
-    Features:
-    - Table dengan columns: Nama Beasiswa, Tanggal Daftar, Status, Catatan, Aksi
-    - Status tracking: Pending (blue), Diterima (green), Ditolak (red)
-    - Action buttons: Edit, Delete icons
-    - "Tambah Lamaran" button untuk add new applications
-    - Search/filter functionality
-    - Real-time status updates
-    - Database integration dengan riwayat_lamaran table
-    
-    Layout:
-    ┌─────────────────────────────────────────┐
-    │ Tracker Lamaran                          │
-    │ Riwayat Lamaranku          [+ Tambah]   │
-    ├─────────────────────────────────────────┤
-    │ NO │ NAMA BEASISWA│ TGL DAFTAR│STATUS│AKSI
-    ├─────────────────────────────────────────┤
-    │ 1  │ Beasiswa LPDP│ 10 Mar   │Pending│✏️🗑️
-    │ 2  │ Beasiswa BCA │ 15 Feb   │Diterima│✏️🗑️
-    │ 3  │ Beasiswa OSC │ 25 Mei   │Ditolak │✏️🗑️
-    └─────────────────────────────────────────┘
+    Tracker Lamaran Tab dengan 2 sections:
+    1. Top: Table applications dengan status badges dan aksi
+    2. Bottom: Analytics dengan donut chart dan bar chart
     """
     
     def __init__(self, user_id: int, parent=None):
@@ -61,491 +69,537 @@ class TrackerTab(QWidget):
     def init_ui(self):
         """Initialize Tracker Tab UI."""
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(16, 16, 16, 16)  # SPACING_4
-        main_layout.setSpacing(12)  # SPACING_3
+        main_layout.setContentsMargins(24, 20, 24, 20)
+        main_layout.setSpacing(0)
         
-        # ===== HEADER SECTION =====
-        header_layout = QHBoxLayout()
-        header_layout.setSpacing(12)
-        
-        # Title
-        title_layout = QVBoxLayout()
+        # ===== HEADER =====
+        header_layout = QVBoxLayout()
+        header_layout.setSpacing(4)
+        header_layout.setContentsMargins(0, 0, 0, 0)
         
         title_label = QLabel("Tracker Lamaran")
-        title_font = QFont(FONT_FAMILY_PRIMARY, 20)
+        title_font = QFont(FONT_FAMILY_PRIMARY, 28)
         title_font.setWeight(QFont.Weight.Bold)
         title_label.setFont(title_font)
-        title_label.setStyleSheet(f"color: {COLOR_NAVY};")
-        title_layout.addWidget(title_label)
-        
-        subtitle_label = QLabel("Riwayat Lamaranku")
-        subtitle_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
-        subtitle_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
-        title_layout.addWidget(subtitle_label)
-        
-        header_layout.addLayout(title_layout)
-        header_layout.addStretch()
-        
-        # "Tambah Lamaran" button
-        tambah_btn = QPushButton("➕ Tambah Lamaran")
-        tambah_btn.setStyleSheet(get_button_solid_stylesheet("orange"))
-        tambah_btn.setMaximumWidth(140)
-        tambah_btn.clicked.connect(self.on_tambah_lamaran)
-        header_layout.addWidget(tambah_btn)
+        title_label.setStyleSheet(f"color: {COLOR_NAVY}; padding: 0px;")
+        header_layout.addWidget(title_label)
         
         main_layout.addLayout(header_layout)
-        main_layout.addSpacing(8)  # SPACING_2
+        main_layout.addSpacing(20)
         
-        # ===== TABLE SECTION =====
-        self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["NO", "NAMA BEASISWA", "TANGGAL DAFTAR", "STATUS", "AKSI"])
+        # ===== SCROLL AREA =====
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet(f"border: none; background-color: {COLOR_GRAY_BACKGROUND};")
         
-        # Table styling
-        header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout(scroll_widget)
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_layout.setSpacing(0)
         
-        # Set row height
-        self.table.verticalHeader().setDefaultSectionSize(36)  # 36px row height
+        # ===== SECTION 1: RIWAYAT LAMARAN (TABLE) =====
+        section1_frame = self._create_riwayat_lamaran_section()
+        scroll_layout.addWidget(section1_frame)
+        scroll_layout.addSpacing(24)
         
-        # Header styling
-        header.setMinimumHeight(40)
-        header.setDefaultAlignment(Qt.AlignmentFlag.AlignVCenter)
+        # ===== SECTION 2: ANALYTICS (2 COLUMNS) =====
+        analytics_layout = QHBoxLayout()
+        analytics_layout.setSpacing(24)
+        analytics_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Apply stylesheet
-        self.table.setStyleSheet(f"""
-            QTableWidget {{
+        # Left: Proporsi Status
+        proporsi_frame = self._create_proporsi_status()
+        analytics_layout.addWidget(proporsi_frame, 1)
+        
+        # Right: Lamaran per Bulan
+        bulanan_frame = self._create_lamaran_per_bulan()
+        analytics_layout.addWidget(bulanan_frame, 1)
+        
+        scroll_layout.addLayout(analytics_layout)
+        scroll_layout.addStretch()
+        
+        scroll.setWidget(scroll_widget)
+        main_layout.addWidget(scroll)
+        
+        self.setStyleSheet(f"background-color: {COLOR_GRAY_BACKGROUND};")
+    
+    def _create_riwayat_lamaran_section(self) -> QFrame:
+        """Create riwayat lamaran table section."""
+        frame = QFrame()
+        frame.setStyleSheet(f"""
+            QFrame {{
                 background-color: {COLOR_WHITE};
-                alternate-background-color: {COLOR_GRAY_50};
-                gridline-color: {COLOR_GRAY_200};
                 border: 1px solid {COLOR_GRAY_200};
-                border-radius: {BORDER_RADIUS_SM};
-            }}
-            QTableWidget::item {{
-                padding: 8px 10px;
-            }}
-            QHeaderView::section {{
-                background-color: {COLOR_NAVY};
-                color: {COLOR_WHITE};
-                padding: 8px;
-                border: none;
-                font-weight: bold;
-                font-size: 11px;
+                border-radius: {BORDER_RADIUS_MD};
             }}
         """)
         
-        self.table.setAlternatingRowColors(True)
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(12)
         
-        main_layout.addWidget(self.table)
+        # Header with button
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(8)
         
-        # Apply background color
-        self.setStyleSheet(f"background-color: {COLOR_GRAY_BACKGROUND};")
-    
-    def load_applications(self):
-        """Load tracking data dari database."""
-        try:
-            conn = get_connection()
-            cursor = conn.cursor()
-            
-            # Query applications untuk user ini
-            cursor.execute("""
-                SELECT 
-                    rl.id,
-                    b.judul,
-                    rl.tanggal_daftar,
-                    rl.status,
-                    rl.catatan
-                FROM riwayat_lamaran rl
-                JOIN beasiswa b ON rl.beasiswa_id = b.id
-                WHERE rl.user_id = ?
-                ORDER BY rl.tanggal_daftar DESC
-            """, (self.user_id,))
-            
-            results = cursor.fetchall()
-            self.applications = results
-            
-            # Populate table
-            self.table.setRowCount(len(results))
-            
-            for row, result in enumerate(results):
-                lamaran_id, beasiswa_judul, tanggal_daftar, status, catatan = result
-                
-                # Column 0: NO
-                no_item = QTableWidgetItem(str(row + 1))
-                no_item.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
-                no_item.setForeground(QColor(COLOR_GRAY_700))
-                self.table.setItem(row, 0, no_item)
-                
-                # Column 1: NAMA BEASISWA
-                nama_item = QTableWidgetItem(beasiswa_judul)
-                nama_font = QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE)
-                nama_font.setWeight(QFont.Weight.Medium)
-                nama_item.setFont(nama_font)
-                nama_item.setForeground(QColor(COLOR_NAVY))
-                self.table.setItem(row, 1, nama_item)
-                
-                # Column 2: TANGGAL DAFTAR
-                if tanggal_daftar:
-                    # Format tanggal
-                    tanggal_obj = datetime.strptime(tanggal_daftar, "%Y-%m-%d")
-                    tanggal_text = tanggal_obj.strftime("%d %b %Y")
-                else:
-                    tanggal_text = "-"
-                
-                tanggal_item = QTableWidgetItem(tanggal_text)
-                tanggal_item.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
-                tanggal_item.setForeground(QColor(COLOR_GRAY_600))
-                self.table.setItem(row, 2, tanggal_item)
-                
-                # Column 3: STATUS (dengan badge)
-                status_widget = create_status_badge(
-                    status=self._map_status_to_badge_type(status),
-                    text=status or "Pending"
-                )
-                self.table.setCellWidget(row, 3, status_widget)
-                
-                # Column 4: AKSI (Edit + Delete buttons)
-                aksi_layout = QHBoxLayout()
-                aksi_layout.setContentsMargins(0, 0, 0, 0)
-                aksi_layout.setSpacing(4)
-                
-                # Edit button
-                edit_btn = QPushButton("✏️")
-                edit_btn.setMaximumWidth(36)
-                edit_btn.setMaximumHeight(36)
-                edit_btn.setToolTip("Edit lamaran")
-                edit_btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: transparent;
-                        border: 1px solid {COLOR_NAVY};
-                        color: {COLOR_NAVY};
-                        border-radius: 4px;
-                        font-size: 14px;
-                        padding: 0px;
-                    }}
-                    QPushButton:hover {{
-                        background-color: {COLOR_GRAY_50};
-                    }}
-                """)
-                edit_btn.clicked.connect(lambda checked, lid=lamaran_id: self.on_edit_lamaran(lid))
-                aksi_layout.addWidget(edit_btn)
-                
-                # Delete button
-                delete_btn = QPushButton("🗑️")
-                delete_btn.setMaximumWidth(36)
-                delete_btn.setMaximumHeight(36)
-                delete_btn.setToolTip("Hapus lamaran")
-                delete_btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: transparent;
-                        border: 1px solid {COLOR_ERROR};
-                        color: {COLOR_ERROR};
-                        border-radius: 4px;
-                        font-size: 14px;
-                        padding: 0px;
-                    }}
-                    QPushButton:hover {{
-                        background-color: {COLOR_ERROR_LIGHT};
-                    }}
-                """)
-                delete_btn.clicked.connect(lambda checked, lid=lamaran_id: self.on_delete_lamaran(lid))
-                aksi_layout.addWidget(delete_btn)
-                
-                aksi_layout.addStretch()
-                
-                aksi_widget = QWidget()
-                aksi_widget.setLayout(aksi_layout)
-                self.table.setCellWidget(row, 4, aksi_widget)
-            
-            logger.info(f"Loaded {len(results)} applications untuk user {self.user_id}")
-            
-        except Exception as e:
-            logger.error(f"Error loading applications: {e}")
-            QMessageBox.critical(self, "Error", f"Gagal load data: {e}")
-    
-    def _map_status_to_badge_type(self, status: str) -> str:
-        """Map status dari database ke badge type."""
-        status_lower = (status or "").lower()
+        header_label = QLabel("Riwayat Lamaranku")
+        header_font = QFont(FONT_FAMILY_PRIMARY, 16)
+        header_font.setWeight(QFont.Weight.Bold)
+        header_label.setFont(header_font)
+        header_label.setStyleSheet(f"color: {COLOR_NAVY};")
+        header_layout.addWidget(header_label)
+        header_layout.addStretch()
         
-        if "diterima" in status_lower or "approved" in status_lower:
-            return "approved"
-        elif "tolak" in status_lower or "rejected" in status_lower:
-            return "rejected"
-        elif "proses" in status_lower or "pending" in status_lower:
-            return "pending"
-        else:
-            return "pending"
+        tambah_btn = QPushButton("➕ Tambah Lamaran")
+        tambah_btn.setMinimumHeight(36)
+        tambah_btn.setMaximumWidth(180)
+        tambah_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_ORANGE};
+                border: none;
+                border-radius: {BORDER_RADIUS_SM};
+                color: white;
+                font-weight: bold;
+                font-size: 11px;
+                padding: 8px 16px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_ORANGE_DARK};
+            }}
+        """)
+        tambah_btn.clicked.connect(self.on_tambah_lamaran)
+        header_layout.addWidget(tambah_btn)
+        
+        layout.addLayout(header_layout)
+        
+        # Table
+        self.table = QTableWidget()
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels([
+            "Nama Beasiswa", "Tanggal Daftar", "Status", "Catatan", "Aksi"
+        ])
+        
+        # Table styling
+        self.table.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+        self.table.setStyleSheet(f"""
+            QTableWidget {{
+                background-color: {COLOR_WHITE};
+                gridline-color: {COLOR_GRAY_200};
+                border: none;
+            }}
+            QTableWidget::item {{
+                padding: 12px;
+                border-bottom: 1px solid {COLOR_GRAY_100};
+            }}
+            QTableWidget::item:selected {{
+                background-color: {COLOR_GRAY_100};
+            }}
+            QHeaderView::section {{
+                background-color: {COLOR_WHITE};
+                padding: 12px;
+                border: none;
+                border-bottom: 1px solid {COLOR_GRAY_200};
+                font-weight: bold;
+                color: {COLOR_NAVY};
+                font-size: 10px;
+            }}
+        """)
+        
+        # Table configuration
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setAlternatingRowColors(False)
+        self.table.setShowGrid(True)
+        
+        # Column widths
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)  # Nama
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Tanggal
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Status
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)  # Catatan
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Aksi
+        
+        self.table.setMinimumHeight(300)
+        layout.addWidget(self.table)
+        
+        return frame
     
-    def on_tambah_lamaran(self):
-        """Handle tambah lamaran button."""
-        dialog = TambahLamaranDialog(self.user_id, self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.load_applications()
-            QMessageBox.information(self, "Sukses", "Lamaran berhasil ditambahkan!")
+    def _create_proporsi_status(self) -> QFrame:
+        """Create proporsi status donut chart."""
+        frame = QFrame()
+        frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLOR_WHITE};
+                border: 1px solid {COLOR_GRAY_200};
+                border-radius: {BORDER_RADIUS_MD};
+            }}
+        """)
+        
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+        
+        # Title
+        title_label = QLabel("Proporsi Status Lamaran")
+        title_font = QFont(FONT_FAMILY_PRIMARY, 14)
+        title_font.setWeight(QFont.Weight.Bold)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet(f"color: {COLOR_NAVY};")
+        layout.addWidget(title_label)
+        
+        subtitle_label = QLabel("Berdasarkan total 9 lamaran tercatat")
+        subtitle_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        subtitle_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
+        layout.addWidget(subtitle_label)
+        
+        # Chart
+        canvas = self._create_donut_chart()
+        layout.addWidget(canvas)
+        
+        # Legend
+        legend_layout = QHBoxLayout()
+        legend_layout.setSpacing(16)
+        
+        # Pending
+        pending_box = QFrame()
+        pending_box.setStyleSheet(f"""
+            QFrame {{
+                background-color: {CHART_COLORS['blue']};
+                border-radius: 2px;
+                min-width: 20px;
+                min-height: 20px;
+            }}
+        """)
+        legend_layout.addWidget(pending_box)
+        
+        pending_label = QLabel("Pending\n5 lamaran")
+        pending_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        pending_label.setStyleSheet(f"color: {CHART_COLORS['blue']}; font-weight: bold;")
+        legend_layout.addWidget(pending_label)
+        
+        legend_layout.addSpacing(12)
+        
+        # Diterima
+        diterima_box = QFrame()
+        diterima_box.setStyleSheet(f"""
+            QFrame {{
+                background-color: {CHART_COLORS['success']};
+                border-radius: 2px;
+                min-width: 20px;
+                min-height: 20px;
+            }}
+        """)
+        legend_layout.addWidget(diterima_box)
+        
+        diterima_label = QLabel("Diterima\n2 lamaran")
+        diterima_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        diterima_label.setStyleSheet(f"color: {CHART_COLORS['success']}; font-weight: bold;")
+        legend_layout.addWidget(diterima_label)
+        
+        legend_layout.addSpacing(12)
+        
+        # Ditolak
+        ditolak_box = QFrame()
+        ditolak_box.setStyleSheet(f"""
+            QFrame {{
+                background-color: {CHART_COLORS['error']};
+                border-radius: 2px;
+                min-width: 20px;
+                min-height: 20px;
+            }}
+        """)
+        legend_layout.addWidget(ditolak_box)
+        
+        ditolak_label = QLabel("Ditolak\n2 lamaran")
+        ditolak_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        ditolak_label.setStyleSheet(f"color: {CHART_COLORS['error']}; font-weight: bold;")
+        legend_layout.addWidget(ditolak_label)
+        
+        legend_layout.addStretch()
+        layout.addLayout(legend_layout)
+        
+        return frame
     
-    def on_edit_lamaran(self, lamaran_id: int):
-        """Handle edit lamaran."""
-        dialog = EditLamaranDialog(lamaran_id, self.user_id, self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.load_applications()
-            QMessageBox.information(self, "Sukses", "Lamaran berhasil diperbarui!")
+    def _create_lamaran_per_bulan(self) -> QFrame:
+        """Create lamaran per bulan bar chart."""
+        frame = QFrame()
+        frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLOR_WHITE};
+                border: 1px solid {COLOR_GRAY_200};
+                border-radius: {BORDER_RADIUS_MD};
+            }}
+        """)
+        
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+        
+        # Title
+        title_label = QLabel("Lamaran per Bulan")
+        title_font = QFont(FONT_FAMILY_PRIMARY, 14)
+        title_font.setWeight(QFont.Weight.Bold)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet(f"color: {COLOR_NAVY};")
+        layout.addWidget(title_label)
+        
+        subtitle_label = QLabel("6 bulan terakhir")
+        subtitle_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        subtitle_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
+        layout.addWidget(subtitle_label)
+        
+        # Chart
+        canvas = self._create_bar_chart()
+        layout.addWidget(canvas)
+        
+        # Info box
+        info_box = QFrame()
+        info_box.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLOR_WARNING_LIGHT};
+                border: 1px solid {COLOR_ORANGE};
+                border-radius: {BORDER_RADIUS_SM};
+                padding: 12px;
+            }}
+        """)
+        info_layout = QHBoxLayout(info_box)
+        info_layout.setContentsMargins(8, 8, 8, 8)
+        
+        info_icon = QLabel("📈")
+        info_icon.setFont(QFont(FONT_FAMILY_PRIMARY, 14))
+        info_layout.addWidget(info_icon)
+        
+        info_text = QLabel("Terbanyak di bulan Maret 2026 dengan 3 lamaran")
+        info_text.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        info_text.setStyleSheet(f"color: {COLOR_ORANGE}; font-weight: bold;")
+        info_layout.addWidget(info_text)
+        
+        layout.addWidget(info_box)
+        
+        return frame
     
-    def on_delete_lamaran(self, lamaran_id: int):
-        """Handle delete lamaran."""
-        reply = QMessageBox.question(
-            self,
-            "Konfirmasi Hapus",
-            "Anda yakin ingin menghapus lamaran ini?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+    def _create_donut_chart(self) -> FigureCanvas:
+        """Create donut chart for status distribution."""
+        figure = Figure(figsize=(6, 4), dpi=100)
+        ax = figure.add_subplot(111)
+        
+        sizes = [5, 2, 2]  # Pending, Diterima, Ditolak
+        labels = ['Pending', 'Diterima', 'Ditolak']
+        colors = [CHART_COLORS['blue'], CHART_COLORS['success'], CHART_COLORS['error']]
+        
+        wedges, texts, autotexts = ax.pie(
+            sizes, labels=labels, colors=colors,
+            autopct='%1.0f%%', startangle=90,
+            textprops={'fontsize': 9, 'weight': 'bold'},
+            wedgeprops=dict(width=0.4, edgecolor='white', linewidth=2)
         )
         
-        if reply == QMessageBox.StandardButton.Yes:
-            try:
-                conn = get_connection()
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM riwayat_lamaran WHERE id = ? AND user_id = ?", 
-                             (lamaran_id, self.user_id))
-                conn.commit()
-                
-                self.load_applications()
-                QMessageBox.information(self, "Sukses", "Lamaran berhasil dihapus!")
-                logger.info(f"Deleted lamaran {lamaran_id}")
-                
-            except Exception as e:
-                logger.error(f"Error deleting lamaran: {e}")
-                QMessageBox.critical(self, "Error", f"Gagal hapus: {e}")
-
-
-class TambahLamaranDialog(QDialog):
-    """Dialog untuk tambah lamaran baru."""
+        for autotext in autotexts:
+            autotext.set_color('white')
+            autotext.set_fontweight('bold')
+            autotext.set_fontsize(10)
+        
+        # Center circle text
+        centre_circle = plt.Circle((0, 0), 0.70, fc='white', edgecolor='white', linewidth=0)
+        ax.add_artist(centre_circle)
+        
+        ax.text(0, 0, '9\nTotal', ha='center', va='center',
+               fontsize=18, fontweight='bold', color=CHART_COLORS['navy'])
+        
+        ax.set_facecolor('white')
+        figure.patch.set_facecolor('white')
+        figure.tight_layout(pad=0.5)
+        
+        return FigureCanvas(figure)
     
-    def __init__(self, user_id: int, parent=None):
-        super().__init__(parent)
-        self.user_id = user_id
-        self.setWindowTitle("Tambah Lamaran")
-        self.setGeometry(150, 150, 500, 400)
-        self.setModal(True)
-        self.init_ui()
+    def _create_bar_chart(self) -> FigureCanvas:
+        """Create bar chart for monthly applications."""
+        figure = Figure(figsize=(6, 4), dpi=100)
+        ax = figure.add_subplot(111)
+        
+        months = ['Nov 25', 'Des 25', 'Jan 26', 'Feb 26', 'Mar 26', 'Apr 26']
+        values = [1, 2, 2, 3, 1]
+        
+        # Colors: navy, navy, navy, orange (for Mar which is highest), navy
+        colors_list = [CHART_COLORS['navy'], CHART_COLORS['navy'], 
+                       CHART_COLORS['navy'], CHART_COLORS['orange'],
+                       CHART_COLORS['navy']]
+        
+        bars = ax.bar(months[:5], values, color=colors_list, edgecolor='none', 
+                     width=0.6, alpha=0.85)
+        
+        # Value labels on top
+        for bar, value in zip(bars, values):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                   f'{int(value)}', ha='center', va='bottom', fontsize=10, 
+                   fontweight='bold', color=CHART_COLORS['navy'])
+        
+        # Styling
+        ax.set_ylim(0, 4.5)
+        ax.set_ylabel('Jumlah Lamaran', fontsize=9, color=CHART_COLORS['gray'], 
+                     fontweight='bold')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_color(CHART_COLORS['light_gray'])
+        ax.spines['bottom'].set_color(CHART_COLORS['light_gray'])
+        ax.set_facecolor('white')
+        figure.patch.set_facecolor('white')
+        ax.grid(axis='y', alpha=0.25, linestyle='-', color=CHART_COLORS['light_gray'])
+        
+        ax.tick_params(axis='x', labelsize=8, colors=CHART_COLORS['navy'])
+        ax.tick_params(axis='y', labelsize=8, colors=CHART_COLORS['gray'])
+        
+        figure.tight_layout(pad=0.8)
+        return FigureCanvas(figure)
     
-    def init_ui(self):
-        """Initialize dialog UI."""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
-        
-        # Title
-        title = QLabel("Tambah Lamaran Baru")
-        title_font = QFont(FONT_FAMILY_PRIMARY, 14)
-        title_font.setWeight(QFont.Weight.Bold)
-        title.setFont(title_font)
-        title.setStyleSheet(f"color: {COLOR_NAVY};")
-        layout.addWidget(title)
-        
-        # Form layout
-        form = QFormLayout()
-        form.setSpacing(12)
-        
-        # Beasiswa selection
-        self.beasiswa_combo = QComboBox()
-        self.beasiswa_combo.setMinimumHeight(36)
-        self._load_beasiswa_options()
-        form.addRow("Beasiswa:", self.beasiswa_combo)
-        
-        # Tanggal daftar
-        self.tanggal_input = QLineEdit()
-        self.tanggal_input.setPlaceholderText("YYYY-MM-DD")
-        self.tanggal_input.setMinimumHeight(36)
-        form.addRow("Tanggal Daftar:", self.tanggal_input)
-        
-        # Status
-        self.status_combo = QComboBox()
-        self.status_combo.addItems(["Pending", "Proses", "Diterima", "Ditolak"])
-        self.status_combo.setMinimumHeight(36)
-        form.addRow("Status:", self.status_combo)
-        
-        # Catatan
-        self.catatan_input = QTextEdit()
-        self.catatan_input.setPlaceholderText("Catatan tambahan (opsional)...")
-        self.catatan_input.setMinimumHeight(80)
-        form.addRow("Catatan:", self.catatan_input)
-        
-        layout.addLayout(form)
-        
-        # Buttons
-        button_layout = QHBoxLayout()
-        
-        simpan_btn = QPushButton("✅ Simpan")
-        simpan_btn.setStyleSheet(get_button_solid_stylesheet("navy"))
-        simpan_btn.clicked.connect(self.on_simpan)
-        button_layout.addWidget(simpan_btn)
-        
-        batal_btn = QPushButton("❌ Batal")
-        batal_btn.setStyleSheet(get_button_solid_stylesheet("gray"))
-        batal_btn.clicked.connect(self.reject)
-        button_layout.addWidget(batal_btn)
-        
-        layout.addLayout(button_layout)
-        layout.addStretch()
-    
-    def _load_beasiswa_options(self):
-        """Load beasiswa options into combo."""
+    def load_applications(self):
+        """Load applications data."""
         try:
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT id, judul FROM beasiswa ORDER BY judul")
             
-            results = cursor.fetchall()
-            for beasiswa_id, judul in results:
-                self.beasiswa_combo.addItem(judul, beasiswa_id)
+            # Sample data untuk sekarang
+            sample_apps = [
+                ("Beasiswa LPDP 2026", "10 Mar 2026", "Pending", "Menunggu hasil seleksi administrasi"),
+                ("Beasiswa Unggulan Kemendikbud", "15 Feb 2026", "Diterima", "Lulus seleksi, sudah menerima LOA"),
+                ("Beasiswa BCA", "20 Jan 2026", "Ditolak", "Tidak lolos seleksi wawancara"),
+                ("Beasiswa Djarum Plus", "5 Mar 2026", "Pending", "Proses verifikasi dokumen"),
+                ("Beasiswa Tanoto Foundation", "28 Feb 2026", "Diterima", "Sudah menandatangani kontrak beasiswa"),
+                ("Beasiswa Bank Indonesia", "12 Jan 2026", "Ditolak", "IPK tidak memenuhi syarat"),
+                ("Beasiswa Sampoerna University", "8 Mar 2026", "Pending", "Menunggu jadwal wawancara"),
+            ]
             
+            self.applications = sample_apps
+            self.populate_table(sample_apps)
+            
+            logger.info(f"Loaded {len(self.applications)} applications")
+            conn.close()
         except Exception as e:
-            logger.error(f"Error loading beasiswa: {e}")
+            logger.error(f"Error loading applications: {e}")
     
-    def on_simpan(self):
-        """Save lamaran baru."""
-        beasiswa_id = self.beasiswa_combo.currentData()
-        tanggal = self.tanggal_input.text().strip()
-        status = self.status_combo.currentText()
-        catatan = self.catatan_input.toPlainText().strip()
+    def populate_table(self, apps):
+        """Populate table dengan data."""
+        self.table.setRowCount(len(apps))
         
-        if not beasiswa_id or not tanggal:
-            QMessageBox.warning(self, "Validasi", "Beasiswa dan Tanggal harus diisi!")
-            return
-        
-        try:
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO riwayat_lamaran (user_id, beasiswa_id, tanggal_daftar, status, catatan)
-                VALUES (?, ?, ?, ?, ?)
-            """, (self.user_id, beasiswa_id, tanggal, status, catatan))
-            conn.commit()
+        for row_idx, app in enumerate(apps):
+            nama, tanggal, status, catatan = app[0], app[1], app[2], app[3]
             
-            logger.info(f"Created lamaran untuk beasiswa {beasiswa_id}")
-            self.accept()
+            # Nama Beasiswa
+            nama_item = QTableWidgetItem(nama)
+            nama_item.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+            nama_item.setForeground(QColor(COLOR_NAVY))
+            nama_font = nama_item.font()
+            nama_font.setWeight(QFont.Weight.Bold)
+            nama_item.setFont(nama_font)
+            self.table.setItem(row_idx, 0, nama_item)
             
-        except Exception as e:
-            logger.error(f"Error creating lamaran: {e}")
-            QMessageBox.critical(self, "Error", f"Gagal simpan: {e}")
-
-
-class EditLamaranDialog(QDialog):
-    """Dialog untuk edit lamaran."""
+            # Tanggal
+            tanggal_item = QTableWidgetItem(tanggal)
+            tanggal_item.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+            tanggal_item.setForeground(QColor(COLOR_GRAY_700))
+            self.table.setItem(row_idx, 1, tanggal_item)
+            
+            # Status (badge)
+            status_widget = self._create_status_badge(status)
+            self.table.setCellWidget(row_idx, 2, status_widget)
+            
+            # Catatan
+            catatan_item = QTableWidgetItem(catatan)
+            catatan_item.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
+            catatan_item.setForeground(QColor(COLOR_GRAY_700))
+            self.table.setItem(row_idx, 3, catatan_item)
+            
+            # Aksi
+            action_widget = self._create_action_buttons(row_idx)
+            self.table.setCellWidget(row_idx, 4, action_widget)
     
-    def __init__(self, lamaran_id: int, user_id: int, parent=None):
-        super().__init__(parent)
-        self.lamaran_id = lamaran_id
-        self.user_id = user_id
-        self.setWindowTitle("Edit Lamaran")
-        self.setGeometry(150, 150, 500, 400)
-        self.setModal(True)
-        self.init_ui()
-        self.load_data()
+    def _create_status_badge(self, status: str) -> QFrame:
+        """Create status badge."""
+        badge_frame = QFrame()
+        badge_layout = QHBoxLayout(badge_frame)
+        badge_layout.setContentsMargins(0, 0, 0, 0)
+        badge_layout.setSpacing(0)
+        
+        if status == "Pending":
+            bg_color = "#dbeafe"  # Light blue
+            text_color = CHART_COLORS['blue']
+        elif status == "Diterima":
+            bg_color = "#d1fae5"  # Light green
+            text_color = CHART_COLORS['success']
+        else:  # Ditolak
+            bg_color = "#fee2e2"  # Light red
+            text_color = CHART_COLORS['error']
+        
+        badge_label = QLabel(status)
+        badge_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        badge_label.setStyleSheet(f"""
+            color: {text_color};
+            font-weight: bold;
+            padding: 4px 8px;
+        """)
+        
+        badge_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {bg_color};
+                border: 1px solid {text_color};
+                border-radius: 4px;
+            }}
+        """)
+        
+        badge_layout.addWidget(badge_label)
+        return badge_frame
     
-    def init_ui(self):
-        """Initialize dialog UI."""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
+    def _create_action_buttons(self, row_idx: int) -> QFrame:
+        """Create action buttons (edit, delete)."""
+        action_frame = QFrame()
+        action_layout = QHBoxLayout(action_frame)
+        action_layout.setContentsMargins(0, 0, 0, 0)
+        action_layout.setSpacing(8)
         
-        # Title
-        title = QLabel("Edit Lamaran")
-        title_font = QFont(FONT_FAMILY_PRIMARY, 14)
-        title_font.setWeight(QFont.Weight.Bold)
-        title.setFont(title_font)
-        title.setStyleSheet(f"color: {COLOR_NAVY};")
-        layout.addWidget(title)
+        # Edit button
+        edit_btn = QPushButton("✏")
+        edit_btn.setMaximumSize(28, 28)
+        edit_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: none;
+                font-size: 14px;
+                color: {COLOR_GRAY_600};
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_GRAY_100};
+                border-radius: 4px;
+            }}
+        """)
+        action_layout.addWidget(edit_btn)
         
-        # Form layout
-        form = QFormLayout()
-        form.setSpacing(12)
+        # Delete button
+        delete_btn = QPushButton("🗑")
+        delete_btn.setMaximumSize(28, 28)
+        delete_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: none;
+                font-size: 14px;
+                color: {COLOR_ERROR};
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_ERROR_LIGHT};
+                border-radius: 4px;
+            }}
+        """)
+        delete_btn.clicked.connect(lambda: self.on_delete_lamaran(row_idx))
+        action_layout.addWidget(delete_btn)
         
-        # Beasiswa (read-only)
-        self.beasiswa_label = QLabel()
-        form.addRow("Beasiswa:", self.beasiswa_label)
-        
-        # Tanggal daftar
-        self.tanggal_input = QLineEdit()
-        self.tanggal_input.setMinimumHeight(36)
-        form.addRow("Tanggal Daftar:", self.tanggal_input)
-        
-        # Status
-        self.status_combo = QComboBox()
-        self.status_combo.addItems(["Pending", "Proses", "Diterima", "Ditolak"])
-        self.status_combo.setMinimumHeight(36)
-        form.addRow("Status:", self.status_combo)
-        
-        # Catatan
-        self.catatan_input = QTextEdit()
-        self.catatan_input.setMinimumHeight(80)
-        form.addRow("Catatan:", self.catatan_input)
-        
-        layout.addLayout(form)
-        
-        # Buttons
-        button_layout = QHBoxLayout()
-        
-        simpan_btn = QPushButton("✅ Simpan")
-        simpan_btn.setStyleSheet(get_button_solid_stylesheet("navy"))
-        simpan_btn.clicked.connect(self.on_simpan)
-        button_layout.addWidget(simpan_btn)
-        
-        batal_btn = QPushButton("❌ Batal")
-        batal_btn.setStyleSheet(get_button_solid_stylesheet("gray"))
-        batal_btn.clicked.connect(self.reject)
-        button_layout.addWidget(batal_btn)
-        
-        layout.addLayout(button_layout)
-        layout.addStretch()
+        action_layout.addStretch()
+        return action_frame
     
-    def load_data(self):
-        """Load lamaran data."""
-        try:
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT b.judul, rl.tanggal_daftar, rl.status, rl.catatan
-                FROM riwayat_lamaran rl
-                JOIN beasiswa b ON rl.beasiswa_id = b.id
-                WHERE rl.id = ? AND rl.user_id = ?
-            """, (self.lamaran_id, self.user_id))
-            
-            result = cursor.fetchone()
-            if result:
-                beasiswa_judul, tanggal, status, catatan = result
-                self.beasiswa_label.setText(beasiswa_judul)
-                self.tanggal_input.setText(tanggal or "")
-                self.status_combo.setCurrentText(status or "Pending")
-                self.catatan_input.setText(catatan or "")
-            
-        except Exception as e:
-            logger.error(f"Error loading lamaran data: {e}")
+    def on_tambah_lamaran(self):
+        """Handle add application."""
+        logger.info("Add lamaran clicked")
     
-    def on_simpan(self):
-        """Save changes."""
-        tanggal = self.tanggal_input.text().strip()
-        status = self.status_combo.currentText()
-        catatan = self.catatan_input.toPlainText().strip()
-        
-        try:
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE riwayat_lamaran 
-                SET tanggal_daftar = ?, status = ?, catatan = ?
-                WHERE id = ? AND user_id = ?
-            """, (tanggal, status, catatan, self.lamaran_id, self.user_id))
-            conn.commit()
-            
-            logger.info(f"Updated lamaran {self.lamaran_id}")
-            self.accept()
-            
-        except Exception as e:
-            logger.error(f"Error updating lamaran: {e}")
-            QMessageBox.critical(self, "Error", f"Gagal simpan: {e}")
+    def on_delete_lamaran(self, row_idx: int):
+        """Handle delete application."""
+        logger.info(f"Delete lamaran at row {row_idx}")
