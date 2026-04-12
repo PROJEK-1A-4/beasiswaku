@@ -548,7 +548,9 @@ if __name__ == "__main__":
         traceback.print_exc()
 
 def save_beasiswa_to_database(beasiswa_list, crud_module):
-    """Convert scraper output → Darva's CRUD"""
+    """
+    Convert scraper output → Darva's CRUD
+    """
     for beasiswa in beasiswa_list:
         status = crud_module.add_beasiswa(
             judul=beasiswa['nama'],
@@ -556,7 +558,7 @@ def save_beasiswa_to_database(beasiswa_list, crud_module):
             deadline=beasiswa['deadline'],
             deskripsi=beasiswa['deskripsi'],
             link_aplikasi=beasiswa['link'],
-            status=determine_status(beasiswa['deadline'])
+            status=beasiswa['status']  # <-- PERBAIKANNYA DI SINI: Langsung pakai data yang sudah ada!
         )
 #untuk auto scraping
 def auto_scrape_on_startup(crud_module):
