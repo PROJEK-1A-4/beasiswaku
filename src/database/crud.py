@@ -1640,26 +1640,88 @@ def get_beasiswa_list_for_user(user_id: int,
         return [], 0
     
     try:
-        # First get the beasiswa list (existing function)
-        beasiswa_list, total_count = get_beasiswa_list(
-            filter_jenjang=filter_jenjang,
-            filter_status=filter_status,
-            search_judul=search_judul,
-            sort_by=sort_by,
-            sort_order=sort_order
-        )
-        
-        # Add sudah_daftar field for each beasiswa
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Build WHERE clause dynamically (same contract as get_beasiswa_list)
+        where_clauses = []
+        params = []
+
+        if filter_jenjang:
+            filter_jenjang = filter_jenjang.strip().upper()
+            if filter_jenjang in ['D3', 'D4', 'S1', 'S2']:
+                where_clauses.append("b.jenjang = ?")
+                params.append(filter_jenjang)
+
+        if filter_status:
+            filter_status = filter_status.strip()
+            valid_status = ['Buka', 'Segera Tutup', 'Tutup']
+            if filter_status in valid_status:
+                where_clauses.append("b.status = ?")
+                params.append(filter_status)
+
+        if search_judul:
+            search_judul = search_judul.strip()
+            where_clauses.append("b.judul LIKE ?")
+            params.append(f"%{search_judul}%")
+
+        where_sql = ""
+        if where_clauses:
+            where_sql = "WHERE " + " AND ".join(where_clauses)
+
+        valid_sort_columns = ['deadline', 'judul', 'created_at', 'jenjang', 'status', 'id']
+        sort_by = sort_by.strip().lower() if sort_by else 'deadline'
+        if sort_by not in valid_sort_columns:
+            sort_by = 'deadline'
+
+        sort_order = sort_order.strip().upper() if sort_order else 'ASC'
+        if sort_order not in ['ASC', 'DESC']:
+            sort_order = 'ASC'
+
+        sort_column_map = {
+            'deadline': 'b.deadline',
+            'judul': 'b.judul',
+            'created_at': 'b.created_at',
+            'jenjang': 'b.jenjang',
+            'status': 'b.status',
+            'id': 'b.id',
+        }
+
+        # Count total rows after filters
+        count_query = f"SELECT COUNT(*) as count FROM beasiswa b {where_sql}"
+        cursor.execute(count_query, params)
+        total_count = cursor.fetchone()[0]
+
+        # Single query with LEFT JOIN to avoid N+1 user-applied checks
+        query = f"""
+            SELECT
+                b.id, b.judul, b.penyelenggara_id, b.jenjang, b.deadline, b.deskripsi,
+                b.benefit, b.persyaratan, b.minimal_ipk, b.coverage, b.status,
+                b.link_aplikasi, b.scrape_date, b.created_at, b.updated_at,
+                CASE WHEN rl.id IS NOT NULL THEN 1 ELSE 0 END AS sudah_daftar
+            FROM beasiswa b
+            LEFT JOIN riwayat_lamaran rl
+                ON rl.beasiswa_id = b.id AND rl.user_id = ?
+            {where_sql}
+            ORDER BY {sort_column_map[sort_by]} {sort_order}
+        """
+
+        cursor.execute(query, [user_id, *params])
+        results = cursor.fetchall()
+        beasiswa_list = [dict(row) for row in results]
         for beasiswa in beasiswa_list:
-            beasiswa['sudah_daftar'] = check_user_applied(user_id, beasiswa['id'])
+            beasiswa['sudah_daftar'] = bool(beasiswa.get('sudah_daftar'))
+
+        cursor.close()
+        # Connection managed by DatabaseManager singleton
         
         logger.info(f"✅ Retrieved {len(beasiswa_list)} beasiswa for user {user_id} "
                    f"with 'sudah_daftar' status")
         
         return beasiswa_list, total_count
         
-    except Exception as e:
-        logger.error(f"❌ Error saat get beasiswa list for user: {e}")
+    except sqlite3.Error as e:
+        logger.error(f"❌ Database error saat get beasiswa list for user: {e}")
         return [], 0
 
 

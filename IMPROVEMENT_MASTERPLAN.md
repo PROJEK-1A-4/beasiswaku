@@ -323,6 +323,10 @@ Pembagian ini mengikuti domain ownership tim agar eksekusi cepat dan minim conte
   - P1-06 (hilangkan N+1 query di beasiswa per user).
   - P2-01 (standarisasi result/error contract backend).
   - P2-04 (isolasi test DB dan migrasi test script-style utama).
+- Status progres Darva (2026-04-20):
+  - [x] P1-06 selesai.
+  - [ ] P2-01 belum dikerjakan.
+  - [ ] P2-04 belum dikerjakan.
 - Reviewer pendamping: Kemal.
 - Deliverable:
   - PR backend stability.
