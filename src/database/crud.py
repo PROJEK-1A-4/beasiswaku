@@ -326,9 +326,6 @@ def add_beasiswa(judul: str, jenjang: str, deadline: str,
         conn = get_connection()
         cursor = conn.cursor()
         
-        # Enable foreign key checking untuk SQLite
-        cursor.execute("PRAGMA foreign_keys = ON")
-        
         # Insert beasiswa
         cursor.execute("""
             INSERT INTO beasiswa (
@@ -614,9 +611,6 @@ def edit_beasiswa(beasiswa_id: int, **kwargs) -> Tuple[bool, str]:
         conn = get_connection()
         cursor = conn.cursor()
         
-        # Enable foreign key checking untuk SQLite
-        cursor.execute("PRAGMA foreign_keys = ON")
-        
         # Check if beasiswa exists
         cursor.execute("SELECT id, judul FROM beasiswa WHERE id = ?", (beasiswa_id,))
         existing = cursor.fetchone()
@@ -688,9 +682,6 @@ def delete_beasiswa(beasiswa_id: int) -> Tuple[bool, str]:
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        
-        # Enable foreign key checking untuk SQLite
-        cursor.execute("PRAGMA foreign_keys = ON")
         
         # Check if beasiswa exists
         cursor.execute("SELECT id, judul FROM beasiswa WHERE id = ?", (beasiswa_id,))
@@ -797,9 +788,6 @@ def add_lamaran(user_id: int, beasiswa_id: int, tanggal_daftar: Optional[str] = 
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        
-        # Enable foreign key checking
-        cursor.execute("PRAGMA foreign_keys = ON")
         
         # Check if user exists
         cursor.execute("SELECT id, username FROM akun WHERE id = ?", (user_id,))
@@ -1187,9 +1175,6 @@ def add_favorit(user_id: int, beasiswa_id: int) -> Tuple[bool, str, Optional[int
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        
-        # Enable foreign key checking
-        cursor.execute("PRAGMA foreign_keys = ON")
         
         # Check if user exists
         cursor.execute("SELECT id, username FROM akun WHERE id = ?", (user_id,))

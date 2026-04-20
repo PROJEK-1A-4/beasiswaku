@@ -373,31 +373,40 @@ Pembagian ini mengikuti domain ownership tim agar eksekusi cepat dan minim conte
   - PR status consistency + chart validation.
   - PR docs synchronization.
 
-### Pembagian Per Sprint (Singkat)
-- Sprint 1:
-  - Darva: P0-03.
-  - Kemal: P0-02 (sync/scraper).
-  - Aulia: setup event mediator skeleton.
-  - Kyla: P0-01.
-  - Richard: baseline test statistik/tracker untuk guard regressions.
-- Sprint 2:
-  - Darva: P0-04 + P1-06.
-  - Kemal: logging + retry/error telemetry sync.
-  - Aulia: P1-02 + P1-03.
-  - Kyla: P1-05 + P1-07.
-  - Richard: P2-02.
-- Sprint 3:
-  - Darva: P2-01 + P2-04.
-  - Kemal: stabilisasi scraper tests.
-  - Aulia: P2-05 (alur UI utama).
-  - Kyla: finalisasi keputusan P1-04.
-  - Richard: P3-01 + P3-02.
+### Mode Eksekusi Non-Paralel (Fokus Per Orang)
+Eksekusi dilakukan berantai (serial), bukan paralel. Pada satu waktu hanya ada satu owner yang aktif mengerjakan task implementasi utama, anggota lain fokus review, test regresi, dan persiapan fase berikutnya.
 
-### Rule Eksekusi Tim
-1. Satu task = satu owner jelas, maksimal satu co-owner.
-2. PR wajib mencantumkan ID task (contoh: P1-03) di judul.
-3. Reviewer silang antar-domain wajib (backend direview GUI atau sebaliknya).
-4. Jangan merge task P1/P2 jika task P0 yang dependency-nya belum selesai.
+### Urutan Fase Kerja (Serial 5 Orang)
+- Fase 1 - Darva:
+  - P0-03 (FK enforcement di level connection).
+  - P0-04 (strategi thread-safe DB, minimal keputusan arsitektur + implementasi awal).
+  - Gate lanjut fase: seluruh test DB lulus dan validasi FK konsisten.
+- Fase 2 - Kemal:
+  - P0-02 untuk area sync/scraper (hapus bare except, error detail per item).
+  - P2-03 untuk logging reliability di alur sync.
+  - Gate lanjut fase: sync gagal menampilkan error yang jelas dan tidak ada bare except pada path sync.
+- Fase 3 - Kyla:
+  - P0-01 (deadline dekat berbasis selisih hari).
+  - P1-05 (deadline color adaptif).
+  - P1-07 (pagination/lazy loading listing).
+  - Gate lanjut fase: filter deadline benar dan performa listing membaik pada data besar.
+- Fase 4 - Aulia:
+  - P1-02 (event mediator/signal antar-tab).
+  - P1-03 (handler profil: edit/simpan/password).
+  - P2-05 (smoke test alur UI utama).
+  - Gate lanjut fase: update antar-tab stabil dan aksi profil benar-benar fungsional.
+- Fase 5 - Richard:
+  - P2-02 (standardisasi enum/status lintas layer).
+  - P3-01 (sinkronisasi dokumentasi arsitektur/API).
+  - P3-02 (policy compat wrapper + canonical import path).
+  - Gate selesai: docs sinkron dengan implementasi final dan status mapping konsisten.
+
+### Rule Eksekusi Tim (Revisi Non-Paralel)
+1. Hanya satu PR implementasi utama yang aktif pada satu waktu.
+2. Fase berikutnya dimulai setelah gate fase sebelumnya terpenuhi.
+3. Anggota non-owner di fase berjalan wajib mengerjakan review, regression test, dan verifikasi acceptance criteria.
+4. Jika blocker fase > 1 hari kerja, owner boleh dipindahkan sementara atas keputusan tim.
+5. Semua PR wajib mencantumkan ID task (contoh: P1-03) dan label fase (Fase-1 s.d. Fase-5).
 
 ## 6. KPI Keberhasilan
 

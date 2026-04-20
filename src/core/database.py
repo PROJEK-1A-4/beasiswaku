@@ -79,7 +79,8 @@ class DatabaseManager:
             check_same_thread=Config.DATABASE_CHECK_SAME_THREAD
         )
         connection.row_factory = sqlite3.Row
-        logger.debug("New database connection created")
+        connection.execute("PRAGMA foreign_keys = ON")
+        logger.debug("New database connection created with foreign_keys enforcement")
         return connection
 
     def close_connection(self) -> None:
