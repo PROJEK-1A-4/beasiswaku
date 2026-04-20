@@ -325,7 +325,7 @@ Pembagian ini mengikuti domain ownership tim agar eksekusi cepat dan minim conte
   - P2-04 (isolasi test DB dan migrasi test script-style utama).
 - Status progres Darva (2026-04-20):
   - [x] P1-06 selesai.
-  - [ ] P2-01 belum dikerjakan.
+  - [x] P2-01 selesai (BackendResult + result wrapper APIs kompatibel).
   - [ ] P2-04 belum dikerjakan.
 - Reviewer pendamping: Kemal.
 - Deliverable:

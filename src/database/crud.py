@@ -12,15 +12,110 @@ Tanggung jawab:
 import sqlite3
 import bcrypt
 import logging
+import re
+from dataclasses import dataclass
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict, Tuple, Any
 
 from ..core.database import DatabaseManager
 from ..core.config import Config
 
 # Setup logging
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class BackendResult:
+    """Standardized backend result contract for write operations."""
+
+    success: bool
+    code: str
+    message: str
+    payload: Any = None
+
+    def to_tuple2(self) -> Tuple[bool, str]:
+        """Compatibility helper for legacy (success, message) callers."""
+        return self.success, self.message
+
+    def to_tuple3(self) -> Tuple[bool, str, Any]:
+        """Compatibility helper for legacy (success, message, payload) callers."""
+        return self.success, self.message, self.payload
+
+
+_ERROR_CODE_HINTS = (
+    ("tidak boleh kosong", "VALIDATION_REQUIRED_FIELD"),
+    ("minimal 6 karakter", "VALIDATION_PASSWORD_TOO_SHORT"),
+    ("harus berupa angka integer", "VALIDATION_INVALID_INTEGER"),
+    ("harus berupa angka", "VALIDATION_INVALID_NUMBER"),
+    ("format", "VALIDATION_INVALID_FORMAT"),
+    ("harus salah satu", "VALIDATION_INVALID_ENUM"),
+    ("sudah terdaftar", "CONFLICT_ALREADY_EXISTS"),
+    ("sudah pernah", "CONFLICT_ALREADY_EXISTS"),
+    ("sudah ada", "CONFLICT_ALREADY_EXISTS"),
+    ("tidak ditemukan", "NOT_FOUND"),
+    ("password salah", "AUTH_INVALID_PASSWORD"),
+    ("username dan password diperlukan", "AUTH_MISSING_CREDENTIALS"),
+    ("username atau email tidak ditemukan", "AUTH_USER_NOT_FOUND"),
+    ("error database", "DATABASE_ERROR"),
+    ("terjadi error", "DATABASE_ERROR"),
+    ("error:", "UNEXPECTED_ERROR"),
+)
+
+
+def _normalize_operation_name(operation: str) -> str:
+    raw = (operation or "UNKNOWN").strip().upper()
+    return re.sub(r"[^A-Z0-9]+", "_", raw).strip("_") or "UNKNOWN"
+
+
+def _derive_error_suffix(message: str) -> str:
+    message_lc = (message or "").lower()
+    for hint, suffix in _ERROR_CODE_HINTS:
+        if hint in message_lc:
+            return suffix
+    return "FAILED"
+
+
+def _build_backend_result(operation: str, legacy_result: Tuple[Any, ...]) -> BackendResult:
+    """
+    Build standardized result from legacy tuple contracts.
+
+    Supported input shapes:
+    - (success, message)
+    - (success, message, payload)
+    """
+    op = _normalize_operation_name(operation)
+
+    if not isinstance(legacy_result, tuple):
+        return BackendResult(
+            success=False,
+            code=f"{op}_INVALID_RESULT_SHAPE",
+            message="Legacy result is not a tuple",
+            payload=legacy_result,
+        )
+
+    if len(legacy_result) == 2:
+        success, message = legacy_result
+        payload = None
+    elif len(legacy_result) == 3:
+        success, message, payload = legacy_result
+    else:
+        return BackendResult(
+            success=False,
+            code=f"{op}_INVALID_RESULT_SHAPE",
+            message=f"Unexpected tuple length: {len(legacy_result)}",
+            payload=legacy_result,
+        )
+
+    success_bool = bool(success)
+    message_text = str(message)
+
+    if success_bool:
+        code = f"{op}_SUCCESS"
+    else:
+        code = f"{op}_{_derive_error_suffix(message_text)}"
+
+    return BackendResult(success=success_bool, code=code, message=message_text, payload=payload)
 
 
 def get_connection():
@@ -2044,6 +2139,101 @@ def get_catatan_list(user_id: int, filter_jenjang: Optional[str] = None,
     finally:
         cursor.close()
         # Connection managed by DatabaseManager singleton
+
+
+# ==================== P2-01: STANDARDIZED RESULT CONTRACT ====================
+
+def register_user_result(username: str, email: str, password: str,
+                         nama_lengkap: str = "", jenjang: str = "") -> BackendResult:
+    """Standardized result contract for register_user."""
+    return _build_backend_result(
+        "REGISTER_USER",
+        register_user(username, email, password, nama_lengkap, jenjang),
+    )
+
+
+def login_user_result(username: str, password: str) -> BackendResult:
+    """Standardized result contract for login_user."""
+    return _build_backend_result("LOGIN_USER", login_user(username, password))
+
+
+def add_beasiswa_result(judul: str, jenjang: str, deadline: str,
+                        penyelenggara_id: Optional[int] = None,
+                        deskripsi: str = "", benefit: str = "",
+                        persyaratan: str = "", minimal_ipk: Optional[float] = None,
+                        coverage: str = "", status: str = "Buka",
+                        link_aplikasi: str = "") -> BackendResult:
+    """Standardized result contract for add_beasiswa."""
+    return _build_backend_result(
+        "ADD_BEASISWA",
+        add_beasiswa(
+            judul=judul,
+            jenjang=jenjang,
+            deadline=deadline,
+            penyelenggara_id=penyelenggara_id,
+            deskripsi=deskripsi,
+            benefit=benefit,
+            persyaratan=persyaratan,
+            minimal_ipk=minimal_ipk,
+            coverage=coverage,
+            status=status,
+            link_aplikasi=link_aplikasi,
+        ),
+    )
+
+
+def edit_beasiswa_result(beasiswa_id: int, **kwargs) -> BackendResult:
+    """Standardized result contract for edit_beasiswa."""
+    return _build_backend_result("EDIT_BEASISWA", edit_beasiswa(beasiswa_id, **kwargs))
+
+
+def delete_beasiswa_result(beasiswa_id: int) -> BackendResult:
+    """Standardized result contract for delete_beasiswa."""
+    return _build_backend_result("DELETE_BEASISWA", delete_beasiswa(beasiswa_id))
+
+
+def add_lamaran_result(user_id: int, beasiswa_id: int, tanggal_daftar: Optional[str] = None,
+                       status: str = "Pending", catatan: str = "") -> BackendResult:
+    """Standardized result contract for add_lamaran."""
+    return _build_backend_result(
+        "ADD_LAMARAN",
+        add_lamaran(user_id, beasiswa_id, tanggal_daftar, status, catatan),
+    )
+
+
+def edit_lamaran_result(lamaran_id: int, **kwargs) -> BackendResult:
+    """Standardized result contract for edit_lamaran."""
+    return _build_backend_result("EDIT_LAMARAN", edit_lamaran(lamaran_id, **kwargs))
+
+
+def delete_lamaran_result(lamaran_id: int) -> BackendResult:
+    """Standardized result contract for delete_lamaran."""
+    return _build_backend_result("DELETE_LAMARAN", delete_lamaran(lamaran_id))
+
+
+def add_favorit_result(user_id: int, beasiswa_id: int) -> BackendResult:
+    """Standardized result contract for add_favorit."""
+    return _build_backend_result("ADD_FAVORIT", add_favorit(user_id, beasiswa_id))
+
+
+def delete_favorit_result(user_id: int, beasiswa_id: int) -> BackendResult:
+    """Standardized result contract for delete_favorit."""
+    return _build_backend_result("DELETE_FAVORIT", delete_favorit(user_id, beasiswa_id))
+
+
+def add_catatan_result(user_id: int, beasiswa_id: int, content: str) -> BackendResult:
+    """Standardized result contract for add_catatan."""
+    return _build_backend_result("ADD_CATATAN", add_catatan(user_id, beasiswa_id, content))
+
+
+def edit_catatan_result(user_id: int, beasiswa_id: int, content: str) -> BackendResult:
+    """Standardized result contract for edit_catatan."""
+    return _build_backend_result("EDIT_CATATAN", edit_catatan(user_id, beasiswa_id, content))
+
+
+def delete_catatan_result(user_id: int, beasiswa_id: int) -> BackendResult:
+    """Standardized result contract for delete_catatan."""
+    return _build_backend_result("DELETE_CATATAN", delete_catatan(user_id, beasiswa_id))
 
 
 if __name__ == "__main__":
