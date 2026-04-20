@@ -7,8 +7,9 @@ All database operations should go through this module.
 
 import sqlite3
 import logging
+import threading
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     """
     Singleton class for managing database connections.
-    Ensures only one connection is used throughout the application.
+    Provides one connection per thread while keeping a single manager instance.
     
     Usage:
         db = DatabaseManager()
@@ -26,7 +27,8 @@ class DatabaseManager:
     """
 
     _instance: Optional['DatabaseManager'] = None
-    _connection: Optional[sqlite3.Connection] = None
+    _connections: Dict[int, sqlite3.Connection]
+    _connections_lock: threading.Lock
 
     def __new__(cls):
         """Implement singleton pattern."""
@@ -44,30 +46,40 @@ class DatabaseManager:
 
         self.db_path = Path(Config.DATABASE_PATH)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._connections = {}
+        self._connections_lock = threading.Lock()
         self._initialized = True
         logger.info(f"DatabaseManager initialized at {self.db_path}")
 
     def get_connection(self) -> sqlite3.Connection:
         """
-        Get or create database connection.
+        Get or create database connection for the current thread.
         
         Returns:
             sqlite3.Connection: Active database connection
         """
-        if self._connection is None:
-            self._connection = self._create_connection()
-        else:
+        thread_id = threading.get_ident()
+
+        with self._connections_lock:
+            connection = self._connections.get(thread_id)
+            if connection is None:
+                connection = self._create_connection()
+                self._connections[thread_id] = connection
+                logger.debug("Created DB connection for thread %s", thread_id)
+                return connection
+
             try:
-                self._connection.execute("SELECT 1")
+                connection.execute("SELECT 1")
+                return connection
             except sqlite3.Error:
-                logger.warning("Existing database connection was closed/invalid. Reconnecting...")
+                logger.warning("Thread %s DB connection invalid. Reconnecting...", thread_id)
                 try:
-                    self._connection.close()
+                    connection.close()
                 except sqlite3.Error:
                     pass
-                self._connection = self._create_connection()
-
-        return self._connection
+                new_connection = self._create_connection()
+                self._connections[thread_id] = new_connection
+                return new_connection
 
     def _create_connection(self) -> sqlite3.Connection:
         """Create a fresh sqlite connection with configured defaults."""
@@ -80,15 +92,34 @@ class DatabaseManager:
         )
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
-        logger.debug("New database connection created with foreign_keys enforcement")
+        connection.execute("PRAGMA journal_mode = WAL")
+        connection.execute(f"PRAGMA busy_timeout = {Config.DATABASE_BUSY_TIMEOUT_MS}")
+        logger.debug("New database connection created with FK+WAL+busy_timeout settings")
         return connection
 
     def close_connection(self) -> None:
-        """Close the database connection."""
-        if self._connection is not None:
-            self._connection.close()
-            self._connection = None
-            logger.info("Database connection closed")
+        """Close database connection for the current thread."""
+        thread_id = threading.get_ident()
+        with self._connections_lock:
+            connection = self._connections.pop(thread_id, None)
+
+        if connection is not None:
+            connection.close()
+            logger.info("Database connection closed for thread %s", thread_id)
+
+    def close_all_connections(self) -> None:
+        """Close all tracked database connections across threads."""
+        with self._connections_lock:
+            connections = list(self._connections.items())
+            self._connections.clear()
+
+        for thread_id, connection in connections:
+            try:
+                connection.close()
+            except sqlite3.Error:
+                logger.warning("Failed to close DB connection for thread %s", thread_id)
+        if connections:
+            logger.info("Closed %s database connection(s)", len(connections))
 
     def execute(self, query: str, params: tuple = None):
         """
@@ -246,7 +277,7 @@ class DatabaseManager:
 
     def __del__(self):
         """Cleanup on deletion."""
-        self.close_connection()
+        self.close_all_connections()
 
 
 # Support legacy get_connection usage

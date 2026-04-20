@@ -381,6 +381,11 @@ Eksekusi dilakukan berantai (serial), bukan paralel. Pada satu waktu hanya ada s
   - P0-03 (FK enforcement di level connection).
   - P0-04 (strategi thread-safe DB, minimal keputusan arsitektur + implementasi awal).
   - Gate lanjut fase: seluruh test DB lulus dan validasi FK konsisten.
+  - Status aktual (2026-04-20):
+    - [x] P0-03 selesai.
+    - [x] P0-04.1 keputusan arsitektur selesai (`docs/DECISION_P0_04_THREAD_SAFETY.md`).
+    - [x] P0-04.2 implementasi per-thread connection.
+    - [ ] P0-04.3 stress test multi-write sederhana.
 - Fase 2 - Kemal:
   - P0-02 untuk area sync/scraper (hapus bare except, error detail per item).
   - P2-03 untuk logging reliability di alur sync.

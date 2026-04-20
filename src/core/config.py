@@ -26,8 +26,9 @@ class Config:
     # ==================== Database Configuration ====================
     DATABASE_PATH: str = os.getenv("DATABASE_PATH", "database/beasiswaku.db")
     DATABASE_BACKUP_PATH: str = os.getenv("DATABASE_BACKUP_PATH", "database/backup/beasiswaku_backup.db")
-    DATABASE_TIMEOUT: int = 30
-    DATABASE_CHECK_SAME_THREAD: bool = False
+    DATABASE_TIMEOUT: int = int(os.getenv("DATABASE_TIMEOUT", "30"))
+    DATABASE_CHECK_SAME_THREAD: bool = os.getenv("DATABASE_CHECK_SAME_THREAD", "True").lower() == "true"
+    DATABASE_BUSY_TIMEOUT_MS: int = int(os.getenv("DATABASE_BUSY_TIMEOUT_MS", "30000"))
 
     # ==================== Application Configuration ====================
     APP_NAME: str = os.getenv("APP_NAME", "BeasiswaKu")
