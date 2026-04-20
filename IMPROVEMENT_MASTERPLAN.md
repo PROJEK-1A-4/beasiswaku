@@ -326,7 +326,7 @@ Pembagian ini mengikuti domain ownership tim agar eksekusi cepat dan minim conte
 - Status progres Darva (2026-04-20):
   - [x] P1-06 selesai.
   - [x] P2-01 selesai (BackendResult + result wrapper APIs kompatibel).
-  - [ ] P2-04 belum dikerjakan.
+  - [x] P2-04 selesai (isolasi DB fixture + migrasi test script-style ke assertion pytest).
 - Reviewer pendamping: Kemal.
 - Deliverable:
   - PR backend stability.
