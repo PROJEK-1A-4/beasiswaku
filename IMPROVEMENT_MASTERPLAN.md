@@ -385,7 +385,8 @@ Eksekusi dilakukan berantai (serial), bukan paralel. Pada satu waktu hanya ada s
     - [x] P0-03 selesai.
     - [x] P0-04.1 keputusan arsitektur selesai (`docs/DECISION_P0_04_THREAD_SAFETY.md`).
     - [x] P0-04.2 implementasi per-thread connection.
-    - [ ] P0-04.3 stress test multi-write sederhana.
+    - [x] P0-04.3 stress test multi-write sederhana.
+    - [x] Gate Fase 1 siap (test DB terkait lulus).
 - Fase 2 - Kemal:
   - P0-02 untuk area sync/scraper (hapus bare except, error detail per item).
   - P2-03 untuk logging reliability di alur sync.

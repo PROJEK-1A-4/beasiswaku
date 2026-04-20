@@ -2,7 +2,7 @@
 
 Tanggal: 2026-04-20  
 Owner: Darva  
-Status: P0-04.2 selesai diimplementasikan, lanjut P0-04.3
+Status: P0-04.3 selesai, gate P0-04 siap ditutup
 
 ## 1. Tujuan
 Menetapkan strategi thread safety untuk akses SQLite agar stabil saat aplikasi melakukan scraping async dan operasi UI/CRUD berjalan bersamaan.
