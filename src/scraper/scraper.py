@@ -550,7 +550,7 @@ if __name__ == "__main__":
 
 def save_beasiswa_to_database(beasiswa_list, crud_module):
     """
-    Save scraped beasiswa to database via CRUD module
+    Save scraped beasiswa to database via CRUD module with telemetry tracking
     
     Args:
         beasiswa_list: List of beasiswa dict from scraper
@@ -562,25 +562,44 @@ def save_beasiswa_to_database(beasiswa_list, crud_module):
             "total": int,
             "saved": int,
             "failed": int,
-            "errors": [list of {judul, alasan}]
+            "errors": [list of {judul, alasan}],
+            "telemetry": {
+                "success_rate": float (0-1),
+                "failure_rate": float (0-1),
+                "total_time_ms": float,
+                "avg_time_per_item_ms": float,
+                "fastest_item_ms": float,
+                "slowest_item_ms": float,
+                "error_types": {type: count}
+            }
         }
     
     Behavior:
         - Jangan stop di error satu item, lanjut ke item berikutnya
         - Collect semua error untuk reporting
+        - Track timing per item untuk observability
+        - Generate telemetry metrics
         - Log detail per beasiswa untuk debugging
     """
+    # Initialize tracking
+    start_time = time.time()
+    item_times = []
+    error_type_counts = {}
+    
     summary = {
         "total": len(beasiswa_list),
         "saved": 0,
         "failed": 0,
-        "errors": []
+        "errors": [],
+        "telemetry": {}
     }
     
     logger.info(f"📥 Menyimpan {len(beasiswa_list)} beasiswa ke database...")
     
     for idx, beasiswa in enumerate(beasiswa_list, 1):
+        item_start = time.time()
         beasiswa_judul = beasiswa.get('nama', 'Unknown')
+        error_type = None
         
         try:
             # Validate required fields
@@ -609,6 +628,7 @@ def save_beasiswa_to_database(beasiswa_list, crud_module):
                 logger.debug(f"  [{idx}/{len(beasiswa_list)}] ✅ Saved: {beasiswa_judul} (ID: {beasiswa_id})")
             else:
                 summary["failed"] += 1
+                error_type = "CRUD_Error"
                 error_msg = message if message else "Unknown error from CRUD"
                 summary["errors"].append({
                     "judul": beasiswa_judul,
@@ -618,6 +638,7 @@ def save_beasiswa_to_database(beasiswa_list, crud_module):
         
         except ValueError as e:
             summary["failed"] += 1
+            error_type = "ValidationError"
             error_msg = str(e)
             summary["errors"].append({
                 "judul": beasiswa_judul,
@@ -627,6 +648,7 @@ def save_beasiswa_to_database(beasiswa_list, crud_module):
         
         except KeyError as e:
             summary["failed"] += 1
+            error_type = "KeyError"
             error_msg = f"Missing required field: {str(e)}"
             summary["errors"].append({
                 "judul": beasiswa_judul,
@@ -636,21 +658,52 @@ def save_beasiswa_to_database(beasiswa_list, crud_module):
         
         except Exception as e:
             summary["failed"] += 1
+            error_type = type(e).__name__
             error_msg = f"Unexpected error: {type(e).__name__}: {str(e)}"
             summary["errors"].append({
                 "judul": beasiswa_judul,
                 "alasan": error_msg
             })
             logger.error(f"  [{idx}/{len(beasiswa_list)}] ❌ Exception: {beasiswa_judul} - {error_msg}", exc_info=True)
+        
+        finally:
+            # Track timing and error type
+            item_time_ms = (time.time() - item_start) * 1000
+            item_times.append(item_time_ms)
+            
+            if error_type:
+                error_type_counts[error_type] = error_type_counts.get(error_type, 0) + 1
     
-    # Log summary
+    # Calculate telemetry metrics
+    total_time_ms = (time.time() - start_time) * 1000
+    
+    telemetry = {
+        "success_rate": round(summary["saved"] / summary["total"], 4) if summary["total"] > 0 else 0,
+        "failure_rate": round(summary["failed"] / summary["total"], 4) if summary["total"] > 0 else 0,
+        "total_time_ms": round(total_time_ms, 2),
+        "avg_time_per_item_ms": round(total_time_ms / summary["total"], 2) if summary["total"] > 0 else 0,
+        "fastest_item_ms": round(min(item_times), 2) if item_times else 0,
+        "slowest_item_ms": round(max(item_times), 2) if item_times else 0,
+        "error_types": error_type_counts
+    }
+    
+    summary["telemetry"] = telemetry
+    
+    # Log summary with telemetry
     logger.info(f"✅ Database save complete: {summary['saved']}/{summary['total']} berhasil")
+    logger.info(f"   Success rate: {telemetry['success_rate']*100:.1f}% | Failure rate: {telemetry['failure_rate']*100:.1f}%")
+    logger.info(f"   Timing: {telemetry['total_time_ms']:.2f}ms total | {telemetry['avg_time_per_item_ms']:.2f}ms avg")
+    logger.info(f"   Range: {telemetry['fastest_item_ms']:.2f}ms - {telemetry['slowest_item_ms']:.2f}ms")
+    
     if summary["errors"]:
         logger.warning(f"⚠️  {summary['failed']} beasiswa gagal disimpan")
         for error in summary["errors"][:5]:  # Log first 5 errors
             logger.warning(f"   - {error['judul']}: {error['alasan']}")
         if len(summary["errors"]) > 5:
             logger.warning(f"   ... dan {len(summary['errors']) - 5} error lainnya")
+        
+        # Log error type distribution
+        logger.warning(f"   Error types: {error_type_counts}")
     
     return summary
 def auto_scrape_on_startup(crud_module):

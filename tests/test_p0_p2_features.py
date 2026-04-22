@@ -232,6 +232,85 @@ def test_p0_02_error_collection():
     return True
 
 
+def test_p0_02_telemetry_metrics():
+    """Test Telemetry: Metrics are tracked correctly"""
+    print("\n" + "="*70)
+    print("TEST TELEMETRY-01: Telemetry metrics tracking")
+    print("="*70)
+    
+    # Setup
+    beasiswa_list = [
+        create_mock_beasiswa(f"Beasiswa {i}") 
+        for i in range(10)
+    ]
+    crud = create_mock_crud_module()
+    
+    # Execute
+    result = save_beasiswa_to_database(beasiswa_list, crud)
+    
+    # Validate telemetry structure
+    assert "telemetry" in result, "Result should have 'telemetry' key"
+    telemetry = result["telemetry"]
+    
+    # Validate telemetry metrics
+    assert "success_rate" in telemetry, "Should have success_rate"
+    assert "failure_rate" in telemetry, "Should have failure_rate"
+    assert "total_time_ms" in telemetry, "Should have total_time_ms"
+    assert "avg_time_per_item_ms" in telemetry, "Should have avg_time_per_item_ms"
+    assert "fastest_item_ms" in telemetry, "Should have fastest_item_ms"
+    assert "slowest_item_ms" in telemetry, "Should have slowest_item_ms"
+    assert "error_types" in telemetry, "Should have error_types"
+    
+    # Validate metric values
+    assert telemetry["success_rate"] == 1.0, f"Expected success_rate=1.0, got {telemetry['success_rate']}"
+    assert telemetry["failure_rate"] == 0.0, f"Expected failure_rate=0.0, got {telemetry['failure_rate']}"
+    assert telemetry["total_time_ms"] > 0, "Total time should be > 0"
+    assert telemetry["avg_time_per_item_ms"] > 0, "Avg time should be > 0"
+    assert telemetry["fastest_item_ms"] > 0, "Fastest time should be > 0"
+    assert telemetry["slowest_item_ms"] > 0, "Slowest time should be > 0"
+    
+    print(f"✅ Telemetry tracking verified:")
+    print(f"   Success rate: {telemetry['success_rate']*100:.1f}%")
+    print(f"   Total time: {telemetry['total_time_ms']:.2f}ms")
+    print(f"   Avg/item: {telemetry['avg_time_per_item_ms']:.2f}ms")
+    print(f"   Range: {telemetry['fastest_item_ms']:.2f}ms - {telemetry['slowest_item_ms']:.2f}ms")
+    return True
+
+
+def test_p0_02_telemetry_with_failures():
+    """Test Telemetry: Error types are tracked"""
+    print("\n" + "="*70)
+    print("TEST TELEMETRY-02: Error type distribution tracking")
+    print("="*70)
+    
+    # Setup
+    beasiswa_list = [
+        create_mock_beasiswa("OK 1"),
+        {"nama": "", "jenjang": "S1", "deadline": "2026-06-10"},  # ValidationError
+        {"nama": "Valid", "jenjang": "", "deadline": "2026-06-10"},  # ValidationError
+        create_mock_beasiswa("OK 2"),
+    ]
+    crud = Mock()
+    crud.add_beasiswa = Mock(return_value=(True, "Success", 1))
+    
+    # Execute
+    result = save_beasiswa_to_database(beasiswa_list, crud)
+    
+    # Validate telemetry with errors
+    assert result["failed"] == 2, f"Expected 2 failed, got {result['failed']}"
+    
+    telemetry = result["telemetry"]
+    assert telemetry["success_rate"] == 0.5, f"Expected success_rate=0.5, got {telemetry['success_rate']}"
+    assert telemetry["failure_rate"] == 0.5, f"Expected failure_rate=0.5, got {telemetry['failure_rate']}"
+    assert "ValidationError" in telemetry["error_types"], "Should track ValidationError"
+    assert telemetry["error_types"]["ValidationError"] == 2, "Should have 2 ValidationErrors"
+    
+    print(f"✅ Error type distribution verified:")
+    print(f"   Success rate: {telemetry['success_rate']*100:.1f}%")
+    print(f"   Error types: {telemetry['error_types']}")
+    return True
+
+
 # ============================================================================
 # P2-03 TESTS: Logging Configuration
 # ============================================================================
@@ -370,6 +449,10 @@ if __name__ == "__main__":
         ("P0-02-03: Validation Error", test_p0_02_validation_error),
         ("P0-02-04: Missing Title", test_p0_02_missing_title),
         ("P0-02-05: Don't-Stop-on-Error", test_p0_02_error_collection),
+        
+        # Telemetry Tests
+        ("TELEMETRY-01: Metrics Tracking", test_p0_02_telemetry_metrics),
+        ("TELEMETRY-02: Error Type Distribution", test_p0_02_telemetry_with_failures),
         
         # P2-03 Tests
         ("P2-03-01: Logging Setup", test_p2_03_setup_logging),
