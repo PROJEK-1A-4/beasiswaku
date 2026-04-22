@@ -362,8 +362,6 @@ def sync_beasiswa_from_scraper(scrape_result: Optional[Dict[str, Any]] = None) -
     errors = 0
 
     try:
-        cursor.execute("PRAGMA foreign_keys = ON")
-
         for item in scraped_rows:
             judul = str(item.get("nama") or "").strip()
             if not judul:
