@@ -27,6 +27,7 @@ from src.database.crud import (
     init_db, login_user, register_user, get_connection,
     hash_password, verify_password
 )
+from src.core import setup_logging
 from src.gui.tab_beranda import BerandaTab
 from src.gui.tab_beasiswa import BeasiswaTab
 from src.gui.tab_tracker import TrackerTab
@@ -56,10 +57,6 @@ from src.gui.design_tokens import (
     FONT_SIZE_SM,
     FONT_SIZE_XS,
 )
-
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 def _create_chart_section(section_title: str, canvas, min_height: int) -> QWidget:
@@ -932,6 +929,10 @@ class SettingsWindow(QDialog):
 
 def main():
     """Main entry point aplikasi"""
+    # Setup centralized logging (MUST be first)
+    setup_logging()
+    logger = logging.getLogger(__name__)
+    
     app = QApplication(sys.argv)
     
     # Initialize database

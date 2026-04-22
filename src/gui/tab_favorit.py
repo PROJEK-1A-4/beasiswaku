@@ -24,8 +24,6 @@ from src.database.crud import (
     add_lamaran, check_user_applied
 )
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

@@ -19,8 +19,8 @@ try:
 except ImportError:
     PYQT_AVAILABLE = False
 
-# Konfigurasi logging untuk debugging dan monitoring
-logging.basicConfig(level=logging.INFO)
+# Logging: gunakan centralized setup dari src.core.logging_config
+# Setup akan dipanggil dari main.py
 logger = logging.getLogger(__name__)
 
 # Konfigurasi folder

@@ -76,15 +76,8 @@ class Config:
         cls.BACKUP_DIR.mkdir(parents=True, exist_ok=True)
         cls.DOCS_DIR.mkdir(parents=True, exist_ok=True)
 
-        # Initialize logging
-        logging.basicConfig(
-            level=cls.LOG_LEVEL,
-            format=cls.LOG_FORMAT,
-            handlers=[
-                logging.FileHandler(cls.LOG_FILE),
-                logging.StreamHandler(),
-            ]
-        )
+        # Note: Logging is now centralized in src.core.logging_config.setup_logging()
+        # This will be called from main.py at startup
         logger.info(f"Configuration initialized - {cls.APP_NAME} v{cls.APP_VERSION}")
         logger.info(f"Debug Mode: {cls.DEBUG_MODE}, Theme: {cls.THEME}")
 
