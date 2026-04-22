@@ -3,7 +3,11 @@
 from collections import Counter
 from datetime import date, datetime, timedelta
 import re
+import logging
 from typing import Any, Dict, List, Optional, Tuple
+
+# Centralized logging
+logger = logging.getLogger(__name__)
 
 from src.database.crud import (
     get_connection,
@@ -348,8 +352,20 @@ def _normalize_deadline_for_db(raw_deadline: Any) -> str:
     return deadline.strftime("%Y-%m-%d")
 
 
-def sync_beasiswa_from_scraper(scrape_result: Optional[Dict[str, Any]] = None) -> Dict[str, int]:
-    """Scrape latest scholarships and upsert into DB without duplicating by title+jenjang."""
+def sync_beasiswa_from_scraper(scrape_result: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Scrape latest scholarships and upsert into DB without duplicating by title+jenjang.
+    
+    Return:
+        Dict with structure:
+        {
+            "scraped": int,
+            "inserted": int,
+            "updated": int,
+            "skipped": int,
+            "errors": int,
+            "error_details": [{"judul": str, "alasan": str}, ...]
+        }
+    """
     payload = scrape_result or scrape_beasiswa_data()
     scraped_rows = payload.get("beasiswa", []) if isinstance(payload, dict) else []
 
@@ -360,9 +376,12 @@ def sync_beasiswa_from_scraper(scrape_result: Optional[Dict[str, Any]] = None) -
     updated = 0
     skipped = 0
     errors = 0
+    error_details = []
 
     try:
-        for item in scraped_rows:
+        logger.info(f"🔄 Syncing {len(scraped_rows)} scraped beasiswa to database...")
+        
+        for idx, item in enumerate(scraped_rows, 1):
             judul = str(item.get("nama") or "").strip()
             if not judul:
                 skipped += 1
@@ -422,6 +441,7 @@ def sync_beasiswa_from_scraper(scrape_result: Optional[Dict[str, Any]] = None) -
                         ),
                     )
                     updated += 1
+                    logger.debug(f"  [{idx}/{len(scraped_rows)}] ✅ Updated: {judul}")
                 else:
                     cursor.execute(
                         """
@@ -441,11 +461,28 @@ def sync_beasiswa_from_scraper(scrape_result: Optional[Dict[str, Any]] = None) -
                         ),
                     )
                     inserted += 1
+                    logger.debug(f"  [{idx}/{len(scraped_rows)}] ✅ Inserted: {judul}")
 
-            except Exception:
+            except ValueError as e:
                 errors += 1
+                error_reason = f"Validation error: {str(e)}"
+                error_details.append({"judul": judul, "alasan": error_reason})
+                logger.warning(f"  [{idx}/{len(scraped_rows)}] ❌ {judul} - {error_reason}")
+            
+            except KeyError as e:
+                errors += 1
+                error_reason = f"Missing required field: {str(e)}"
+                error_details.append({"judul": judul, "alasan": error_reason})
+                logger.warning(f"  [{idx}/{len(scraped_rows)}] ❌ {judul} - {error_reason}")
+            
+            except Exception as e:
+                errors += 1
+                error_reason = f"{type(e).__name__}: {str(e)}"
+                error_details.append({"judul": judul, "alasan": error_reason})
+                logger.error(f"  [{idx}/{len(scraped_rows)}] ❌ {judul} - {error_reason}", exc_info=False)
 
         conn.commit()
+        logger.info(f"✅ Sync complete: {inserted} inserted, {updated} updated, {errors} errors, {skipped} skipped")
 
         return {
             "scraped": len(scraped_rows),
@@ -453,8 +490,11 @@ def sync_beasiswa_from_scraper(scrape_result: Optional[Dict[str, Any]] = None) -
             "updated": updated,
             "skipped": skipped,
             "errors": errors,
+            "error_details": error_details,
         }
-    except Exception:
+    except Exception as e:
+        error_msg = f"Sync transaction failed: {type(e).__name__}: {str(e)}"
+        logger.error(f"🔴 {error_msg}", exc_info=False)
         conn.rollback()
         return {
             "scraped": len(scraped_rows),
@@ -462,6 +502,8 @@ def sync_beasiswa_from_scraper(scrape_result: Optional[Dict[str, Any]] = None) -
             "updated": updated,
             "skipped": skipped,
             "errors": errors + 1,
+            "error_details": error_details,
+            "transaction_error": error_msg,
         }
     finally:
         cursor.close()

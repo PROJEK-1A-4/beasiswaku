@@ -41,7 +41,8 @@ def has_note(user_id: int, beasiswa_id: int) -> bool:
     try:
         note, _ = get_catatan(user_id=user_id, beasiswa_id=beasiswa_id)
         return note is not None
-    except:
+    except Exception as e:
+        logger.warning(f"Failed to check note - user_id: {user_id}, beasiswa_id: {beasiswa_id}. Error: {str(e)}")
         return False
 
 
@@ -69,7 +70,8 @@ def get_note_preview(user_id: int, beasiswa_id: int, max_length: int = 50) -> st
                 return content[:max_length] + "..."
             return content
         return ""
-    except:
+    except Exception as e:
+        logger.warning(f"Failed to get note preview - user_id: {user_id}, beasiswa_id: {beasiswa_id}. Error: {str(e)}")
         return ""
 
 
