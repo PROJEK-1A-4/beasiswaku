@@ -22,8 +22,6 @@ from PyQt6.QtGui import QFont, QColor, QIcon
 
 from src.database.crud import add_catatan, get_catatan, edit_catatan, delete_catatan, get_catatan_list
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

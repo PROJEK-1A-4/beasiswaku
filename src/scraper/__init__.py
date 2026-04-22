@@ -15,8 +15,13 @@ from .scraper import (
     extract_beasiswa_info,
     get_scraper_thread,
     save_backup,
-    ScraperThread  # If available
 )
+
+# ScraperThread only available if PyQt6 is installed
+try:
+    from .scraper import ScraperThread
+except ImportError:
+    ScraperThread = None
 
 __all__ = [
     'scrape_beasiswa_data',
