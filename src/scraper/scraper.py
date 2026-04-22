@@ -550,53 +550,214 @@ if __name__ == "__main__":
 
 def save_beasiswa_to_database(beasiswa_list, crud_module):
     """
-    Convert scraper output → Darva's CRUD
+    Save scraped beasiswa to database via CRUD module
+    
+    Args:
+        beasiswa_list: List of beasiswa dict from scraper
+        crud_module: Darva's CRUD module with add_beasiswa() function
+    
+    Return:
+        Dict with structure:
+        {
+            "total": int,
+            "saved": int,
+            "failed": int,
+            "errors": [list of {judul, alasan}]
+        }
+    
+    Behavior:
+        - Jangan stop di error satu item, lanjut ke item berikutnya
+        - Collect semua error untuk reporting
+        - Log detail per beasiswa untuk debugging
     """
-    for beasiswa in beasiswa_list:
-        status = crud_module.add_beasiswa(
-            judul=beasiswa['nama'],
-            jenjang=beasiswa['jenjang'],
-            deadline=beasiswa['deadline'],
-            deskripsi=beasiswa['deskripsi'],
-            link_aplikasi=beasiswa['link'],
-            status=beasiswa['status']  # <-- PERBAIKANNYA DI SINI: Langsung pakai data yang sudah ada!
-        )
-#untuk auto scraping
+    summary = {
+        "total": len(beasiswa_list),
+        "saved": 0,
+        "failed": 0,
+        "errors": []
+    }
+    
+    logger.info(f"📥 Menyimpan {len(beasiswa_list)} beasiswa ke database...")
+    
+    for idx, beasiswa in enumerate(beasiswa_list, 1):
+        beasiswa_judul = beasiswa.get('nama', 'Unknown')
+        
+        try:
+            # Validate required fields
+            if not beasiswa_judul:
+                raise ValueError("Judul beasiswa kosong")
+            
+            if not beasiswa.get('jenjang'):
+                raise ValueError("Jenjang beasiswa kosong")
+            
+            if not beasiswa.get('deadline'):
+                raise ValueError("Deadline beasiswa kosong")
+            
+            # Call CRUD function
+            success, message, beasiswa_id = crud_module.add_beasiswa(
+                judul=beasiswa_judul,
+                jenjang=beasiswa.get('jenjang', ''),
+                deadline=beasiswa.get('deadline', '0000-00-00'),
+                deskripsi=beasiswa.get('deskripsi', ''),
+                link_aplikasi=beasiswa.get('link', ''),
+                status=beasiswa.get('status', 'Buka'),
+                penyelenggara_id=None  # CRUD handles penyelenggara lookup
+            )
+            
+            if success:
+                summary["saved"] += 1
+                logger.debug(f"  [{idx}/{len(beasiswa_list)}] ✅ Saved: {beasiswa_judul} (ID: {beasiswa_id})")
+            else:
+                summary["failed"] += 1
+                error_msg = message if message else "Unknown error from CRUD"
+                summary["errors"].append({
+                    "judul": beasiswa_judul,
+                    "alasan": error_msg
+                })
+                logger.warning(f"  [{idx}/{len(beasiswa_list)}] ❌ Failed: {beasiswa_judul} - {error_msg}")
+        
+        except ValueError as e:
+            summary["failed"] += 1
+            error_msg = str(e)
+            summary["errors"].append({
+                "judul": beasiswa_judul,
+                "alasan": error_msg
+            })
+            logger.warning(f"  [{idx}/{len(beasiswa_list)}] ❌ Validation error: {beasiswa_judul} - {error_msg}")
+        
+        except KeyError as e:
+            summary["failed"] += 1
+            error_msg = f"Missing required field: {str(e)}"
+            summary["errors"].append({
+                "judul": beasiswa_judul,
+                "alasan": error_msg
+            })
+            logger.warning(f"  [{idx}/{len(beasiswa_list)}] ❌ Key error: {beasiswa_judul} - {error_msg}")
+        
+        except Exception as e:
+            summary["failed"] += 1
+            error_msg = f"Unexpected error: {type(e).__name__}: {str(e)}"
+            summary["errors"].append({
+                "judul": beasiswa_judul,
+                "alasan": error_msg
+            })
+            logger.error(f"  [{idx}/{len(beasiswa_list)}] ❌ Exception: {beasiswa_judul} - {error_msg}", exc_info=True)
+    
+    # Log summary
+    logger.info(f"✅ Database save complete: {summary['saved']}/{summary['total']} berhasil")
+    if summary["errors"]:
+        logger.warning(f"⚠️  {summary['failed']} beasiswa gagal disimpan")
+        for error in summary["errors"][:5]:  # Log first 5 errors
+            logger.warning(f"   - {error['judul']}: {error['alasan']}")
+        if len(summary["errors"]) > 5:
+            logger.warning(f"   ... dan {len(summary['errors']) - 5} error lainnya")
+    
+    return summary
 def auto_scrape_on_startup(crud_module):
     """
-    Check database kosong → scrape → save.
-    Dijalankan saat aplikasi pertama kali dibuka.
+    Auto-scraping saat aplikasi startup jika database kosong
+    
+    Flow:
+        1. Check apakah database beasiswa sudah terisi
+        2. Jika kosong → jalankan scraping
+        3. Simpan hasil ke database
+        4. Return status & summary
+    
+    Args:
+        crud_module: Darva's CRUD module
+    
+    Return:
+        Dict with structure:
+        {
+            "triggered": bool,  # True jika scraping dijalankan
+            "success": bool,    # True jika scraping + save berhasil
+            "message": str,
+            "summary": dict or None  # Result dari save_beasiswa_to_database
+        }
     """
+    result = {
+        "triggered": False,
+        "success": False,
+        "message": "",
+        "summary": None
+    }
+    
     try:
-        # 1. Cek apakah database kosong menggunakan fungsi dari crud.py milik Darva
-        # Asumsi: Darva memiliki fungsi get_beasiswa_list() yang mengembalikan list
-        existing_data = crud_module.get_beasiswa_list()
-        total_data = 0
-        if isinstance(existing_data, tuple) and len(existing_data) >= 2:
-            total_data = int(existing_data[1] or 0)
-        elif isinstance(existing_data, list):
-            total_data = len(existing_data)
+        # 1. Check database status
+        logger.info("🔍 Checking database status on startup...")
         
-        # 2. Jika kosong (panjang list = 0), jalankan scraping
-        if total_data == 0:
-            logger.info("⚠️ Database beasiswa masih kosong. Memulai proses auto-scraping...")
+        try:
+            existing_data = crud_module.get_beasiswa_list()
+            total_data = 0
             
-            # Jalankan proses scraping utamamu
+            if isinstance(existing_data, tuple) and len(existing_data) >= 2:
+                total_data = int(existing_data[1] or 0)
+            elif isinstance(existing_data, list):
+                total_data = len(existing_data)
+            
+            logger.debug(f"   Database check: found {total_data} existing beasiswa")
+        
+        except AttributeError as e:
+            logger.error(f"❌ CRUD module missing get_beasiswa_list(): {str(e)}", exc_info=True)
+            result["message"] = "CRUD module error: missing get_beasiswa_list()"
+            return result
+        
+        except Exception as e:
+            logger.error(f"❌ Error checking database: {type(e).__name__}: {str(e)}", exc_info=True)
+            result["message"] = f"Database check failed: {str(e)}"
+            return result
+        
+        # 2. Decide: scrape or skip
+        if total_data > 0:
+            logger.info(f"✅ Database sudah terisi ({total_data} beasiswa). Melewati auto-scraping.")
+            result["triggered"] = False
+            result["success"] = True
+            result["message"] = f"Database already populated with {total_data} beasiswa"
+            return result
+        
+        # 3. Database kosong → trigger scraping
+        logger.info("⚠️ Database beasiswa kosong. Memulai auto-scraping...")
+        result["triggered"] = True
+        
+        try:
             hasil_scrape = scrape_beasiswa_data()
             
-            # Jika berhasil mendapat data, simpan ke database
-            if hasil_scrape and "beasiswa" in hasil_scrape:
-                logger.info("📥 Menyimpan hasil auto-scrape ke database...")
-                save_beasiswa_to_database(hasil_scrape["beasiswa"], crud_module)
-                logger.info("✅ Auto-scraping dan penyimpanan selesai!")
-                return True
-            else:
-                logger.warning("⚠️ Auto-scrape selesai tapi tidak mendapat data beasiswa.")
-                return False
+            if not hasil_scrape or "beasiswa" not in hasil_scrape:
+                logger.warning("⚠️ Scraping returned no data")
+                result["success"] = False
+                result["message"] = "Scraping returned no data"
+                return result
+            
+            beasiswa_list = hasil_scrape["beasiswa"]
+            logger.info(f"✅ Scraping complete: {len(beasiswa_list)} beasiswa found")
+            
+            # 4. Save to database
+            try:
+                save_summary = save_beasiswa_to_database(beasiswa_list, crud_module)
                 
-        else:
-            logger.info(f"✅ Database sudah terisi ({total_data} data). Melewati auto-scraping.")
-            return False
+                logger.info(f"✅ Auto-scrape completed: {save_summary['saved']} beasiswa saved")
+                result["success"] = True
+                result["message"] = f"Auto-scraping successful: {save_summary['saved']}/{save_summary['total']} saved"
+                result["summary"] = save_summary
+                return result
+            
+            except Exception as e:
+                logger.error(f"❌ Error saving scraped data to database: {type(e).__name__}: {str(e)}", exc_info=True)
+                result["success"] = False
+                result["message"] = f"Save to database failed: {str(e)}"
+                return result
+        
+        except Exception as e:
+            logger.error(f"❌ Scraping error during auto-scrape: {type(e).__name__}: {str(e)}", exc_info=True)
+            result["success"] = False
+            result["message"] = f"Scraping failed: {str(e)}"
+            return result
+    
+    except Exception as e:
+        logger.error(f"❌ Unexpected error in auto_scrape_on_startup: {type(e).__name__}: {str(e)}", exc_info=True)
+        result["success"] = False
+        result["message"] = f"Unexpected error: {str(e)}"
+        return result
             
     except Exception as e:
         logger.error(f"❌ Terjadi kesalahan saat auto-scrape on startup: {str(e)}")
