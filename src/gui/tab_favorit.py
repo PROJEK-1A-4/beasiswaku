@@ -103,7 +103,8 @@ def is_beasiswa_favorited(user_id: int, beasiswa_id: int) -> bool:
     try:
         favorit_list, _ = get_favorit_list(user_id=user_id)
         return any(f['beasiswa_id'] == beasiswa_id for f in favorit_list)
-    except:
+    except Exception as e:
+        logger.warning(f"Failed to check favorite status - user_id: {user_id}, beasiswa_id: {beasiswa_id}. Error: {str(e)}")
         return False
 
 
