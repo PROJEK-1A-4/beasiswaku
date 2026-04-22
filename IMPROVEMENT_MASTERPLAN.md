@@ -323,10 +323,10 @@ Pembagian ini mengikuti domain ownership tim agar eksekusi cepat dan minim conte
   - P1-06 (hilangkan N+1 query di beasiswa per user).
   - P2-01 (standarisasi result/error contract backend).
   - P2-04 (isolasi test DB dan migrasi test script-style utama).
-- Status progres Darva (2026-04-20):
-  - [x] P1-06 selesai.
-  - [x] P2-01 selesai (BackendResult + result wrapper APIs kompatibel).
-  - [x] P2-04 selesai (isolasi DB fixture + migrasi test script-style ke assertion pytest).
+- Status audit aktual (2026-04-22): PARTIAL.
+  - P0-03 dan P0-04 belum konsisten di kode sekarang: `src/core/database.py` masih memakai pola singleton connection lama dan `src/core/config.py` masih belum menunjukkan strategi koneksi per-thread yang final.
+  - P1-06 belum terverifikasi di tree sekarang: `src/database/crud.py` masih memperlihatkan pola lama yang mengarah ke N+1.
+  - P2-01 dan P2-04 belum terverifikasi di tree sekarang: kontrak backend dan fixture test masih belum sinkron dengan versi yang direncanakan.
 - Reviewer pendamping: Kemal.
 - Deliverable:
   - PR backend stability.
@@ -339,6 +339,10 @@ Pembagian ini mengikuti domain ownership tim agar eksekusi cepat dan minim conte
   - Hardening alur sinkronisasi scraper -> DB (error summary yang actionable).
   - P2-03 untuk konsolidasi logging pada scraper + sinkronisasi.
   - Dukungan stress test untuk skenario sync paralel (bagian dari P0-04/P2-04).
+- Status audit aktual (2026-04-22): PARTIAL.
+  - `src/scraper/scraper.py` sudah punya logging dan error summary yang lebih kaya, tetapi masih ada broad exception handling di beberapa jalur.
+  - `src/services/dashboard_service.py` masih menyerap error dengan `except Exception` tanpa detail context pada loop sinkronisasi.
+  - `src/gui/tab_notes.py` dan `src/gui/tab_favorit.py` masih menyimpan bare except, jadi target P0-02 belum selesai penuh.
 - Reviewer pendamping: Darva.
 - Deliverable:
   - PR scraper reliability.
@@ -350,6 +354,10 @@ Pembagian ini mengikuti domain ownership tim agar eksekusi cepat dan minim conte
   - P1-03 (aktifkan handler tombol profil + alur simpan profile/password).
   - Integrasi perubahan arsitektur ke `main.py` dan flow window/tab.
   - P2-05 (smoke test UI flow: login/logout/profile update).
+- Status audit aktual (2026-04-22): BELUM DIKERJAKAN.
+  - Belum ada bukti pada tree sekarang bahwa event mediator antar-tab sudah dipasang secara terpusat.
+  - Handler profil dan alur simpan profile/password belum terverifikasi di kode yang sekarang.
+  - Smoke test UI flow juga belum terlihat sebagai implementasi yang stabil di test suite saat ini.
 - Reviewer pendamping: Kyla.
 - Deliverable:
   - PR app orchestration refactor.
@@ -361,6 +369,10 @@ Pembagian ini mengikuti domain ownership tim agar eksekusi cepat dan minim conte
   - P1-05 (deadline coloring adaptif, bukan tanggal hardcoded).
   - P1-07 (pagination/lazy loading tabel beasiswa).
   - P1-04 (putusan final integrasi/deprecate modul Favorit/Notes dari sisi UI).
+- Status audit aktual (2026-04-22): BELUM DIKERJAKAN.
+  - Audit cepat belum menemukan bukti bahwa filter deadline benar-benar berbasis selisih hari.
+  - Deadline coloring adaptif dan pagination/lazy loading belum terverifikasi di UI current tree.
+  - Keputusan final integrasi/deprecate Favorit/Notes belum dituangkan sebagai perubahan struktur yang final.
 - Reviewer pendamping: Aulia.
 - Deliverable:
   - PR UX correctness beasiswa/favorit.
@@ -372,6 +384,10 @@ Pembagian ini mengikuti domain ownership tim agar eksekusi cepat dan minim conte
   - P2-05 (test alur statistik/tracker setelah standardisasi status).
   - P3-01 (sinkronisasi dokumen arsitektur/API terhadap kode aktual).
   - P3-02 (policy compat wrapper + canonical import path).
+- Status audit aktual (2026-04-22): BELUM DIKERJAKAN.
+  - Belum ada bukti audit bahwa enum/status mapping sudah diseragamkan lintas layer.
+  - Dokumentasi arsitektur dan API masih perlu diselaraskan ke source of truth yang sekarang.
+  - Kebijakan compat wrapper vs canonical import path belum dinyatakan sebagai keputusan final di dokumen aktif.
 - Reviewer pendamping: Darva.
 - Deliverable:
   - PR status consistency + chart validation.
@@ -385,12 +401,8 @@ Eksekusi dilakukan berantai (serial), bukan paralel. Pada satu waktu hanya ada s
   - P0-03 (FK enforcement di level connection).
   - P0-04 (strategi thread-safe DB, minimal keputusan arsitektur + implementasi awal).
   - Gate lanjut fase: seluruh test DB lulus dan validasi FK konsisten.
-  - Status aktual (2026-04-20):
-    - [x] P0-03 selesai.
-    - [x] P0-04.1 keputusan arsitektur selesai (`docs/DECISION_P0_04_THREAD_SAFETY.md`).
-    - [x] P0-04.2 implementasi per-thread connection.
-    - [x] P0-04.3 stress test multi-write sederhana.
-    - [x] Gate Fase 1 siap (test DB terkait lulus).
+  - Status audit aktual (2026-04-22): PARTIAL.
+    - Gate fase belum bisa dianggap tertutup karena tree sekarang masih menunjukkan implementasi database lama dan test suite lama.
 - Fase 2 - Kemal:
   - P0-02 untuk area sync/scraper (hapus bare except, error detail per item).
   - P2-03 untuk logging reliability di alur sync.
