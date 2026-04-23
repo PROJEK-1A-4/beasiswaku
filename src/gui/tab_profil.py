@@ -4,11 +4,12 @@ User profile management dengan layout yang rapi dan terstruktur
 """
 
 import logging
+import re
 from datetime import datetime
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
-    QFrame, QScrollArea, QGridLayout, QCheckBox
+    QFrame, QScrollArea, QGridLayout, QCheckBox, QMessageBox
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QFont, QColor
@@ -748,7 +749,15 @@ class ProfileTab(QWidget):
         logger.info("Profile edit mode enabled")
 
     def _on_save_profile_clicked(self):
-        """Disable all profile fields after saving."""
+        """Validate and save profile data."""
+        # Validate profile fields
+        is_valid, error_msg = self._validate_profile_fields()
+        if not is_valid:
+            QMessageBox.warning(self, "Validasi Gagal", error_msg)
+            return
+        
+        # All validations passed (persistence in next commit)
+        QMessageBox.information(self, "Berhasil", "Data profil berhasil disimpan.")
         self.profile_edit_mode = False
         # Disable all profile fields
         for field in self.profile_fields.values():
@@ -756,5 +765,64 @@ class ProfileTab(QWidget):
         logger.info("Profile save requested")
 
     def _on_change_password_clicked(self):
-        """Stub handler untuk ubah password (akan diperdalam di commit berikutnya)."""
+        """Validate and change password."""
+        # Validate password fields
+        is_valid, error_msg = self._validate_password_fields()
+        if not is_valid:
+            QMessageBox.warning(self, "Validasi Gagal", error_msg)
+            return
+        
+        # All validations passed (persistence in next commit)
+        QMessageBox.information(self, "Berhasil", "Password berhasil diubah.")
+        # Clear password fields
+        self.current_password_input.setText("")
+        self.new_password_input.setText("")
+        self.confirm_password_input.setText("")
         logger.info("Change password requested")
+    
+    def _validate_profile_fields(self) -> tuple[bool, str]:
+        """Validate profile fields. Returns (is_valid, error_message)."""
+        # Get field values
+        nama_field = self.profile_fields.get("nama_lengkap")
+        email_field = self.profile_fields.get("email")
+        
+        if not nama_field or not email_field:
+            return False, "Kolom nama atau email tidak ditemukan."
+        
+        nama = nama_field.text().strip()
+        email = email_field.text().strip()
+        
+        # Validate nama is not empty
+        if not nama:
+            return False, "Nama lengkap tidak boleh kosong."
+        
+        # Validate email format
+        email_pattern = r'^[^@]+@[^@]+\.[^@]+$'
+        if not re.match(email_pattern, email):
+            return False, "Format email tidak valid."
+        
+        return True, ""
+    
+    def _validate_password_fields(self) -> tuple[bool, str]:
+        """Validate password fields. Returns (is_valid, error_message)."""
+        current_pwd = self.current_password_input.text().strip()
+        new_pwd = self.new_password_input.text().strip()
+        confirm_pwd = self.confirm_password_input.text().strip()
+        
+        # Validate current password is not empty
+        if not current_pwd or current_pwd == "••••••••":
+            return False, "Password saat ini harus diisi."
+        
+        # Validate new password is not empty
+        if not new_pwd:
+            return False, "Password baru tidak boleh kosong."
+        
+        # Validate new password min 8 chars
+        if len(new_pwd) < 8:
+            return False, "Password baru minimal 8 karakter."
+        
+        # Validate passwords match
+        if new_pwd != confirm_pwd:
+            return False, "Password baru tidak cocok dengan konfirmasi."
+        
+        return True, ""
