@@ -23,14 +23,12 @@ from src.database.crud import (
     add_lamaran,
     check_user_applied,
     delete_favorit,
-    get_connection,
 )
-from src.core.database import DatabaseManager
-from src.scraper.scraper import get_scraper_thread
-from src.services.beasiswa_service import get_beasiswa_table_data
-from src.services.dashboard_service import sync_beasiswa_from_scraper
-from src.services.status_utils import SCHOLARSHIP_STATUS_ORDER
-
+from src.gui.tab_beranda import BerandaTab
+from src.gui.tab_beasiswa import BeasiswaTab
+from src.gui.tab_tracker import TrackerTab          # ← FavoritTab BELUM ditambah di sini
+from src.gui.tab_statistik import StatistikTab
+from src.gui.tab_profil import ProfileTab
 # Setup logging
 logger = logging.getLogger(__name__)
 
@@ -38,28 +36,12 @@ logger = logging.getLogger(__name__)
 # ==================== DEADLINE HELPER FUNCTIONS ====================
 
 def _get_days_until_deadline(deadline_str: str) -> Optional[int]:
-    """
-    Calculate days remaining until deadline.
-    
-    Args:
-        deadline_str (str): Deadline in format 'YYYY-MM-DD'
-    
-    Returns:
-        int: Number of days remaining (can be negative if deadline passed)
-        None: If deadline_str cannot be parsed
-    
-    Example:
-        >>> _get_days_until_deadline("2026-05-15")
-        22  # (if today is 2026-04-23)
-    """
-    try:
-        deadline_date = datetime.strptime(deadline_str, "%Y-%m-%d").date()
-        today = date.today()
-        days_remaining = (deadline_date - today).days
-        return days_remaining
-    except (ValueError, TypeError, AttributeError) as e:
-        logger.warning(f"Could not parse deadline '{deadline_str}': {e}")
-        return None
+    # Menggunakan date.today() untuk menghitung selisih hari REAL-TIME
+    # Bukan hardcoded berdasarkan tanggal tertentu
+    deadline_date = datetime.strptime(deadline_str, "%Y-%m-%d").date()
+    today = date.today()
+    days_remaining = (deadline_date - today).days
+    return days_remaining
 
 
 def _get_deadline_color(days_remaining: Optional[int]) -> str:
@@ -78,31 +60,13 @@ def _get_deadline_color(days_remaining: Optional[int]) -> str:
     Returns:
         str: Hex color code
     
-    Example:
-        >>> _get_deadline_color(5)
-        '#ef4444'  # Red
-        >>> _get_deadline_color(15)
-        '#f59e0b'  # Yellow
-        >>> _get_deadline_color(45)
-        '#10b981'  # Green
-    """
-    if days_remaining is None:
-        return COLOR_GRAY_500
-    elif days_remaining <= 7:
-        return COLOR_ERROR
+    def _get_deadline_color(days_remaining: Optional[int]) -> str:
+    if days_remaining <= 7:
+        return COLOR_ERROR      # Red
     elif days_remaining <= 30:
-        return COLOR_WARNING
+        return COLOR_WARNING    # Yellow
     else:
-        return COLOR_SUCCESS
-
-
-class BeasiswaTab(QWidget):
-    """
-    Beasiswa (Scholarship List) Tab dengan professional data table.
-    
-    Features:
-    - Search bar untuk cari beasiswa
-    - Filters: Status, Jenjang
+        return COLOR_SUCCESS    # Green
     - Action buttons: Deadline Dekat, Refresh, Export CSV
     - Professional table dengan 7 columns
     - Status badges (Buka, Segera Tutup, Tutup)
@@ -154,12 +118,19 @@ class BeasiswaTab(QWidget):
         # Subtitle dengan last updated time
         self.subtitle_label = QLabel(f"Terakhir diperbaharui: {datetime.now().strftime('%d %b %Y %H:%M')}")
         self.subtitle_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
-        self.subtitle_label.setStyleSheet(f"color: {COLOR_GRAY_400}; padding: 0px;")
-        header_layout.addWidget(self.subtitle_label)
-        
+        # Pagination state variables:
+        self.current_page: int = 1
+        self.items_per_page: int = 20
+        self.total_pages: int = 0
+
+    # populate_table() dengan page slicing:
+    def populate_table(self, data: List[Dict[str, Any]], page: int = 1):
+        start_idx = (self.current_page - 1) * self.items_per_page
+        end_idx = start_idx + self.items_per_page
+        page_data = data[start_idx:end_idx]  # Hanya render 20 item per page
         main_layout.addLayout(header_layout)
         main_layout.addSpacing(20)
-        
+            
         # ===== TOOLBAR SECTION =====
         toolbar_layout = QHBoxLayout()
         toolbar_layout.setSpacing(12)

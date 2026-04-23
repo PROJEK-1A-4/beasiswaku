@@ -30,6 +30,7 @@ from src.database.crud import (
 from src.core import setup_logging
 from src.gui.tab_beranda import BerandaTab
 from src.gui.tab_beasiswa import BeasiswaTab
+from src.gui.tab_favorit import FavoritTab
 from src.gui.tab_tracker import TrackerTab
 from src.gui.tab_statistik import StatistikTab
 from src.gui.tab_profil import ProfileTab
@@ -653,17 +654,21 @@ class MainWindow(QMainWindow):
         self.beasiswa_tab = BeasiswaTab(self.user_id)
         self.tabs.addTab(self.beasiswa_tab, "📚 Beasiswa")
         
-        # Tab 2: Tracker
+        # Tab 2: Favorit
+        self.favorit_tab = FavoritTab(self.user_id)
+        self.tabs.addTab(self.favorit_tab, "⭐ Favorit")
+        
+        # Tab 3: Tracker
         self.tracker_tab = TrackerTab(self.user_id)
         self.tabs.addTab(self.tracker_tab, "📋 Tracker Lamaran")
         
-        # Tab 3: Statistik
+        # Tab 4: Statistik
         self.statistik_tab = StatistikTab(self.user_id)
         self.tabs.addTab(self.statistik_tab, "📊 Statistik")
         self.tabs.setDocumentMode(True)
         self.tabs.setStyleSheet("QTabBar::tab { min-width: 120px; }")
         
-        # Tab 4: Profil
+        # Tab 5: Profil
         self.profil_tab = ProfileTab(self.user_id, self.username)
         self.tabs.addTab(self.profil_tab, "👤 Profil")
         
