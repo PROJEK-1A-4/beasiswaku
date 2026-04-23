@@ -33,6 +33,11 @@ class ProfileTab(QWidget):
         self.username = username
         self.email = email
         self.user_data = {}
+        self.profile_fields = {}
+        self.profile_edit_mode = False
+        self.current_password_input = None
+        self.new_password_input = None
+        self.confirm_password_input = None
         
         logger.info(f"Initializing ProfileTab for user {user_id}")
         self.load_user_data()
