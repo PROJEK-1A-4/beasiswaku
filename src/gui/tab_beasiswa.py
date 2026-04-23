@@ -5,7 +5,7 @@ Professional scholarship listing with search, filters, and actions
 
 import logging
 from typing import Optional, Dict, List, Any
-from datetime import datetime
+from datetime import datetime, date
 import csv
 import os
 
@@ -35,6 +35,67 @@ from src.services.status_utils import SCHOLARSHIP_STATUS_ORDER
 logger = logging.getLogger(__name__)
 
 
+# ==================== DEADLINE HELPER FUNCTIONS ====================
+
+def _get_days_until_deadline(deadline_str: str) -> Optional[int]:
+    """
+    Calculate days remaining until deadline.
+    
+    Args:
+        deadline_str (str): Deadline in format 'YYYY-MM-DD'
+    
+    Returns:
+        int: Number of days remaining (can be negative if deadline passed)
+        None: If deadline_str cannot be parsed
+    
+    Example:
+        >>> _get_days_until_deadline("2026-05-15")
+        22  # (if today is 2026-04-23)
+    """
+    try:
+        deadline_date = datetime.strptime(deadline_str, "%Y-%m-%d").date()
+        today = date.today()
+        days_remaining = (deadline_date - today).days
+        return days_remaining
+    except (ValueError, TypeError, AttributeError) as e:
+        logger.warning(f"Could not parse deadline '{deadline_str}': {e}")
+        return None
+
+
+def _get_deadline_color(days_remaining: Optional[int]) -> str:
+    """
+    Get color for deadline display based on days remaining.
+    
+    Color scheme:
+    - Red (COLOR_ERROR): 7 days or less remaining
+    - Yellow (COLOR_WARNING): 8-30 days remaining
+    - Green (COLOR_SUCCESS): More than 30 days remaining
+    - Gray (COLOR_GRAY_500): If days_remaining is None (unparseable)
+    
+    Args:
+        days_remaining (int or None): Days until deadline
+    
+    Returns:
+        str: Hex color code
+    
+    Example:
+        >>> _get_deadline_color(5)
+        '#ef4444'  # Red
+        >>> _get_deadline_color(15)
+        '#f59e0b'  # Yellow
+        >>> _get_deadline_color(45)
+        '#10b981'  # Green
+    """
+    if days_remaining is None:
+        return COLOR_GRAY_500
+    elif days_remaining <= 7:
+        return COLOR_ERROR
+    elif days_remaining <= 30:
+        return COLOR_WARNING
+    else:
+        return COLOR_SUCCESS
+
+
 class BeasiswaTab(QWidget):
     """
     Beasiswa (Scholarship List) Tab dengan professional data table.
@@ -57,6 +118,12 @@ class BeasiswaTab(QWidget):
         self.sync_btn: Optional[QPushButton] = None
         self._sync_thread = None
         self._sync_in_progress = False
+        
+        # ===== PAGINATION VARIABLES =====
+        self.current_page: int = 1
+        self.items_per_page: int = 20
+        self.total_pages: int = 0
+        self.filtered_data: List[Dict[str, Any]] = []
         
         logger.info(f"Initializing BeasiswaTab")
         self.init_ui()
@@ -338,6 +405,83 @@ class BeasiswaTab(QWidget):
         
         self.table.setMinimumHeight(400)
         main_layout.addWidget(self.table)
+        main_layout.addSpacing(16)
+        
+        # ===== PAGINATION SECTION =====
+        pagination_layout = QHBoxLayout()
+        pagination_layout.setContentsMargins(0, 0, 0, 0)
+        pagination_layout.setSpacing(12)
+        
+        # Previous button
+        self.prev_btn = QPushButton("← Sebelumnya")
+        self.prev_btn.setMinimumHeight(36)
+        self.prev_btn.setMaximumWidth(120)
+        self.prev_btn.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        self.prev_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_WHITE};
+                border: 1px solid {COLOR_GRAY_200};
+                border-radius: {BORDER_RADIUS_MD};
+                color: {COLOR_NAVY};
+                padding: 6px 12px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_GRAY_100};
+                border: 1px solid {COLOR_GRAY_300};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_GRAY_200};
+            }}
+            QPushButton:disabled {{
+                background-color: {COLOR_GRAY_100};
+                color: {COLOR_GRAY_400};
+                border: 1px solid {COLOR_GRAY_200};
+            }}
+        """)
+        self.prev_btn.clicked.connect(self._on_previous_page)
+        pagination_layout.addWidget(self.prev_btn)
+        
+        # Page info label
+        pagination_layout.addStretch()
+        self.page_info_label = QLabel("Halaman 1 dari 1")
+        self.page_info_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        self.page_info_label.setStyleSheet(f"color: {COLOR_GRAY_600};")
+        self.page_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pagination_layout.addWidget(self.page_info_label)
+        pagination_layout.addStretch()
+        
+        # Next button
+        self.next_btn = QPushButton("Selanjutnya →")
+        self.next_btn.setMinimumHeight(36)
+        self.next_btn.setMaximumWidth(120)
+        self.next_btn.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
+        self.next_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_WHITE};
+                border: 1px solid {COLOR_GRAY_200};
+                border-radius: {BORDER_RADIUS_MD};
+                color: {COLOR_NAVY};
+                padding: 6px 12px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_GRAY_100};
+                border: 1px solid {COLOR_GRAY_300};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_GRAY_200};
+            }}
+            QPushButton:disabled {{
+                background-color: {COLOR_GRAY_100};
+                color: {COLOR_GRAY_400};
+                border: 1px solid {COLOR_GRAY_200};
+            }}
+        """)
+        self.next_btn.clicked.connect(self._on_next_page)
+        pagination_layout.addWidget(self.next_btn)
+        
+        main_layout.addLayout(pagination_layout)
         main_layout.addStretch()
     
     def _create_status_badge(self, status: str) -> QWidget:
@@ -466,7 +610,7 @@ class BeasiswaTab(QWidget):
             self.beasiswa_data = get_beasiswa_table_data()
             
             logger.info(f"Loaded {len(self.beasiswa_data)} beasiswa")
-            self.populate_table(self.beasiswa_data)
+            self.populate_table(self.beasiswa_data, page=1)
             self.subtitle_label.setText(
                 "Terakhir diperbaharui: "
                 f"{datetime.now().strftime('%d %b %Y %H:%M')} | "
@@ -477,7 +621,7 @@ class BeasiswaTab(QWidget):
         except Exception as e:
             logger.error(f"Error loading beasiswa data: {e}")
             self.beasiswa_data = []
-            self.populate_table([])
+            self.populate_table([], page=1)
             self.subtitle_label.setText(
                 "Gagal memuat data | "
                 f"DB {self._current_db_name()}"
@@ -549,14 +693,40 @@ class BeasiswaTab(QWidget):
         self._sync_thread.error.connect(self._on_sync_error)
         self._sync_thread.start()
     
-    def populate_table(self, data: List[Dict[str, Any]]):
-        """Populate table dengan data."""
-        self.displayed_data = list(data)
-        self.table.setRowCount(len(data))
+    def populate_table(self, data: List[Dict[str, Any]], page: int = 1):
+        """
+        Populate table dengan data untuk halaman tertentu.
         
-        for row_idx, item in enumerate(data):
+        Args:
+            data: List of all scholarship data (sudah difilter)
+            page: Halaman yang ingin ditampilkan (default 1)
+        """
+        # Store filtered data dan hitung total pages
+        self.filtered_data = data
+        self.current_page = page
+        self.total_pages = max(1, (len(data) + self.items_per_page - 1) // self.items_per_page)
+        
+        # Validate page number
+        if self.current_page > self.total_pages:
+            self.current_page = self.total_pages
+        if self.current_page < 1:
+            self.current_page = 1
+        
+        # Calculate slice untuk current page
+        start_idx = (self.current_page - 1) * self.items_per_page
+        end_idx = start_idx + self.items_per_page
+        page_data = data[start_idx:end_idx]
+        
+        # Populate table dengan hanya page_data (bukan semua data)
+        self.displayed_data = list(page_data)
+        self.table.setRowCount(len(page_data))
+        
+        for row_idx, item in enumerate(page_data):
+            # Hitung actual row number dari full dataset
+            actual_row_number = start_idx + row_idx + 1
+            
             # NO
-            no_item = QTableWidgetItem(str(row_idx + 1))
+            no_item = QTableWidgetItem(str(actual_row_number))
             no_item.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
             no_item.setForeground(QColor(COLOR_GRAY_700))
             self.table.setItem(row_idx, 0, no_item)
@@ -580,10 +750,19 @@ class BeasiswaTab(QWidget):
             jenjang_item.setForeground(QColor(COLOR_NAVY))
             self.table.setItem(row_idx, 3, jenjang_item)
             
-            # DEADLINE
-            deadline_item = QTableWidgetItem(item["deadline"])
+            # DEADLINE - dengan warna dinamis berdasarkan hari tersisa
+            days_left = _get_days_until_deadline(item["deadline"])
+            deadline_color = _get_deadline_color(days_left)
+            
+            # Format display: "2026-05-15 (22 hari)" atau "2026-05-15" jika error
+            if days_left is not None:
+                deadline_display = f"{item['deadline']} ({days_left} hari)"
+            else:
+                deadline_display = item["deadline"]
+            
+            deadline_item = QTableWidgetItem(deadline_display)
             deadline_item.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_BASE))
-            deadline_item.setForeground(QColor(COLOR_GRAY_700))
+            deadline_item.setForeground(QColor(deadline_color))
             self.table.setItem(row_idx, 4, deadline_item)
             
             # STATUS (Badge)
@@ -593,11 +772,14 @@ class BeasiswaTab(QWidget):
             # AKSI (Buttons)
             actions = self._create_action_buttons(item["id"])
             self.table.setCellWidget(row_idx, 6, actions)
+        
+        # Update pagination UI (buttons dan label)
+        self._update_pagination_ui()
     
     def filter_table(self):
-        """Filter table berdasarkan search dan filters."""
+        """Filter table berdasarkan search dan filters, reset ke halaman 1."""
         filtered_data = self._get_filtered_data()
-        self.populate_table(filtered_data)
+        self.populate_table(filtered_data, page=1)
 
     def _get_filtered_data(self) -> List[Dict[str, Any]]:
         """Return beasiswa rows that match current search and filter controls."""
@@ -614,13 +796,21 @@ class BeasiswaTab(QWidget):
         ]
     
     def filter_by_deadline(self):
-        """Filter beasiswa yang deadline-nya dekat (dalam 7 hari)."""
-        deadline_soon = [
-            item for item in self.beasiswa_data
-            if item["status"] != "Tutup"  # Only open/closing soon
-        ]
+        """Filter beasiswa yang deadline-nya dekat (7 hari atau kurang)."""
+        deadline_soon = []
+        for item in self.beasiswa_data:
+            days = _get_days_until_deadline(item["deadline"])
+            if days is not None and days <= 7:
+                deadline_soon.append(item)
         
-        self.populate_table(deadline_soon)
+        if not deadline_soon:
+            QMessageBox.information(
+                self,
+                "Tidak Ada Deadline Dekat",
+                "Tidak ada beasiswa dengan deadline dalam 7 hari ke depan.",
+            )
+        
+        self.populate_table(deadline_soon, page=1)
     
     def refresh_data(self):
         """Refresh data dari database."""
@@ -841,6 +1031,22 @@ class BeasiswaTab(QWidget):
                 beranda_tab.load_dashboard_data()
         except Exception as exc:
             logger.warning("Beranda refresh skipped: %s", exc)
+
+    def _on_previous_page(self):
+        """Handler untuk tombol Previous."""
+        if self.current_page > 1:
+            self.populate_table(self.filtered_data, page=self.current_page - 1)
+
+    def _on_next_page(self):
+        """Handler untuk tombol Next."""
+        if self.current_page < self.total_pages:
+            self.populate_table(self.filtered_data, page=self.current_page + 1)
+
+    def _update_pagination_ui(self):
+        """Update pagination buttons dan label berdasarkan current_page dan total_pages."""
+        self.page_info_label.setText(f"Halaman {self.current_page} dari {self.total_pages}")
+        self.prev_btn.setEnabled(self.current_page > 1)
+        self.next_btn.setEnabled(self.current_page < self.total_pages)
 
 
 def _make_bold_font(font: QFont) -> QFont:
