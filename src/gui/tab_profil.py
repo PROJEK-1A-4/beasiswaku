@@ -437,6 +437,7 @@ class ProfileTab(QWidget):
         current_pass.setMinimumHeight(40)
         current_pass.setStyleSheet(self._get_input_stylesheet())
         form_layout.addWidget(current_pass)
+        self.current_password_input = current_pass
         
         # New password
         form_layout.addWidget(self._create_form_label("PASSWORD BARU"))
@@ -445,6 +446,7 @@ class ProfileTab(QWidget):
         new_pass.setMinimumHeight(40)
         new_pass.setStyleSheet(self._get_input_stylesheet())
         form_layout.addWidget(new_pass)
+        self.new_password_input = new_pass
         
         # Confirm password
         form_layout.addWidget(self._create_form_label("KONFIRMASI"))
@@ -453,6 +455,7 @@ class ProfileTab(QWidget):
         confirm_pass.setMinimumHeight(40)
         confirm_pass.setStyleSheet(self._get_input_stylesheet())
         form_layout.addWidget(confirm_pass)
+        self.confirm_password_input = confirm_pass
         
         layout.addLayout(form_layout)
         
@@ -472,6 +475,7 @@ class ProfileTab(QWidget):
                 background-color: {COLOR_NAVY_DARK};
             }}
         """)
+        change_btn.clicked.connect(self._on_change_password_clicked)
         layout.addWidget(change_btn)
         
         return frame
@@ -737,3 +741,7 @@ class ProfileTab(QWidget):
     def _on_save_profile_clicked(self):
         """Stub handler untuk simpan profil (akan diperdalam di commit berikutnya)."""
         logger.info("Profile save requested")
+
+    def _on_change_password_clicked(self):
+        """Stub handler untuk ubah password (akan diperdalam di commit berikutnya)."""
+        logger.info("Change password requested")
