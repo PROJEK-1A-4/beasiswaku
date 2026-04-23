@@ -363,6 +363,9 @@ class ProfileTab(QWidget):
             field.setMinimumHeight(40)
             field.setStyleSheet(self._get_input_stylesheet())
             form_layout.addWidget(field, row + 1, 0)
+            # Store field reference in profile_fields dict
+            field_key = label.lower().replace(" ", "_")
+            self.profile_fields[field_key] = field
 
         for idx, (label, value) in enumerate(right_fields):
             row = idx * 2
@@ -373,6 +376,9 @@ class ProfileTab(QWidget):
             field.setMinimumHeight(40)
             field.setStyleSheet(self._get_input_stylesheet())
             form_layout.addWidget(field, row + 1, 1)
+            # Store field reference in profile_fields dict
+            field_key = label.lower().replace(" ", "_")
+            self.profile_fields[field_key] = field
         
         form_layout.setColumnStretch(0, 1)
         form_layout.setColumnStretch(1, 1)
@@ -734,12 +740,19 @@ class ProfileTab(QWidget):
             logger.error(f"Error loading user data: {e}")
 
     def _on_edit_profile_clicked(self):
-        """Stub handler untuk mode edit profil (akan diperdalam di commit berikutnya)."""
+        """Enable all profile fields for editing."""
         self.profile_edit_mode = True
+        # Enable all profile fields
+        for field in self.profile_fields.values():
+            field.setReadOnly(False)
         logger.info("Profile edit mode enabled")
 
     def _on_save_profile_clicked(self):
-        """Stub handler untuk simpan profil (akan diperdalam di commit berikutnya)."""
+        """Disable all profile fields after saving."""
+        self.profile_edit_mode = False
+        # Disable all profile fields
+        for field in self.profile_fields.values():
+            field.setReadOnly(True)
         logger.info("Profile save requested")
 
     def _on_change_password_clicked(self):
