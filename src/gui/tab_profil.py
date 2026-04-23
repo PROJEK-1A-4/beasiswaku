@@ -395,6 +395,7 @@ class ProfileTab(QWidget):
                 background-color: {COLOR_NAVY_DARK};
             }}
         """)
+        save_btn.clicked.connect(self._on_save_profile_clicked)
         layout.addWidget(save_btn)
         
         return frame
@@ -732,3 +733,7 @@ class ProfileTab(QWidget):
         """Stub handler untuk mode edit profil (akan diperdalam di commit berikutnya)."""
         self.profile_edit_mode = True
         logger.info("Profile edit mode enabled")
+
+    def _on_save_profile_clicked(self):
+        """Stub handler untuk simpan profil (akan diperdalam di commit berikutnya)."""
+        logger.info("Profile save requested")
