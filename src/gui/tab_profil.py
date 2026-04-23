@@ -328,6 +328,7 @@ class ProfileTab(QWidget):
                 background-color: {COLOR_GRAY_100};
             }}
         """)
+        edit_btn.clicked.connect(self._on_edit_profile_clicked)
         header_layout.addWidget(edit_btn)
         layout.addLayout(header_layout)
         
@@ -726,3 +727,8 @@ class ProfileTab(QWidget):
             cursor.close()
         except Exception as e:
             logger.error(f"Error loading user data: {e}")
+
+    def _on_edit_profile_clicked(self):
+        """Stub handler untuk mode edit profil (akan diperdalam di commit berikutnya)."""
+        self.profile_edit_mode = True
+        logger.info("Profile edit mode enabled")
