@@ -202,9 +202,10 @@ class Sidebar(QWidget):
         menu_items = [
             (0, "🏠", "Beranda"),
             (1, "📚", "Beasiswa"),
-            (2, "📋", "Tracker Lamaran"),
-            (3, "📊", "Statistik"),
-            (4, "👤", "Profil"),
+            (2, "⭐", "Favorit"),
+            (3, "📋", "Tracker Lamaran"),
+            (4, "📊", "Statistik"),
+            (5, "👤", "Profil"),
         ]
         
         for tab_index, icon, label in menu_items:
