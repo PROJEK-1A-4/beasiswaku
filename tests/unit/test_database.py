@@ -1,449 +1,371 @@
 #!/usr/bin/env python3
-"""
-CONSOLIDATED TEST: Database, CRUD Operations, and Authentication
-=================================================================
-
-This file consolidates all database-related tests.
-
-Team: DARVA - Database Backend
-Status: All tests PASSING ✅
-"""
+"""Assertion-based database tests with isolated SQLite per test."""
 
 import sys
+import sqlite3
 from pathlib import Path
+
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-import sqlite3
-import logging
-from datetime import datetime, timedelta
-
-# Import all DARVA functions
+from src.core.config import Config
 from src.database.crud import (
-    init_db, get_connection, hash_password, verify_password,
-    register_user, login_user,
-    add_beasiswa, get_beasiswa_list, edit_beasiswa, delete_beasiswa,
-    add_lamaran, get_lamaran_list, edit_lamaran, delete_lamaran,
-    add_favorit, get_favorit_list, delete_favorit,
-    add_catatan, get_catatan, edit_catatan, delete_catatan,
-    get_beasiswa_per_jenjang, get_top_penyelenggara, get_status_availability
+    add_beasiswa,
+    add_catatan,
+    add_favorit,
+    add_lamaran,
+    delete_beasiswa,
+    delete_catatan,
+    delete_favorit,
+    delete_lamaran,
+    edit_beasiswa,
+    edit_catatan,
+    edit_lamaran,
+    get_beasiswa_list,
+    get_beasiswa_per_jenjang,
+    get_catatan,
+    get_connection,
+    get_favorit_list,
+    get_lamaran_list,
+    get_status_availability,
+    get_top_penyelenggara,
+    hash_password,
+    init_db,
+    login_user,
+    register_user,
+    update_user_password,
+    update_user_profile,
+    verify_password,
 )
 
-logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+
+EXPECTED_TABLES = {
+    "akun",
+    "penyelenggara",
+    "beasiswa",
+    "riwayat_lamaran",
+    "favorit",
+    "catatan",
+}
 
 
-def print_header(text: str):
-    """Print formatted header"""
-    print(f"\n{'='*80}")
-    print(f"{text.center(80)}")
-    print(f"{'='*80}")
+def _table_columns(cursor, table_name: str):
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    return {row[1] for row in cursor.fetchall()}
 
 
-def print_section(section: str):
-    """Print section header"""
-    print(f"\n{'-'*80}\n{section}\n{'-'*80}")
+def test_database_initialization_creates_file(isolated_database):
+    """init_db should be idempotent and keep a valid DB file."""
+    init_db()
+
+    assert str(isolated_database) == Config.DATABASE_PATH
+    assert isolated_database.exists()
+    assert isolated_database.stat().st_size > 0
 
 
-def print_result(symbol: str, message: str):
-    """Print test result"""
-    print(f"{symbol} {message}")
-
-
-# ============================================================================
-# PHASE 1.1: Database Initialization & Schema Validation
-# ============================================================================
-
-def test_database_initialization():
-    """Test 1: Database initialization and file creation"""
-    print_section("TEST 1: DATABASE INITIALIZATION")
-    
-    db_path = Path("database/beasiswaku.db")
-    
-    # Remove database for fresh test
-    if db_path.exists():
-        db_path.unlink()
-        print_result("✅", "Cleaned up old database file")
-    
-    # Execute init_db
+def test_core_tables_exist(isolated_database):
+    """All required tables should exist after schema initialization."""
+    conn = get_connection()
+    cursor = conn.cursor()
     try:
-        init_db()
-        print_result("✅", "init_db() executed successfully")
-    except Exception as e:
-        print_result("❌", f"init_db() failed: {e}")
-        return False
-    
-    # Verify file exists
-    if db_path.exists():
-        file_size = db_path.stat().st_size
-        print_result("✅", f"Database file created: {db_path} (size: {file_size} bytes)")
-        return True
-    else:
-        print_result("❌", f"Database file NOT found at {db_path}")
-        return False
-
-
-def test_table_existence():
-    """Test 2: Verify all tables exist"""
-    print_section("TEST 2: TABLE EXISTENCE VERIFICATION")
-    
-    expected_tables = ['akun', 'penyelenggara', 'beasiswa', 'riwayat_lamaran', 'favorit', 'catatan']
-    
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT name FROM sqlite_master 
+        cursor.execute(
+            """
+            SELECT name
+            FROM sqlite_master
             WHERE type='table' AND name NOT LIKE 'sqlite_%'
-        """)
-        
-        existing_tables = [row[0] for row in cursor.fetchall()]
-        
-        print_result("ℹ️", f"Found tables: {', '.join(existing_tables)}")
-        
-        for table in expected_tables:
-            if table in existing_tables:
-                print_result("✅", f"Table '{table}' exists")
-            else:
-                print_result("❌", f"Table '{table}' NOT found")
-                return False
-        
-        cursor.close()
-        return True
-        
-    except Exception as e:
-        print_result("❌", f"Error checking tables: {e}")
-        return False
-
-
-def test_table_schemas():
-    """Test 3: Verify table column structures"""
-    print_section("TEST 3: TABLE SCHEMA VALIDATION")
-    
-    expected_schemas = {
-        'akun': ['id', 'username', 'email', 'password_hash', 'nama_lengkap', 'jenjang', 'created_at', 'updated_at'],
-        'penyelenggara': ['id', 'nama', 'description', 'website', 'contact_email', 'created_at'],
-        'beasiswa': ['id', 'judul', 'penyelenggara_id', 'jenjang', 'deadline', 'benefit', 'minimal_ipk', 'status', 'created_at', 'updated_at'],
-        'riwayat_lamaran': ['id', 'user_id', 'beasiswa_id', 'status', 'tanggal_daftar', 'catatan', 'created_at', 'updated_at'],
-        'favorit': ['id', 'user_id', 'beasiswa_id', 'created_at'],
-        'catatan': ['id', 'user_id', 'beasiswa_id', 'content', 'created_at', 'updated_at']
-    }
-    
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        all_pass = True
-        
-        for table, expected_cols in expected_schemas.items():
-            cursor.execute(f"PRAGMA table_info({table})")
-            actual_cols = [row[1] for row in cursor.fetchall()]
-            
-            print_result("ℹ️", f"Table '{table}' columns: {', '.join(actual_cols)}")
-            
-            for col in expected_cols:
-                if col in actual_cols:
-                    print_result("✅", f"  → Column '{col}' exists")
-                else:
-                    print_result("❌", f"  → Column '{col}' MISSING")
-                    all_pass = False
-        
-        cursor.close()
-        return all_pass
-        
-    except Exception as e:
-        print_result("❌", f"Error checking schemas: {e}")
-        return False
-
-
-def test_constraints():
-    """Test 4: Verify PRIMARY KEY, UNIQUE, NOT NULL constraints"""
-    print_section("TEST 4: CONSTRAINT VALIDATION")
-    
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        all_pass = True
-        
-        # Test UNIQUE constraints
-        cursor.execute("INSERT INTO akun (username, email, password_hash, nama_lengkap, jenjang) VALUES (?, ?, ?, ?, ?)",
-                      ("test_user", "test@test.com", hash_password("pass123"), "Test User", "S1"))
-        conn.commit()
-        print_result("✅", "UNIQUE constraint on username/email: Can insert new user")
-        
-        # Try duplicate username
-        try:
-            cursor.execute("INSERT INTO akun (username, email, password_hash, nama_lengkap, jenjang) VALUES (?, ?, ?, ?, ?)",
-                          ("test_user", "test2@test.com", hash_password("pass123"), "Test User 2", "S1"))
-            print_result("❌", "UNIQUE constraint FAILED: Duplicate username allowed")
-            all_pass = False
-        except sqlite3.IntegrityError:
-            print_result("✅", "UNIQUE constraint on username: Correctly prevents duplicates")
-        
-        conn.rollback()
-        cursor.close()
-        return all_pass
-        
-    except Exception as e:
-        print_result("❌", f"Error testing constraints: {e}")
-        return False
-
-
-def test_foreign_keys():
-    """Test 5: Verify FOREIGN KEY relationships"""
-    print_section("TEST 5: FOREIGN KEY VALIDATION")
-    
-    try:
-        conn = get_connection()
-        # **FIX**: Enable foreign keys explicitly in SQLite
-        cursor = conn.cursor()
-        cursor.execute("PRAGMA foreign_keys = ON")
-        
-        all_pass = True
-        
-        # Insert test data
-        user_id = None
-        beasiswa_id = None
-        penyelenggara_id = None
-        
-        # Add provider
-        cursor.execute("INSERT INTO penyelenggara (nama, description, website, contact_email) VALUES (?, ?, ?, ?)",
-                      ("Test Provider", "Test", "https://test.com", "test@test.com"))
-        conn.commit()
-        cursor.execute("SELECT id FROM penyelenggara ORDER BY id DESC LIMIT 1")
-        penyelenggara_id = cursor.fetchone()[0]
-        print_result("✅", f"Inserted penyelenggara (id={penyelenggara_id})")
-        
-        # Add user
-        cursor.execute("INSERT INTO akun (username, email, password_hash, nama_lengkap, jenjang) VALUES (?, ?, ?, ?, ?)",
-                      ("fk_test_user", "fk@test.com", hash_password("pass123"), "FK Test", "S1"))
-        conn.commit()
-        cursor.execute("SELECT id FROM akun WHERE username='fk_test_user'")
-        user_id = cursor.fetchone()[0]
-        print_result("✅", f"Inserted user (id={user_id})")
-        
-        # Add beasiswa
-        cursor.execute("INSERT INTO beasiswa (judul, penyelenggara_id, jenjang, deadline, benefit, minimal_ipk, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                      ("Test Beasiswa", penyelenggara_id, "S1", "2025-12-31", "Full", "3.0", "open"))
-        conn.commit()
-        cursor.execute("SELECT id FROM beasiswa ORDER BY id DESC LIMIT 1")
-        beasiswa_id = cursor.fetchone()[0]
-        print_result("✅", f"Inserted beasiswa (id={beasiswa_id})")
-        
-        # Try to insert lamaran with valid FKs
-        try:
-            cursor.execute("INSERT INTO riwayat_lamaran (user_id, beasiswa_id, status, tanggal_daftar) VALUES (?, ?, ?, ?)",
-                          (user_id, beasiswa_id, "pending", datetime.now()))
-            conn.commit()
-            print_result("✅", "Foreign key constraints: Valid FKs accepted")
-        except sqlite3.IntegrityError as e:
-            print_result("❌", f"Foreign key constraints: Valid FKs rejected - {e}")
-            all_pass = False
-        
-        # Try with invalid FK
-        try:
-            cursor.execute("INSERT INTO favorit (user_id, beasiswa_id) VALUES (?, ?)", (99999, 99999))
-            conn.commit()
-            print_result("❌", "Foreign key constraints FAILED: Invalid FKs accepted")
-            all_pass = False
-        except sqlite3.IntegrityError:
-            print_result("✅", "Foreign key constraints: Invalid FKs correctly rejected")
-        
-        conn.rollback()
-        cursor.close()
-        return all_pass
-        
-    except Exception as e:
-        print_result("❌", f"Error testing foreign keys: {e}")
-        return False
-
-
-def test_backend_integration():
-    """Test that all CRUD functions are available and importable"""
-    print_section("TEST 6: BACKEND INTEGRATION")
-    
-    functions_to_test = [
-        ('init_db', 'Database initialization'),
-        ('login_user', 'User authentication'),
-        ('register_user', 'User registration'),
-        ('add_beasiswa', 'Add scholarship'),
-        ('get_beasiswa_list', 'Get scholarships list'),
-        ('edit_beasiswa', 'Edit scholarship'),
-        ('delete_beasiswa', 'Delete scholarship'),
-        ('add_lamaran', 'Add application'),
-        ('get_lamaran_list', 'Get applications list'),
-        ('add_favorit', 'Add to favorites'),
-        ('get_favorit_list', 'Get favorites list'),
-        ('get_beasiswa_per_jenjang', 'Aggregation: by education level'),
-        ('get_top_penyelenggara', 'Aggregation: top providers'),
-        ('get_status_availability', 'Aggregation: status distribution'),
-    ]
-    
-    print_result("ℹ️", f"Checking {len(functions_to_test)} CRUD functions...")
-    
-    all_pass = True
-    for func_name, description in functions_to_test:
-        try:
-            func = globals()[func_name]
-            if callable(func):
-                print_result("✅", f"{func_name:<30} - {description}")
-            else:
-                print_result("❌", f"{func_name:<30} - Not callable")
-                all_pass = False
-        except KeyError:
-            print_result("❌", f"{func_name:<30} - Function NOT imported")
-            all_pass = False
-    
-    return all_pass
-
-
-def test_crud_operations():
-    """Test CRUD operations (Create, Read, Update, Delete)"""
-    print_section("TEST 7: CRUD OPERATIONS")
-    
-    all_pass = True
-    user_id = None
-    beasiswa_id = None
-    
-    try:
-        # CREATE: Register user
-        print_result("ℹ️", "Testing CREATE operations...")
-        success, msg = register_user("crud_user", "crud@test.com", "CrudPass123!")
-        if success:
-            print_result("✅", f"CREATE user: {msg}")
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT id FROM akun WHERE username='crud_user'")
-            user_id = cursor.fetchone()[0]
-            cursor.close()
-        else:
-            print_result("❌", f"CREATE user FAILED: {msg}")
-            all_pass = False
-        
-        # CREATE: Add beasiswa
-        success, msg, new_id = add_beasiswa(
-            "Test Beasiswa",  # judul
-            "S1",  # jenjang
-            "2025-12-31",  # deadline
-            penyelenggara_id=1,  # penyelenggara_id
-            benefit="Full",  # benefit
-            minimal_ipk=3.0,  # minimal_ipk
-            status="open"  # status
+            """
         )
-        if success:
-            print_result("✅", f"CREATE beasiswa: {msg}")
-            beasiswa_id = new_id
-        else:
-            print_result("❌", f"CREATE beasiswa FAILED: {msg}")
-            all_pass = False
-        
-        # READ: Login user
-        print_result("ℹ️", "Testing READ operations...")
-        success, msg, uid = login_user("crud_user", "CrudPass123!")
-        if success:
-            print_result("✅", f"READ user: {msg}")
-        else:
-            print_result("❌", f"READ user FAILED: {msg}")
-            all_pass = False
-        
-        # READ: Get beasiswa list
-        beasiswa_list, total = get_beasiswa_list()
-        if beasiswa_list or total >= 0:
-            print_result("✅", f"READ beasiswa list: Found {total} scholarships")
-        else:
-            print_result("⚠️", "READ beasiswa list: Error retrieving data")
-        
-        # UPDATE: Edit beasiswa
-        print_result("ℹ️", "Testing UPDATE operations...")
-        if beasiswa_id:
-            success, msg = edit_beasiswa(beasiswa_id, judul="Updated Beasiswa")
-            if success:
-                print_result("✅", f"UPDATE beasiswa: {msg}")
-            else:
-                print_result("⚠️", f"UPDATE beasiswa: {msg}")
-        else:
-            print_result("⚠️", "UPDATE skipped (no beasiswa_id)")
-        
-        # DELETE: Delete beasiswa
-        print_result("ℹ️", "Testing DELETE operations...")
-        if beasiswa_id:
-            success, msg = delete_beasiswa(beasiswa_id)
-            if success:
-                print_result("✅", f"DELETE beasiswa: {msg}")
-            else:
-                print_result("⚠️", f"DELETE beasiswa: {msg}")
-        else:
-            print_result("⚠️", "DELETE skipped (no beasiswa_id)")
-        
-        return all_pass
-        
-    except Exception as e:
-        print_result("❌", f"CRUD operations test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+        existing_tables = {row[0] for row in cursor.fetchall()}
+    finally:
+        cursor.close()
+
+    assert EXPECTED_TABLES.issubset(existing_tables)
 
 
-def test_authentication():
-    """Test password hashing and verification"""
-    print_section("TEST 8: AUTHENTICATION")
-    
+def test_table_schema_contains_required_columns(isolated_database):
+    """Critical columns should exist in each primary table."""
+    expected_columns = {
+        "akun": {"id", "username", "email", "password_hash", "created_at", "updated_at"},
+        "penyelenggara": {"id", "nama", "created_at"},
+        "beasiswa": {"id", "judul", "jenjang", "deadline", "status", "created_at", "updated_at"},
+        "riwayat_lamaran": {"id", "user_id", "beasiswa_id", "status", "tanggal_daftar"},
+        "favorit": {"id", "user_id", "beasiswa_id", "created_at"},
+        "catatan": {"id", "user_id", "beasiswa_id", "content", "created_at", "updated_at"},
+    }
+
+    conn = get_connection()
+    cursor = conn.cursor()
     try:
-        # Test hash_password
-        hashed = hash_password("TestPassword123!")
-        print_result("✅", "Password hashing: Works")
-        
-        # Test verify_password
-        if verify_password("TestPassword123!", hashed):
-            print_result("✅", "Password verification: Correct password verified")
-        else:
-            print_result("❌", "Password verification: Correct password NOT verified")
-            return False
-        
-        # Test wrong password
-        if not verify_password("WrongPassword123!", hashed):
-            print_result("✅", "Password verification: Wrong password correctly rejected")
-        else:
-            print_result("❌", "Password verification: Wrong password incorrectly accepted")
-            return False
-        
-        return True
-        
-    except Exception as e:
-        print_result("❌", f"Authentication test failed: {e}")
-        return False
+        for table_name, required in expected_columns.items():
+            actual = _table_columns(cursor, table_name)
+            assert required.issubset(actual), f"Missing columns in {table_name}: {required - actual}"
+    finally:
+        cursor.close()
 
 
-# ============================================================================
-# Main Test Runner
-# ============================================================================
+def test_unique_and_foreign_key_constraints(isolated_database):
+    """UNIQUE and FOREIGN KEY constraints should be enforced by SQLite."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            INSERT INTO akun (username, email, password_hash, nama_lengkap, jenjang)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            ("constraint_user", "constraint@test.local", hash_password("pass1234"), "Constraint", "S1"),
+        )
+        conn.commit()
 
-if __name__ == "__main__":
-    print_header("CONSOLIDATED DATABASE TEST SUITE - DARVA")
-    
-    tests = [
-        ("Database Initialization", test_database_initialization()),
-        ("Table Existence", test_table_existence()),
-        ("Table Schemas", test_table_schemas()),
-        ("Constraints", test_constraints()),
-        ("Foreign Keys", test_foreign_keys()),
-        ("Backend Integration", test_backend_integration()),
-        ("CRUD Operations", test_crud_operations()),
-        ("Authentication", test_authentication()),
-    ]
-    
-    print_header("TEST SUMMARY")
-    passed = sum(1 for _, result in tests if result)
-    total = len(tests)
-    
-    for test_name, result in tests:
-        status = "✅ PASSED" if result else "❌ FAILED"
-        print(f"  {test_name:<40} {status}")
-    
-    print(f"\n  Total: {passed}/{total} passed")
-    
-    if passed == total:
-        print("\n🎉 ALL TESTS PASSED! Database is fully functional and production-ready!")
-        sys.exit(0)
-    else:
-        print(f"\n⚠️  {total - passed} test(s) failed. Review output above.")
-        sys.exit(1)
+        with pytest.raises(sqlite3.IntegrityError):
+            cursor.execute(
+                """
+                INSERT INTO akun (username, email, password_hash, nama_lengkap, jenjang)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                ("constraint_user", "other@test.local", hash_password("pass1234"), "Dup", "S1"),
+            )
+
+        with pytest.raises(sqlite3.IntegrityError):
+            cursor.execute("INSERT INTO favorit (user_id, beasiswa_id) VALUES (?, ?)", (99999, 99999))
+    finally:
+        conn.rollback()
+        cursor.close()
+
+
+def test_register_and_login_flow(isolated_database):
+    """Register/login flow should return consistent success and failure states."""
+    success_register, register_message = register_user(
+        "flow_user",
+        "flow_user@test.local",
+        "FlowPass123",
+        "Flow User",
+        "S1",
+    )
+    assert success_register is True
+    assert "berhasil" in register_message.lower()
+
+    dup_success, dup_message = register_user(
+        "flow_user",
+        "dup_email@test.local",
+        "FlowPass123",
+        "Duplicate",
+        "S1",
+    )
+    assert dup_success is False
+    assert "sudah" in dup_message.lower()
+
+    login_success, _, user_data = login_user("flow_user", "FlowPass123")
+    assert login_success is True
+    assert user_data is not None
+    assert user_data["username"] == "flow_user"
+
+    wrong_success, wrong_message, _ = login_user("flow_user", "wrong")
+    assert wrong_success is False
+    assert "password" in wrong_message.lower()
+
+
+def test_update_user_profile_persists_changes(isolated_database):
+    """Profile update helper should persist username, email, name, and jenjang."""
+    ok_register, register_message = register_user(
+        "profile_user",
+        "profile_user@test.local",
+        "ProfilePass123",
+        "Profile User",
+        "S1",
+    )
+    assert ok_register is True, register_message
+
+    ok_login, _, user_data = login_user("profile_user", "ProfilePass123")
+    assert ok_login is True
+    user_id = user_data["id"]
+
+    ok_update, update_message = update_user_profile(
+        user_id,
+        "profile_user_updated",
+        "profile_user_updated@test.local",
+        "Profile User Updated",
+        "S2",
+    )
+    assert ok_update is True, update_message
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT username, email, nama_lengkap, jenjang
+            FROM akun
+            WHERE id = ?
+            """,
+            (user_id,),
+        )
+        row = cursor.fetchone()
+    finally:
+        cursor.close()
+
+    assert row is not None
+    assert row["username"] == "profile_user_updated"
+    assert row["email"] == "profile_user_updated@test.local"
+    assert row["nama_lengkap"] == "Profile User Updated"
+    assert row["jenjang"] == "S2"
+
+
+def test_update_user_password_requires_current_password(isolated_database):
+    """Password update helper should reject wrong current password and accept the correct one."""
+    ok_register, register_message = register_user(
+        "password_user",
+        "password_user@test.local",
+        "OldPass123",
+        "Password User",
+        "S1",
+    )
+    assert ok_register is True, register_message
+
+    ok_login, _, user_data = login_user("password_user", "OldPass123")
+    assert ok_login is True
+    user_id = user_data["id"]
+
+    wrong_ok, wrong_message = update_user_password(user_id, "wrong-current", "NewPass123")
+    assert wrong_ok is False
+    assert "password" in wrong_message.lower()
+
+    ok_update, update_message = update_user_password(user_id, "OldPass123", "NewPass123")
+    assert ok_update is True, update_message
+
+    old_login_ok, old_login_message, _ = login_user("password_user", "OldPass123")
+    assert old_login_ok is False
+    assert "password" in old_login_message.lower()
+
+    new_login_ok, new_login_message, new_user_data = login_user("password_user", "NewPass123")
+    assert new_login_ok is True, new_login_message
+    assert new_user_data is not None
+
+
+def test_beasiswa_crud_flow(isolated_database):
+    """Create, read, update, delete lifecycle should work for beasiswa."""
+    created, message, beasiswa_id = add_beasiswa(
+        judul="Beasiswa CRUD",
+        jenjang="S1",
+        deadline="2026-12-31",
+        benefit="Full",
+        minimal_ipk=3.0,
+        status="Buka",
+    )
+    assert created is True, message
+    assert isinstance(beasiswa_id, int)
+
+    beasiswa_list, total = get_beasiswa_list(search_judul="CRUD")
+    assert total >= 1
+    assert any(item["id"] == beasiswa_id for item in beasiswa_list)
+
+    updated, update_message = edit_beasiswa(beasiswa_id, judul="Beasiswa CRUD Updated")
+    assert updated is True, update_message
+
+    updated_list, _ = get_beasiswa_list(search_judul="Updated")
+    assert any(item["id"] == beasiswa_id for item in updated_list)
+
+    deleted, delete_message = delete_beasiswa(beasiswa_id)
+    assert deleted is True, delete_message
+
+    after_delete_list, _ = get_beasiswa_list(search_judul="Updated")
+    assert all(item["id"] != beasiswa_id for item in after_delete_list)
+
+
+def test_lamaran_favorit_catatan_flow(isolated_database):
+    """Lamaran, favorit, and catatan flows should support create-update-delete paths."""
+    ok_user, user_msg = register_user("flow_detail", "flow_detail@test.local", "FlowPass123", "Detail User", "S1")
+    assert ok_user is True, user_msg
+
+    ok_login, _, user_data = login_user("flow_detail", "FlowPass123")
+    assert ok_login is True
+    user_id = user_data["id"]
+
+    ok_beasiswa, beasiswa_msg, beasiswa_id = add_beasiswa(
+        judul="Beasiswa Detail Flow",
+        jenjang="S1",
+        deadline="2026-11-30",
+        status="Buka",
+    )
+    assert ok_beasiswa is True, beasiswa_msg
+
+    lamaran_ok, lamaran_msg, lamaran_id = add_lamaran(user_id=user_id, beasiswa_id=beasiswa_id, status="Pending")
+    assert lamaran_ok is True, lamaran_msg
+    assert isinstance(lamaran_id, int)
+
+    lamaran_list, lamaran_total = get_lamaran_list(filter_user_id=user_id)
+    assert lamaran_total >= 1
+    assert any(item["id"] == lamaran_id for item in lamaran_list)
+
+    lamaran_edit_ok, lamaran_edit_msg = edit_lamaran(lamaran_id, status="Submitted")
+    assert lamaran_edit_ok is True, lamaran_edit_msg
+
+    favorit_ok, favorit_msg, _ = add_favorit(user_id=user_id, beasiswa_id=beasiswa_id)
+    assert favorit_ok is True, favorit_msg
+
+    favorit_list, favorit_total = get_favorit_list(user_id)
+    assert favorit_total >= 1
+    assert any(item.get("beasiswa_id") == beasiswa_id for item in favorit_list)
+
+    catatan_ok, catatan_msg, _ = add_catatan(user_id=user_id, beasiswa_id=beasiswa_id, content="Catatan awal")
+    assert catatan_ok is True, catatan_msg
+
+    catatan, _ = get_catatan(user_id=user_id, beasiswa_id=beasiswa_id)
+    assert catatan is not None
+    assert catatan["content"] == "Catatan awal"
+
+    catatan_edit_ok, catatan_edit_msg = edit_catatan(user_id=user_id, beasiswa_id=beasiswa_id, content="Catatan update")
+    assert catatan_edit_ok is True, catatan_edit_msg
+
+    fav_delete_ok, fav_delete_msg = delete_favorit(user_id=user_id, beasiswa_id=beasiswa_id)
+    assert fav_delete_ok is True, fav_delete_msg
+
+    lamaran_delete_ok, lamaran_delete_msg = delete_lamaran(lamaran_id)
+    assert lamaran_delete_ok is True, lamaran_delete_msg
+
+    catatan_delete_ok, catatan_delete_msg = delete_catatan(user_id=user_id, beasiswa_id=beasiswa_id)
+    assert catatan_delete_ok is True, catatan_delete_msg
+
+
+def test_aggregation_queries_return_expected_shapes(isolated_database):
+    """Aggregation helpers should return stable data shapes for dashboard usage."""
+    ok_s1, msg_s1, _ = add_beasiswa(
+        judul="Beasiswa Statistik S1",
+        jenjang="S1",
+        deadline="2026-12-31",
+        status="Buka",
+    )
+    assert ok_s1 is True, msg_s1
+
+    ok_s2, msg_s2, _ = add_beasiswa(
+        judul="Beasiswa Statistik S2",
+        jenjang="S2",
+        deadline="2026-10-31",
+        status="Segera Tutup",
+    )
+    assert ok_s2 is True, msg_s2
+
+    by_jenjang = get_beasiswa_per_jenjang()
+    assert isinstance(by_jenjang, dict)
+    assert by_jenjang.get("S1", 0) >= 1
+    assert by_jenjang.get("S2", 0) >= 1
+
+    by_status = get_status_availability()
+    assert isinstance(by_status, dict)
+    assert by_status.get("Buka", 0) >= 1
+
+    top_penyelenggara = get_top_penyelenggara(limit=5)
+    assert isinstance(top_penyelenggara, list)
+    assert len(top_penyelenggara) >= 1
+    assert "nama_penyelenggara" in top_penyelenggara[0]
+
+
+def test_password_hash_and_verify_helpers():
+    """Password hashing helper should produce verifiable hashes."""
+    hashed = hash_password("TestPassword123")
+    assert isinstance(hashed, str)
+    assert hashed
+
+    assert verify_password("TestPassword123", hashed) is True
+    assert verify_password("WrongPassword123", hashed) is False

@@ -26,8 +26,9 @@ class Config:
     # ==================== Database Configuration ====================
     DATABASE_PATH: str = os.getenv("DATABASE_PATH", "database/beasiswaku.db")
     DATABASE_BACKUP_PATH: str = os.getenv("DATABASE_BACKUP_PATH", "database/backup/beasiswaku_backup.db")
-    DATABASE_TIMEOUT: int = 30
-    DATABASE_CHECK_SAME_THREAD: bool = False
+    DATABASE_TIMEOUT: int = int(os.getenv("DATABASE_TIMEOUT", "30"))
+    DATABASE_CHECK_SAME_THREAD: bool = os.getenv("DATABASE_CHECK_SAME_THREAD", "True").lower() == "true"
+    DATABASE_BUSY_TIMEOUT_MS: int = int(os.getenv("DATABASE_BUSY_TIMEOUT_MS", "30000"))
 
     # ==================== Application Configuration ====================
     APP_NAME: str = os.getenv("APP_NAME", "BeasiswaKu")
@@ -76,15 +77,8 @@ class Config:
         cls.BACKUP_DIR.mkdir(parents=True, exist_ok=True)
         cls.DOCS_DIR.mkdir(parents=True, exist_ok=True)
 
-        # Initialize logging
-        logging.basicConfig(
-            level=cls.LOG_LEVEL,
-            format=cls.LOG_FORMAT,
-            handlers=[
-                logging.FileHandler(cls.LOG_FILE),
-                logging.StreamHandler(),
-            ]
-        )
+        # Note: Logging is now centralized in src.core.logging_config.setup_logging()
+        # This will be called from main.py at startup
         logger.info(f"Configuration initialized - {cls.APP_NAME} v{cls.APP_VERSION}")
         logger.info(f"Debug Mode: {cls.DEBUG_MODE}, Theme: {cls.THEME}")
 
