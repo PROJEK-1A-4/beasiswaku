@@ -16,7 +16,7 @@ from PyQt6.QtGui import QFont, QColor
 
 from src.gui.design_tokens import *
 from src.gui.styles import get_button_solid_stylesheet
-from src.database.crud import get_connection
+from src.database.crud import get_connection, update_user_password, update_user_profile
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,7 @@ class ProfileTab(QWidget):
         self.email = email
         self.user_data = {}
         self.profile_fields = {}
+        self.editable_profile_field_keys = {"nama_lengkap", "email", "username", "jenjang"}
         self.profile_edit_mode = False
         self.current_password_input = None
         self.new_password_input = None
@@ -191,7 +192,7 @@ class ProfileTab(QWidget):
         layout.addWidget(level_label)
         
         # University
-        university_label = QLabel("Teknik Informatika - POLBAN")
+        university_label = QLabel("Institusi belum disinkronkan")
         university_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
         university_label.setStyleSheet(f"color: {COLOR_GRAY_500}; text-align: center;")
         university_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -209,7 +210,7 @@ class ProfileTab(QWidget):
         stats_layout.setContentsMargins(0, 0, 0, 0)
         
         # Lamaran
-        lamaran_num = QLabel("9")
+        lamaran_num = QLabel("-")
         lamaran_num.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_2XL))
         lamaran_num.setStyleSheet(f"color: {COLOR_NAVY}; font-weight: bold;")
         lamaran_num.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -222,7 +223,7 @@ class ProfileTab(QWidget):
         stats_layout.addWidget(lamaran_label, 1, 0)
         
         # Diterima
-        diterima_num = QLabel("2")
+        diterima_num = QLabel("-")
         diterima_num.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_2XL))
         diterima_num.setStyleSheet(f"color: {COLOR_SUCCESS}; font-weight: bold;")
         diterima_num.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -235,7 +236,7 @@ class ProfileTab(QWidget):
         stats_layout.addWidget(diterima_label, 1, 1)
         
         # Favorit
-        favorit_num = QLabel("12")
+        favorit_num = QLabel("-")
         favorit_num.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_2XL))
         favorit_num.setStyleSheet(f"color: {COLOR_ORANGE}; font-weight: bold;")
         favorit_num.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -380,6 +381,7 @@ class ProfileTab(QWidget):
             # Store field reference in profile_fields dict
             field_key = label.lower().replace(" ", "_")
             self.profile_fields[field_key] = field
+        self._set_profile_edit_mode(False)
         
         form_layout.setColumnStretch(0, 1)
         form_layout.setColumnStretch(1, 1)
@@ -440,7 +442,7 @@ class ProfileTab(QWidget):
         form_layout.addWidget(self._create_form_label("PASSWORD SAAT INI"))
         current_pass = QLineEdit()
         current_pass.setEchoMode(QLineEdit.EchoMode.Password)
-        current_pass.setText("••••••••")
+        current_pass.setPlaceholderText("Masukkan password saat ini")
         current_pass.setMinimumHeight(40)
         current_pass.setStyleSheet(self._get_input_stylesheet())
         form_layout.addWidget(current_pass)
@@ -733,20 +735,45 @@ class ProfileTab(QWidget):
                 self.user_data = dict(result)
                 self.username = result["username"] or self.username
                 self.email = result["email"] or self.email
+                self._sync_profile_fields_from_user_data()
                 logger.info(f"Loaded user data for {self.username}")
             else:
                 logger.warning(f"User data not found for user_id={self.user_id}")
-            cursor.close()
         except Exception as e:
             logger.error(f"Error loading user data: {e}")
+        finally:
+            if cursor is not None:
+                cursor.close()
+
+    def _sync_profile_fields_from_user_data(self):
+        """Push loaded user data into visible form fields."""
+        if not self.profile_fields:
+            return
+
+        field_value_map = {
+            "nama_lengkap": self.user_data.get("nama_lengkap") or self.user_data.get("username") or self.username or "-",
+            "email": self.user_data.get("email") or self.email or "-",
+            "username": self.user_data.get("username") or self.username or "-",
+            "jenjang": self.user_data.get("jenjang") or "-",
+        }
+
+        for field_key, field_value in field_value_map.items():
+            field = self.profile_fields.get(field_key)
+            if field is not None:
+                field.setText(str(field_value))
+
+    def _set_profile_edit_mode(self, enabled: bool):
+        """Toggle editable state for profile form fields."""
+        self.profile_edit_mode = enabled
+        for field_key, field in self.profile_fields.items():
+            if field_key in self.editable_profile_field_keys:
+                field.setReadOnly(not enabled)
+
+        logger.info("Profile edit mode %s", "enabled" if enabled else "disabled")
 
     def _on_edit_profile_clicked(self):
         """Enable all profile fields for editing."""
-        self.profile_edit_mode = True
-        # Enable all profile fields
-        for field in self.profile_fields.values():
-            field.setReadOnly(False)
-        logger.info("Profile edit mode enabled")
+        self._set_profile_edit_mode(True)
 
     def _on_save_profile_clicked(self):
         """Validate and save profile data."""
@@ -756,12 +783,30 @@ class ProfileTab(QWidget):
             QMessageBox.warning(self, "Validasi Gagal", error_msg)
             return
 
-        QMessageBox.information(self, "Berhasil", "Data profil berhasil disimpan.")
-        self.profile_edit_mode = False
-        # Disable all profile fields
-        for field in self.profile_fields.values():
-            field.setReadOnly(True)
-        logger.info("Profile save requested")
+        nama_field = self.profile_fields.get("nama_lengkap")
+        email_field = self.profile_fields.get("email")
+        username_field = self.profile_fields.get("username")
+        jenjang_field = self.profile_fields.get("jenjang")
+
+        if not all([nama_field, email_field, username_field, jenjang_field]):
+            QMessageBox.warning(self, "Validasi Gagal", "Form profil belum siap.")
+            return
+
+        success, message = update_user_profile(
+            self.user_id,
+            username_field.text().strip(),
+            email_field.text().strip(),
+            nama_field.text().strip(),
+            jenjang_field.text().strip(),
+        )
+        if not success:
+            QMessageBox.warning(self, "Gagal Menyimpan", message)
+            return
+
+        self.load_user_data()
+        self._set_profile_edit_mode(False)
+        QMessageBox.information(self, "Berhasil", message)
+        logger.info("Profile update completed for user_id=%s", self.user_id)
 
     def _on_change_password_clicked(self):
         """Validate and change password."""
@@ -771,24 +816,46 @@ class ProfileTab(QWidget):
             QMessageBox.warning(self, "Validasi Gagal", error_msg)
             return
 
-        QMessageBox.information(self, "Berhasil", "Password berhasil diubah.")
+        success, message = update_user_password(
+            self.user_id,
+            self.current_password_input.text().strip(),
+            self.new_password_input.text().strip(),
+        )
+        if not success:
+            QMessageBox.warning(self, "Gagal Mengubah Password", message)
+            return
+
         # Clear password fields
         self.current_password_input.setText("")
         self.new_password_input.setText("")
         self.confirm_password_input.setText("")
-        logger.info("Change password requested")
+        QMessageBox.information(self, "Berhasil", message)
+        logger.info("Password update completed for user_id=%s", self.user_id)
     
     def _validate_profile_fields(self) -> tuple[bool, str]:
         """Validate profile fields. Returns (is_valid, error_message)."""
         # Get field values
         nama_field = self.profile_fields.get("nama_lengkap")
         email_field = self.profile_fields.get("email")
+        username_field = self.profile_fields.get("username")
+        jenjang_field = self.profile_fields.get("jenjang")
+        if not all([nama_field, email_field, username_field, jenjang_field]):
+            return False, "Form profil belum siap."
+
         nama = nama_field.text().strip()
         email = email_field.text().strip()
+        username = username_field.text().strip()
+        jenjang = jenjang_field.text().strip()
         
         # Validate nama is not empty
         if not nama:
             return False, "Nama lengkap tidak boleh kosong."
+
+        if not username:
+            return False, "Username tidak boleh kosong."
+
+        if not jenjang:
+            return False, "Jenjang tidak boleh kosong."
         
         # Validate email format
         email_pattern = r'^[^@]+@[^@]+\.[^@]+$'

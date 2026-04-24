@@ -34,6 +34,8 @@ from src.database.crud import (
     init_db,
     login_user,
     register_user,
+    update_user_password,
+    update_user_profile,
     verify_password,
 )
 
@@ -162,6 +164,83 @@ def test_register_and_login_flow(isolated_database):
     wrong_success, wrong_message, _ = login_user("flow_user", "wrong")
     assert wrong_success is False
     assert "password" in wrong_message.lower()
+
+
+def test_update_user_profile_persists_changes(isolated_database):
+    """Profile update helper should persist username, email, name, and jenjang."""
+    ok_register, register_message = register_user(
+        "profile_user",
+        "profile_user@test.local",
+        "ProfilePass123",
+        "Profile User",
+        "S1",
+    )
+    assert ok_register is True, register_message
+
+    ok_login, _, user_data = login_user("profile_user", "ProfilePass123")
+    assert ok_login is True
+    user_id = user_data["id"]
+
+    ok_update, update_message = update_user_profile(
+        user_id,
+        "profile_user_updated",
+        "profile_user_updated@test.local",
+        "Profile User Updated",
+        "S2",
+    )
+    assert ok_update is True, update_message
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT username, email, nama_lengkap, jenjang
+            FROM akun
+            WHERE id = ?
+            """,
+            (user_id,),
+        )
+        row = cursor.fetchone()
+    finally:
+        cursor.close()
+
+    assert row is not None
+    assert row["username"] == "profile_user_updated"
+    assert row["email"] == "profile_user_updated@test.local"
+    assert row["nama_lengkap"] == "Profile User Updated"
+    assert row["jenjang"] == "S2"
+
+
+def test_update_user_password_requires_current_password(isolated_database):
+    """Password update helper should reject wrong current password and accept the correct one."""
+    ok_register, register_message = register_user(
+        "password_user",
+        "password_user@test.local",
+        "OldPass123",
+        "Password User",
+        "S1",
+    )
+    assert ok_register is True, register_message
+
+    ok_login, _, user_data = login_user("password_user", "OldPass123")
+    assert ok_login is True
+    user_id = user_data["id"]
+
+    wrong_ok, wrong_message = update_user_password(user_id, "wrong-current", "NewPass123")
+    assert wrong_ok is False
+    assert "password" in wrong_message.lower()
+
+    ok_update, update_message = update_user_password(user_id, "OldPass123", "NewPass123")
+    assert ok_update is True, update_message
+
+    old_login_ok, old_login_message, _ = login_user("password_user", "OldPass123")
+    assert old_login_ok is False
+    assert "password" in old_login_message.lower()
+
+    new_login_ok, new_login_message, new_user_data = login_user("password_user", "NewPass123")
+    assert new_login_ok is True, new_login_message
+    assert new_user_data is not None
 
 
 def test_beasiswa_crud_flow(isolated_database):
