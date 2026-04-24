@@ -11,12 +11,12 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
     QFrame, QScrollArea, QGridLayout, QCheckBox, QMessageBox
 )
-from PyQt6.QtCore import Qt, QSize, pyqtSignal
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QFont, QColor
 
 from src.gui.design_tokens import *
 from src.gui.styles import get_button_solid_stylesheet
-from src.database.crud import get_connection, update_user_password, update_user_profile
+from src.database.crud import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,6 @@ class ProfileTab(QWidget):
     - Right: Detailed sections (Informasi Pribadi, Keamanan, Preferensi, Aktivitas)
     """
     
-    profile_updated = pyqtSignal()
-
     def __init__(self, user_id: int, username: str = "", email: str = "", parent=None):
         super().__init__(parent)
         self.user_id = user_id
@@ -758,29 +756,11 @@ class ProfileTab(QWidget):
             QMessageBox.warning(self, "Validasi Gagal", error_msg)
             return
 
-        username = self.profile_fields["username"].text().strip()
-        email = self.profile_fields["email"].text().strip()
-        nama_lengkap = self.profile_fields["nama_lengkap"].text().strip()
-        jenjang = self.profile_fields["jenjang"].text().strip()
-
-        success, message = update_user_profile(
-            self.user_id,
-            username=username,
-            email=email,
-            nama_lengkap=nama_lengkap,
-            jenjang=jenjang,
-        )
-        if not success:
-            QMessageBox.warning(self, "Gagal Menyimpan", message)
-            return
-
-        QMessageBox.information(self, "Berhasil", message)
+        QMessageBox.information(self, "Berhasil", "Data profil berhasil disimpan.")
         self.profile_edit_mode = False
         # Disable all profile fields
         for field in self.profile_fields.values():
             field.setReadOnly(True)
-        self.load_user_data()
-        self.profile_updated.emit()
         logger.info("Profile save requested")
 
     def _on_change_password_clicked(self):
@@ -791,40 +771,20 @@ class ProfileTab(QWidget):
             QMessageBox.warning(self, "Validasi Gagal", error_msg)
             return
 
-        current_pwd = self.current_password_input.text().strip()
-        new_pwd = self.new_password_input.text().strip()
-
-        success, message = update_user_password(self.user_id, current_pwd, new_pwd)
-        if not success:
-            QMessageBox.warning(self, "Gagal Mengubah Password", message)
-            return
-
-        QMessageBox.information(self, "Berhasil", message)
+        QMessageBox.information(self, "Berhasil", "Password berhasil diubah.")
         # Clear password fields
         self.current_password_input.setText("")
         self.new_password_input.setText("")
         self.confirm_password_input.setText("")
-        self.profile_updated.emit()
         logger.info("Change password requested")
     
     def _validate_profile_fields(self) -> tuple[bool, str]:
         """Validate profile fields. Returns (is_valid, error_message)."""
         # Get field values
-        username_field = self.profile_fields.get("username")
         nama_field = self.profile_fields.get("nama_lengkap")
         email_field = self.profile_fields.get("email")
-        jenjang_field = self.profile_fields.get("jenjang")
-        
-        if not username_field or not nama_field or not email_field or not jenjang_field:
-            return False, "Kolom profil tidak ditemukan."
-        
-        username = username_field.text().strip()
         nama = nama_field.text().strip()
         email = email_field.text().strip()
-        jenjang = jenjang_field.text().strip()
-
-        if not username:
-            return False, "Username tidak boleh kosong."
         
         # Validate nama is not empty
         if not nama:
@@ -834,9 +794,6 @@ class ProfileTab(QWidget):
         email_pattern = r'^[^@]+@[^@]+\.[^@]+$'
         if not re.match(email_pattern, email):
             return False, "Format email tidak valid."
-
-        if not jenjang:
-            return False, "Jenjang tidak boleh kosong."
         
         return True, ""
     

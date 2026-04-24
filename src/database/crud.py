@@ -342,7 +342,7 @@ def login_user(username: str, password: str) -> Tuple[bool, str, Optional[Dict]]
 
 def update_user_profile(user_id: int, username: str, email: str,
                         nama_lengkap: str = "", jenjang: str = "") -> Tuple[bool, str]:
-    """Update data profil user pada tabel akun."""
+    """Update profil dasar user pada tabel akun."""
     if not username or not username.strip():
         return False, "Username tidak boleh kosong"
     if not email or not email.strip():
@@ -407,7 +407,7 @@ def update_user_profile(user_id: int, username: str, email: str,
 
 
 def update_user_password(user_id: int, current_password: str, new_password: str) -> Tuple[bool, str]:
-    """Update password user setelah memverifikasi password lama."""
+    """Update password user setelah verifikasi password lama."""
     if not current_password:
         return False, "Password saat ini harus diisi"
     if not new_password or len(new_password) < 8:

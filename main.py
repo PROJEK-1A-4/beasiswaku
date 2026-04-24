@@ -19,9 +19,8 @@ from PyQt6.QtWidgets import (
     QMessageBox, QComboBox, QTableWidget, QHeaderView, QDialog,
     QFormLayout, QTextEdit, QFrame
 )
-from PyQt6.QtCore import Qt, QSize, QTimer, QObject
+from PyQt6.QtCore import Qt, QSize, QTimer
 from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap
-from PyQt6.QtCore import pyqtSignal
 
 from src.database.crud import (
     init_db, login_user, register_user, get_connection,
@@ -58,12 +57,7 @@ from src.gui.design_tokens import (
     FONT_SIZE_XS,
 )
 
-
-class AppSignalBus(QObject):
-    """Central app-level refresh bus for cross-tab updates."""
-
-    profile_updated = pyqtSignal()
-    favorit_updated = pyqtSignal()
+logger = logging.getLogger(__name__)
 
 
 def _create_chart_section(section_title: str, canvas, min_height: int) -> QWidget:
@@ -625,13 +619,13 @@ class MainWindow(QMainWindow):
         top_bar_layout.addWidget(workspace_badge)
 
         # User info
-        self.user_label = QLabel(f"👤 {self.username}")
-        self.user_label.setFont(QFont("Trebuchet MS", FONT_SIZE_SM, QFont.Weight.Medium))
-        self.user_label.setStyleSheet(
+        user_label = QLabel(f"👤 {self.username}")
+        user_label.setFont(QFont("Trebuchet MS", FONT_SIZE_SM, QFont.Weight.Medium))
+        user_label.setStyleSheet(
             f"background-color: {COLOR_WHITE}; color: {COLOR_COBALT}; "
             "padding: 5px 12px; border-radius: 14px; border: 1px solid #d7e2f2;"
         )
-        top_bar_layout.addWidget(self.user_label)
+        top_bar_layout.addWidget(user_label)
         
         top_bar_frame = QFrame()
         top_bar_frame.setStyleSheet(f"""
@@ -659,7 +653,6 @@ class MainWindow(QMainWindow):
         
         # Tab 1: Beasiswa
         self.beasiswa_tab = BeasiswaTab(self.user_id)
-        self.beasiswa_tab.favorit_updated.connect(self.signals.favorit_updated)
         self.tabs.addTab(self.beasiswa_tab, "📚 Beasiswa")
         
         # Tab 2: Tracker
@@ -674,13 +667,7 @@ class MainWindow(QMainWindow):
         
         # Tab 4: Profil
         self.profil_tab = ProfileTab(self.user_id, self.username)
-        self.profil_tab.profile_updated.connect(self.signals.profile_updated)
         self.tabs.addTab(self.profil_tab, "👤 Profil")
-
-        self.signals.profile_updated.connect(self._handle_profile_updated)
-        self.signals.profile_updated.connect(self.beranda_tab.load_dashboard_data)
-        self.signals.profile_updated.connect(self.statistik_tab.refresh_data)
-        self.signals.favorit_updated.connect(self.beranda_tab.load_dashboard_data)
         
         # Hide tab bar (navigation is in sidebar)
         self.tabs.tabBar().hide()
@@ -725,13 +712,6 @@ class MainWindow(QMainWindow):
         """Handle sidebar navigation click."""
         self.tabs.setCurrentIndex(tab_index)
         logger.info(f"Switched to tab {tab_index}")
-
-    def _handle_profile_updated(self):
-        """Refresh main window identity after profile changes."""
-        self.username = self.profil_tab.username or self.username
-        self.user_label.setText(f"👤 {self.username}")
-        self.setWindowTitle(f"BeasiswaKu - {self.username}")
-        logger.info("Main window profile identity refreshed")
     
     def open_settings(self):
         """Open settings dialog"""
