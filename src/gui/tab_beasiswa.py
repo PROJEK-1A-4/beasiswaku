@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QComboBox, QTableWidget, QTableWidgetItem, QHeaderView,
     QAbstractItemView, QFileDialog, QSpacerItem, QSizePolicy, QMessageBox
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon, QColor
 
 from src.gui.design_tokens import *
@@ -36,6 +36,8 @@ logger = logging.getLogger(__name__)
 
 
 class BeasiswaTab(QWidget):
+    favorit_updated = pyqtSignal()
+
     """
     Beasiswa (Scholarship List) Tab dengan professional data table.
     
@@ -780,7 +782,7 @@ class BeasiswaTab(QWidget):
             success, message = delete_favorit(self.user_id, beasiswa_id)
             if success:
                 QMessageBox.information(self, "Favorit", message)
-                self._refresh_beranda_tab()
+                self.favorit_updated.emit()
                 return
             QMessageBox.warning(self, "Favorit Gagal", message)
             return
@@ -788,7 +790,7 @@ class BeasiswaTab(QWidget):
         success, message, _ = add_favorit(self.user_id, beasiswa_id)
         if success:
             QMessageBox.information(self, "Favorit", message)
-            self._refresh_beranda_tab()
+            self.favorit_updated.emit()
             return
 
         QMessageBox.warning(self, "Favorit Gagal", message)

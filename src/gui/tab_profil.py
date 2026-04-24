@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
     QFrame, QScrollArea, QGridLayout, QCheckBox, QMessageBox
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from PyQt6.QtGui import QFont, QColor
 
 from src.gui.design_tokens import *
@@ -28,6 +28,8 @@ class ProfileTab(QWidget):
     - Right: Detailed sections (Informasi Pribadi, Keamanan, Preferensi, Aktivitas)
     """
     
+    profile_updated = pyqtSignal()
+
     def __init__(self, user_id: int, username: str = "", email: str = "", parent=None):
         super().__init__(parent)
         self.user_id = user_id
@@ -778,6 +780,7 @@ class ProfileTab(QWidget):
         for field in self.profile_fields.values():
             field.setReadOnly(True)
         self.load_user_data()
+        self.profile_updated.emit()
         logger.info("Profile save requested")
 
     def _on_change_password_clicked(self):
@@ -801,6 +804,7 @@ class ProfileTab(QWidget):
         self.current_password_input.setText("")
         self.new_password_input.setText("")
         self.confirm_password_input.setText("")
+        self.profile_updated.emit()
         logger.info("Change password requested")
     
     def _validate_profile_fields(self) -> tuple[bool, str]:
