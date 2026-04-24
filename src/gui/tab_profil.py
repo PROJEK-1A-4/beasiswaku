@@ -4,18 +4,19 @@ User profile management dengan layout yang rapi dan terstruktur
 """
 
 import logging
+import re
 from datetime import datetime
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
-    QFrame, QScrollArea, QGridLayout, QCheckBox
+    QFrame, QScrollArea, QGridLayout, QCheckBox, QMessageBox
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QFont, QColor
 
 from src.gui.design_tokens import *
 from src.gui.styles import get_button_solid_stylesheet
-from src.database.crud import get_connection
+from src.database.crud import get_connection, update_user_password, update_user_profile
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +28,19 @@ class ProfileTab(QWidget):
     - Right: Detailed sections (Informasi Pribadi, Keamanan, Preferensi, Aktivitas)
     """
     
-    def __init__(self, user_id: int, username: str = "", email: str = "", parent=None):
+    def __init__(self, user_id: int, username: str = "", email: str = "", event_bus=None, parent=None):
         super().__init__(parent)
         self.user_id = user_id
         self.username = username
         self.email = email
+        self.event_bus = event_bus
         self.user_data = {}
+        self.profile_fields = {}
+        self.editable_profile_field_keys = {"nama_lengkap", "email", "username", "jenjang"}
+        self.profile_edit_mode = False
+        self.current_password_input = None
+        self.new_password_input = None
+        self.confirm_password_input = None
         
         logger.info(f"Initializing ProfileTab for user {user_id}")
         self.load_user_data()
@@ -185,7 +193,7 @@ class ProfileTab(QWidget):
         layout.addWidget(level_label)
         
         # University
-        university_label = QLabel("Teknik Informatika - POLBAN")
+        university_label = QLabel("Institusi belum disinkronkan")
         university_label.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_SM))
         university_label.setStyleSheet(f"color: {COLOR_GRAY_500}; text-align: center;")
         university_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -203,7 +211,7 @@ class ProfileTab(QWidget):
         stats_layout.setContentsMargins(0, 0, 0, 0)
         
         # Lamaran
-        lamaran_num = QLabel("9")
+        lamaran_num = QLabel("-")
         lamaran_num.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_2XL))
         lamaran_num.setStyleSheet(f"color: {COLOR_NAVY}; font-weight: bold;")
         lamaran_num.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -216,7 +224,7 @@ class ProfileTab(QWidget):
         stats_layout.addWidget(lamaran_label, 1, 0)
         
         # Diterima
-        diterima_num = QLabel("2")
+        diterima_num = QLabel("-")
         diterima_num.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_2XL))
         diterima_num.setStyleSheet(f"color: {COLOR_SUCCESS}; font-weight: bold;")
         diterima_num.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -229,7 +237,7 @@ class ProfileTab(QWidget):
         stats_layout.addWidget(diterima_label, 1, 1)
         
         # Favorit
-        favorit_num = QLabel("12")
+        favorit_num = QLabel("-")
         favorit_num.setFont(QFont(FONT_FAMILY_PRIMARY, FONT_SIZE_2XL))
         favorit_num.setStyleSheet(f"color: {COLOR_ORANGE}; font-weight: bold;")
         favorit_num.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -323,6 +331,7 @@ class ProfileTab(QWidget):
                 background-color: {COLOR_GRAY_100};
             }}
         """)
+        edit_btn.clicked.connect(self._on_edit_profile_clicked)
         header_layout.addWidget(edit_btn)
         layout.addLayout(header_layout)
         
@@ -357,6 +366,9 @@ class ProfileTab(QWidget):
             field.setMinimumHeight(40)
             field.setStyleSheet(self._get_input_stylesheet())
             form_layout.addWidget(field, row + 1, 0)
+            # Store field reference in profile_fields dict
+            field_key = label.lower().replace(" ", "_")
+            self.profile_fields[field_key] = field
 
         for idx, (label, value) in enumerate(right_fields):
             row = idx * 2
@@ -367,6 +379,10 @@ class ProfileTab(QWidget):
             field.setMinimumHeight(40)
             field.setStyleSheet(self._get_input_stylesheet())
             form_layout.addWidget(field, row + 1, 1)
+            # Store field reference in profile_fields dict
+            field_key = label.lower().replace(" ", "_")
+            self.profile_fields[field_key] = field
+        self._set_profile_edit_mode(False)
         
         form_layout.setColumnStretch(0, 1)
         form_layout.setColumnStretch(1, 1)
@@ -389,6 +405,7 @@ class ProfileTab(QWidget):
                 background-color: {COLOR_NAVY_DARK};
             }}
         """)
+        save_btn.clicked.connect(self._on_save_profile_clicked)
         layout.addWidget(save_btn)
         
         return frame
@@ -426,10 +443,11 @@ class ProfileTab(QWidget):
         form_layout.addWidget(self._create_form_label("PASSWORD SAAT INI"))
         current_pass = QLineEdit()
         current_pass.setEchoMode(QLineEdit.EchoMode.Password)
-        current_pass.setText("••••••••")
+        current_pass.setPlaceholderText("Masukkan password saat ini")
         current_pass.setMinimumHeight(40)
         current_pass.setStyleSheet(self._get_input_stylesheet())
         form_layout.addWidget(current_pass)
+        self.current_password_input = current_pass
         
         # New password
         form_layout.addWidget(self._create_form_label("PASSWORD BARU"))
@@ -438,6 +456,7 @@ class ProfileTab(QWidget):
         new_pass.setMinimumHeight(40)
         new_pass.setStyleSheet(self._get_input_stylesheet())
         form_layout.addWidget(new_pass)
+        self.new_password_input = new_pass
         
         # Confirm password
         form_layout.addWidget(self._create_form_label("KONFIRMASI"))
@@ -446,6 +465,7 @@ class ProfileTab(QWidget):
         confirm_pass.setMinimumHeight(40)
         confirm_pass.setStyleSheet(self._get_input_stylesheet())
         form_layout.addWidget(confirm_pass)
+        self.confirm_password_input = confirm_pass
         
         layout.addLayout(form_layout)
         
@@ -465,6 +485,7 @@ class ProfileTab(QWidget):
                 background-color: {COLOR_NAVY_DARK};
             }}
         """)
+        change_btn.clicked.connect(self._on_change_password_clicked)
         layout.addWidget(change_btn)
         
         return frame
@@ -715,9 +736,162 @@ class ProfileTab(QWidget):
                 self.user_data = dict(result)
                 self.username = result["username"] or self.username
                 self.email = result["email"] or self.email
+                self._sync_profile_fields_from_user_data()
                 logger.info(f"Loaded user data for {self.username}")
             else:
                 logger.warning(f"User data not found for user_id={self.user_id}")
-            cursor.close()
         except Exception as e:
             logger.error(f"Error loading user data: {e}")
+        finally:
+            if cursor is not None:
+                cursor.close()
+
+    def _sync_profile_fields_from_user_data(self):
+        """Push loaded user data into visible form fields."""
+        if not self.profile_fields:
+            return
+
+        field_value_map = {
+            "nama_lengkap": self.user_data.get("nama_lengkap") or self.user_data.get("username") or self.username or "-",
+            "email": self.user_data.get("email") or self.email or "-",
+            "username": self.user_data.get("username") or self.username or "-",
+            "jenjang": self.user_data.get("jenjang") or "-",
+        }
+
+        for field_key, field_value in field_value_map.items():
+            field = self.profile_fields.get(field_key)
+            if field is not None:
+                field.setText(str(field_value))
+
+    def _set_profile_edit_mode(self, enabled: bool):
+        """Toggle editable state for profile form fields."""
+        self.profile_edit_mode = enabled
+        for field_key, field in self.profile_fields.items():
+            if field_key in self.editable_profile_field_keys:
+                field.setReadOnly(not enabled)
+
+        logger.info("Profile edit mode %s", "enabled" if enabled else "disabled")
+
+    def _emit_data_changed(self, topic: str):
+        """Notify other tabs that user-related data changed."""
+        if self.event_bus is not None:
+            self.event_bus.data_changed.emit(topic)
+
+    def _on_edit_profile_clicked(self):
+        """Enable all profile fields for editing."""
+        self._set_profile_edit_mode(True)
+
+    def _on_save_profile_clicked(self):
+        """Validate and save profile data."""
+        # Validate profile fields
+        is_valid, error_msg = self._validate_profile_fields()
+        if not is_valid:
+            QMessageBox.warning(self, "Validasi Gagal", error_msg)
+            return
+
+        nama_field = self.profile_fields.get("nama_lengkap")
+        email_field = self.profile_fields.get("email")
+        username_field = self.profile_fields.get("username")
+        jenjang_field = self.profile_fields.get("jenjang")
+
+        if not all([nama_field, email_field, username_field, jenjang_field]):
+            QMessageBox.warning(self, "Validasi Gagal", "Form profil belum siap.")
+            return
+
+        success, message = update_user_profile(
+            self.user_id,
+            username_field.text().strip(),
+            email_field.text().strip(),
+            nama_field.text().strip(),
+            jenjang_field.text().strip(),
+        )
+        if not success:
+            QMessageBox.warning(self, "Gagal Menyimpan", message)
+            return
+
+        self.load_user_data()
+        self._set_profile_edit_mode(False)
+        QMessageBox.information(self, "Berhasil", message)
+        self._emit_data_changed("profile.updated")
+        logger.info("Profile update completed for user_id=%s", self.user_id)
+
+    def _on_change_password_clicked(self):
+        """Validate and change password."""
+        # Validate password fields
+        is_valid, error_msg = self._validate_password_fields()
+        if not is_valid:
+            QMessageBox.warning(self, "Validasi Gagal", error_msg)
+            return
+
+        success, message = update_user_password(
+            self.user_id,
+            self.current_password_input.text().strip(),
+            self.new_password_input.text().strip(),
+        )
+        if not success:
+            QMessageBox.warning(self, "Gagal Mengubah Password", message)
+            return
+
+        # Clear password fields
+        self.current_password_input.setText("")
+        self.new_password_input.setText("")
+        self.confirm_password_input.setText("")
+        QMessageBox.information(self, "Berhasil", message)
+        self._emit_data_changed("profile.updated")
+        logger.info("Password update completed for user_id=%s", self.user_id)
+    
+    def _validate_profile_fields(self) -> tuple[bool, str]:
+        """Validate profile fields. Returns (is_valid, error_message)."""
+        # Get field values
+        nama_field = self.profile_fields.get("nama_lengkap")
+        email_field = self.profile_fields.get("email")
+        username_field = self.profile_fields.get("username")
+        jenjang_field = self.profile_fields.get("jenjang")
+        if not all([nama_field, email_field, username_field, jenjang_field]):
+            return False, "Form profil belum siap."
+
+        nama = nama_field.text().strip()
+        email = email_field.text().strip()
+        username = username_field.text().strip()
+        jenjang = jenjang_field.text().strip()
+        
+        # Validate nama is not empty
+        if not nama:
+            return False, "Nama lengkap tidak boleh kosong."
+
+        if not username:
+            return False, "Username tidak boleh kosong."
+
+        if not jenjang:
+            return False, "Jenjang tidak boleh kosong."
+        
+        # Validate email format
+        email_pattern = r'^[^@]+@[^@]+\.[^@]+$'
+        if not re.match(email_pattern, email):
+            return False, "Format email tidak valid."
+        
+        return True, ""
+    
+    def _validate_password_fields(self) -> tuple[bool, str]:
+        """Validate password fields. Returns (is_valid, error_message)."""
+        current_pwd = self.current_password_input.text().strip()
+        new_pwd = self.new_password_input.text().strip()
+        confirm_pwd = self.confirm_password_input.text().strip()
+        
+        # Validate current password is not empty
+        if not current_pwd or current_pwd == "••••••••":
+            return False, "Password saat ini harus diisi."
+        
+        # Validate new password is not empty
+        if not new_pwd:
+            return False, "Password baru tidak boleh kosong."
+        
+        # Validate new password min 8 chars
+        if len(new_pwd) < 8:
+            return False, "Password baru minimal 8 karakter."
+        
+        # Validate passwords match
+        if new_pwd != confirm_pwd:
+            return False, "Password baru tidak cocok dengan konfirmasi."
+        
+        return True, ""

@@ -19,9 +19,8 @@ from PyQt6.QtWidgets import (
     QMessageBox, QComboBox, QTableWidget, QHeaderView, QDialog,
     QFormLayout, QTextEdit, QFrame
 )
-from PyQt6.QtCore import Qt, QSize, QTimer
+from PyQt6.QtCore import Qt, QSize, QTimer, QObject, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap
-from PyQt6.QtCore import pyqtSignal
 
 from src.database.crud import (
     init_db, login_user, register_user, get_connection,
@@ -57,6 +56,14 @@ from src.gui.design_tokens import (
     FONT_SIZE_SM,
     FONT_SIZE_XS,
 )
+
+logger = logging.getLogger(__name__)
+
+
+class AppSignalBus(QObject):
+    """Shared event bus for cross-tab refresh notifications."""
+
+    data_changed = pyqtSignal(str)
 
 
 def _create_chart_section(section_title: str, canvas, min_height: int) -> QWidget:
@@ -515,6 +522,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.user_id = user_id
         self.username = username
+        self.signals = AppSignalBus()
+        self.signals.data_changed.connect(self._handle_data_changed)
         
         self.init_ui()
         
@@ -617,13 +626,13 @@ class MainWindow(QMainWindow):
         top_bar_layout.addWidget(workspace_badge)
 
         # User info
-        user_label = QLabel(f"👤 {self.username}")
-        user_label.setFont(QFont("Trebuchet MS", FONT_SIZE_SM, QFont.Weight.Medium))
-        user_label.setStyleSheet(
+        self.user_label = QLabel(f"👤 {self.username}")
+        self.user_label.setFont(QFont("Trebuchet MS", FONT_SIZE_SM, QFont.Weight.Medium))
+        self.user_label.setStyleSheet(
             f"background-color: {COLOR_WHITE}; color: {COLOR_COBALT}; "
             "padding: 5px 12px; border-radius: 14px; border: 1px solid #d7e2f2;"
         )
-        top_bar_layout.addWidget(user_label)
+        top_bar_layout.addWidget(self.user_label)
         
         top_bar_frame = QFrame()
         top_bar_frame.setStyleSheet(f"""
@@ -650,11 +659,11 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.beranda_tab, "🏠 Beranda")
         
         # Tab 1: Beasiswa
-        self.beasiswa_tab = BeasiswaTab(self.user_id)
+        self.beasiswa_tab = BeasiswaTab(self.user_id, self.signals)
         self.tabs.addTab(self.beasiswa_tab, "📚 Beasiswa")
         
         # Tab 2: Tracker
-        self.tracker_tab = TrackerTab(self.user_id)
+        self.tracker_tab = TrackerTab(self.user_id, self.signals)
         self.tabs.addTab(self.tracker_tab, "📋 Tracker Lamaran")
         
         # Tab 3: Statistik
@@ -664,7 +673,7 @@ class MainWindow(QMainWindow):
         self.tabs.setStyleSheet("QTabBar::tab { min-width: 120px; }")
         
         # Tab 4: Profil
-        self.profil_tab = ProfileTab(self.user_id, self.username)
+        self.profil_tab = ProfileTab(self.user_id, self.username, event_bus=self.signals)
         self.tabs.addTab(self.profil_tab, "👤 Profil")
         
         # Hide tab bar (navigation is in sidebar)
@@ -695,6 +704,23 @@ class MainWindow(QMainWindow):
         
         # ===== STATUS BAR =====
         self.statusBar().showMessage("✅ Aplikasi siap digunakan | Database: beasiswaku.db")
+
+    def _handle_data_changed(self, topic: str):
+        """Refresh tabs and shell widgets after data mutations."""
+        if topic in {"beasiswa.updated", "favorit.updated", "lamaran.updated", "profile.updated"}:
+            if hasattr(self.beranda_tab, "load_dashboard_data"):
+                self.beranda_tab.load_dashboard_data()
+
+        if topic in {"beasiswa.updated", "favorit.updated"} and hasattr(self.beasiswa_tab, "refresh_data"):
+            self.beasiswa_tab.refresh_data()
+
+        if topic in {"lamaran.updated", "profile.updated"} and hasattr(self.tracker_tab, "load_applications"):
+            self.tracker_tab.load_applications()
+
+        if topic == "profile.updated":
+            self.username = getattr(self.profil_tab, "username", self.username) or self.username
+            self.user_label.setText(f"👤 {self.username}")
+            self.setWindowTitle(f"BeasiswaKu - {self.username}")
         
     def center_window(self):
         """Center window di layar"""

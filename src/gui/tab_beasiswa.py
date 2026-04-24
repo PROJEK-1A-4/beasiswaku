@@ -48,9 +48,10 @@ class BeasiswaTab(QWidget):
     - Action icons: View, Bookmark, Apply
     """
     
-    def __init__(self, user_id: int, parent=None):
+    def __init__(self, user_id: int, event_bus=None, parent=None):
         super().__init__(parent)
         self.user_id = user_id
+        self.event_bus = event_bus
         self.beasiswa_data: List[Dict[str, Any]] = []
         self.displayed_data: List[Dict[str, Any]] = []
         self.refresh_btn: Optional[QPushButton] = None
@@ -60,6 +61,7 @@ class BeasiswaTab(QWidget):
         
         logger.info(f"Initializing BeasiswaTab")
         self.init_ui()
+        self._bind_event_bus()
         loaded_count = self.load_beasiswa_data()
         if loaded_count == 0:
             self.sync_from_web(auto_trigger=True)
@@ -491,6 +493,23 @@ class BeasiswaTab(QWidget):
         except Exception:
             return "unknown"
 
+    def _bind_event_bus(self):
+        """Subscribe to shared refresh events when available."""
+        if self.event_bus is None:
+            return
+
+        self.event_bus.data_changed.connect(self._on_data_changed)
+
+    def _on_data_changed(self, topic: str):
+        """Reload scholarship data after a shared mutation event."""
+        if topic in {"beasiswa.updated", "favorit.updated", "lamaran.updated", "profile.updated"}:
+            self.refresh_data()
+
+    def _emit_data_changed(self, topic: str):
+        """Notify other tabs that shared data changed."""
+        if self.event_bus is not None:
+            self.event_bus.data_changed.emit(topic)
+
     def _set_sync_state(self, syncing: bool):
         """Toggle button states while sync is running."""
         self._sync_in_progress = syncing
@@ -514,6 +533,7 @@ class BeasiswaTab(QWidget):
             f"Total tampil {loaded} | "
             f"DB {self._current_db_name()}"
         )
+        self._emit_data_changed("beasiswa.updated")
         self._set_sync_state(False)
 
     def _on_sync_finished(self, scrape_payload: object):
@@ -780,7 +800,7 @@ class BeasiswaTab(QWidget):
             success, message = delete_favorit(self.user_id, beasiswa_id)
             if success:
                 QMessageBox.information(self, "Favorit", message)
-                self._refresh_beranda_tab()
+                self._emit_data_changed("favorit.updated")
                 return
             QMessageBox.warning(self, "Favorit Gagal", message)
             return
@@ -788,7 +808,7 @@ class BeasiswaTab(QWidget):
         success, message, _ = add_favorit(self.user_id, beasiswa_id)
         if success:
             QMessageBox.information(self, "Favorit", message)
-            self._refresh_beranda_tab()
+            self._emit_data_changed("favorit.updated")
             return
 
         QMessageBox.warning(self, "Favorit Gagal", message)
@@ -817,30 +837,10 @@ class BeasiswaTab(QWidget):
                 "Lamaran berhasil ditambahkan ke Tracker | "
                 f"DB {self._current_db_name()}"
             )
-            self._refresh_tracker_tab()
+            self._emit_data_changed("lamaran.updated")
             return
 
         QMessageBox.warning(self, "Lamaran Gagal", message)
-
-    def _refresh_tracker_tab(self):
-        """Refresh tracker tab data if main window exposes tracker instance."""
-        try:
-            main_window = self.window()
-            tracker_tab = getattr(main_window, "tracker_tab", None)
-            if tracker_tab and hasattr(tracker_tab, "load_applications"):
-                tracker_tab.load_applications()
-        except Exception as exc:
-            logger.warning("Tracker refresh skipped: %s", exc)
-
-    def _refresh_beranda_tab(self):
-        """Refresh beranda snapshot so favorites/stats stay in sync."""
-        try:
-            main_window = self.window()
-            beranda_tab = getattr(main_window, "beranda_tab", None)
-            if beranda_tab and hasattr(beranda_tab, "load_dashboard_data"):
-                beranda_tab.load_dashboard_data()
-        except Exception as exc:
-            logger.warning("Beranda refresh skipped: %s", exc)
 
 
 def _make_bold_font(font: QFont) -> QFont:
