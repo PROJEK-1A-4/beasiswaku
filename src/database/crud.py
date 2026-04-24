@@ -340,6 +340,116 @@ def login_user(username: str, password: str) -> Tuple[bool, str, Optional[Dict]]
         pass
 
 
+def update_user_profile(user_id: int, username: str, email: str,
+                        nama_lengkap: str = "", jenjang: str = "") -> Tuple[bool, str]:
+    """Update data profil user pada tabel akun."""
+    if not username or not username.strip():
+        return False, "Username tidak boleh kosong"
+    if not email or not email.strip():
+        return False, "Email tidak boleh kosong"
+    if not nama_lengkap or not nama_lengkap.strip():
+        return False, "Nama lengkap tidak boleh kosong"
+
+    username = username.strip()
+    email = email.strip()
+    nama_lengkap = nama_lengkap.strip()
+    jenjang = (jenjang or "").strip()
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT id FROM akun WHERE id = ?", (user_id,))
+        if not cursor.fetchone():
+            return False, "User tidak ditemukan"
+
+        cursor.execute("""
+            SELECT id
+            FROM akun
+            WHERE (username = ? OR email = ?) AND id != ?
+        """, (username, email, user_id))
+        if cursor.fetchone():
+            return False, "Username atau email sudah digunakan"
+
+        cursor.execute("""
+            UPDATE akun
+            SET username = ?, email = ?, nama_lengkap = ?, jenjang = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (username, email, nama_lengkap, jenjang, user_id))
+
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return False, "User tidak ditemukan"
+
+        conn.commit()
+        logger.info(f"✅ User profile updated for user_id={user_id}")
+        return True, "Profil berhasil diperbarui"
+
+    except sqlite3.IntegrityError as e:
+        conn.rollback()
+        message = str(e).lower()
+        if "username" in message:
+            error_msg = "Username sudah digunakan"
+        elif "email" in message:
+            error_msg = "Email sudah digunakan"
+        else:
+            error_msg = f"Gagal memperbarui profil: {str(e)}"
+        logger.warning(f"⚠️ Update profile failed: {error_msg}")
+        return False, error_msg
+
+    except sqlite3.Error as e:
+        conn.rollback()
+        logger.error(f"❌ Database error during profile update: {e}")
+        return False, f"Terjadi error saat memperbarui profil: {str(e)}"
+
+    finally:
+        cursor.close()
+
+
+def update_user_password(user_id: int, current_password: str, new_password: str) -> Tuple[bool, str]:
+    """Update password user setelah memverifikasi password lama."""
+    if not current_password:
+        return False, "Password saat ini harus diisi"
+    if not new_password or len(new_password) < 8:
+        return False, "Password baru minimal 8 karakter"
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT password_hash FROM akun WHERE id = ?", (user_id,))
+        user = cursor.fetchone()
+
+        if not user:
+            return False, "User tidak ditemukan"
+
+        if not verify_password(current_password, user["password_hash"]):
+            return False, "Password saat ini salah"
+
+        new_password_hash = hash_password(new_password)
+        cursor.execute("""
+            UPDATE akun
+            SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (new_password_hash, user_id))
+
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return False, "User tidak ditemukan"
+
+        conn.commit()
+        logger.info(f"✅ User password updated for user_id={user_id}")
+        return True, "Password berhasil diperbarui"
+
+    except sqlite3.Error as e:
+        conn.rollback()
+        logger.error(f"❌ Database error during password update: {e}")
+        return False, f"Terjadi error saat memperbarui password: {str(e)}"
+
+    finally:
+        cursor.close()
+
+
 # =====================================================================
 # PHASE 2.2: CRUD BEASISWA FUNCTIONS
 # =====================================================================
