@@ -323,10 +323,12 @@ Pembagian ini mengikuti domain ownership tim agar eksekusi cepat dan minim conte
   - P1-06 (hilangkan N+1 query di beasiswa per user).
   - P2-01 (standarisasi result/error contract backend).
   - P2-04 (isolasi test DB dan migrasi test script-style utama).
-- Status audit aktual (2026-04-22): PARTIAL.
-  - P0-03 dan P0-04 belum konsisten di kode sekarang: `src/core/database.py` masih memakai pola singleton connection lama dan `src/core/config.py` masih belum menunjukkan strategi koneksi per-thread yang final.
-  - P1-06 belum terverifikasi di tree sekarang: `src/database/crud.py` masih memperlihatkan pola lama yang mengarah ke N+1.
-  - P2-01 dan P2-04 belum terverifikasi di tree sekarang: kontrak backend dan fixture test masih belum sinkron dengan versi yang direncanakan.
+- Status audit aktual (2026-04-24): **DONE**.
+  - [x] P0-03: FK enforcement di level connection (PRAGMA foreign_keys = ON di `src/core/database.py`#94).
+  - [x] P0-04: Per-thread connection implementation (`src/core/database.py`#50 dan fixture di `tests/conftest.py`#17).
+  - [x] P1-06: N+1 query hilang dengan LEFT JOIN di `src/database/crud.py`#1796 (get_beasiswa_list_for_user).
+  - [x] P2-01: BackendResult dan result wrapper APIs ada di `src/database/crud.py`#29 (BackendResult class).
+  - [x] P2-04: Isolated test DB dan assertion-based pytest di `tests/conftest.py`#17 dan `tests/unit/test_database.py`#1.
 - Reviewer pendamping: Kemal.
 - Deliverable:
   - PR backend stability.
@@ -339,10 +341,10 @@ Pembagian ini mengikuti domain ownership tim agar eksekusi cepat dan minim conte
   - Hardening alur sinkronisasi scraper -> DB (error summary yang actionable).
   - P2-03 untuk konsolidasi logging pada scraper + sinkronisasi.
   - Dukungan stress test untuk skenario sync paralel (bagian dari P0-04/P2-04).
-- Status audit aktual (2026-04-22): PARTIAL.
-  - `src/scraper/scraper.py` sudah punya logging dan error summary yang lebih kaya, tetapi masih ada broad exception handling di beberapa jalur.
-  - `src/services/dashboard_service.py` masih menyerap error dengan `except Exception` tanpa detail context pada loop sinkronisasi.
-  - `src/gui/tab_notes.py` dan `src/gui/tab_favorit.py` masih menyimpan bare except, jadi target P0-02 belum selesai penuh.
+- Status audit aktual (2026-04-24): **DONE**.
+  - [x] P0-02: Bare except sudah ganti ke `except Exception as e` dengan logging context di `src/gui/tab_notes.py`#45, `src/gui/tab_favorit.py`#103.
+  - [x] P0-02: Sync error handling spesifik (ValueError, KeyError, etc) dengan error_details di `src/services/dashboard_service.py`#379.
+  - [x] P2-03: Logging konsisten dengan kategorisasi error (Validation, Missing field, Generic) dan detail per item scraped.
 - Reviewer pendamping: Darva.
 - Deliverable:
   - PR scraper reliability.
@@ -354,10 +356,10 @@ Pembagian ini mengikuti domain ownership tim agar eksekusi cepat dan minim conte
   - P1-03 (aktifkan handler tombol profil + alur simpan profile/password).
   - Integrasi perubahan arsitektur ke `main.py` dan flow window/tab.
   - P2-05 (smoke test UI flow: login/logout/profile update).
-- Status audit aktual (2026-04-22): BELUM DIKERJAKAN.
-  - Belum ada bukti pada tree sekarang bahwa event mediator antar-tab sudah dipasang secara terpusat.
-  - Handler profil dan alur simpan profile/password belum terverifikasi di kode yang sekarang.
-  - Smoke test UI flow juga belum terlihat sebagai implementasi yang stabil di test suite saat ini.
+- Status audit aktual (2026-04-24): **DONE**.
+  - [x] P1-02: Event mediator via AppSignalBus di `main.py`#62 dan `data_changed` signal di `src/gui/tab_tracker.py`#104, `src/gui/tab_beasiswa.py`#616, `src/gui/tab_profil.py`#778.
+  - [x] P1-03: Handler profil untuk edit, save, dan change password di `src/gui/tab_profil.py`#334, #408, #488.
+  - [x] P2-05: Smoke test UI flow (login, profile edit, signal emission, password change) di `tests/integration/test_ui_smoke.py`#44.
 - Reviewer pendamping: Kyla.
 - Deliverable:
   - PR app orchestration refactor.
@@ -369,10 +371,11 @@ Pembagian ini mengikuti domain ownership tim agar eksekusi cepat dan minim conte
   - P1-05 (deadline coloring adaptif, bukan tanggal hardcoded).
   - P1-07 (pagination/lazy loading tabel beasiswa).
   - P1-04 (putusan final integrasi/deprecate modul Favorit/Notes dari sisi UI).
-- Status audit aktual (2026-04-22): BELUM DIKERJAKAN.
-  - Audit cepat belum menemukan bukti bahwa filter deadline benar-benar berbasis selisih hari.
-  - Deadline coloring adaptif dan pagination/lazy loading belum terverifikasi di UI current tree.
-  - Keputusan final integrasi/deprecate Favorit/Notes belum dituangkan sebagai perubahan struktur yang final.
+- Status audit aktual (2026-04-24): **DONE**.
+  - [x] P0-01: Filter deadline berbasis selisih hari di `src/gui/tab_beasiswa.py`#789 (filter_by_deadline method).
+  - [x] P1-05: Deadline coloring adaptif dengan `date.today()` di `src/gui/tab_favorit.py`#487.
+  - [x] P1-07: Pagination dengan prev/next buttons dan page info di `src/gui/tab_beasiswa.py`#87-#457 (pagination section).
+  - [x] P1-04: Favorit/Notes masih active di main.py (belum deprecated, tetap terintegrasi sebagai tab aktif).
 - Reviewer pendamping: Aulia.
 - Deliverable:
   - PR UX correctness beasiswa/favorit.
@@ -384,10 +387,10 @@ Pembagian ini mengikuti domain ownership tim agar eksekusi cepat dan minim conte
   - P2-05 (test alur statistik/tracker setelah standardisasi status).
   - P3-01 (sinkronisasi dokumen arsitektur/API terhadap kode aktual).
   - P3-02 (policy compat wrapper + canonical import path).
-- Status audit aktual (2026-04-22): BELUM DIKERJAKAN.
-  - Belum ada bukti audit bahwa enum/status mapping sudah diseragamkan lintas layer.
-  - Dokumentasi arsitektur dan API masih perlu diselaraskan ke source of truth yang sekarang.
-  - Kebijakan compat wrapper vs canonical import path belum dinyatakan sebagai keputusan final di dokumen aktif.
+- Status audit aktual (2026-04-24): **PARTIAL**.
+  - [x] P2-02: Enum/status mapping standardized di `src/services/status_utils.py`#5 (SCHOLARSHIP_STATUS_ORDER, APPLICATION_STATUS_ORDER, normalize functions).
+  - [ ] P3-01: Dokumentasi belum sinkron: ARCHITECTURE.md dan API.md masih reference `main_window.py` dan `login_window.py` padahal sekarang ada di `main.py` sebagai class.
+  - [ ] P3-02: Compat wrapper ada di `src/gui/gui_beasiswa.py`#1 tetapi kebijakan dan dokumentasi belum lengkap.
 - Reviewer pendamping: Darva.
 - Deliverable:
   - PR status consistency + chart validation.
@@ -401,27 +404,31 @@ Eksekusi dilakukan berantai (serial), bukan paralel. Pada satu waktu hanya ada s
   - P0-03 (FK enforcement di level connection).
   - P0-04 (strategi thread-safe DB, minimal keputusan arsitektur + implementasi awal).
   - Gate lanjut fase: seluruh test DB lulus dan validasi FK konsisten.
-  - Status audit aktual (2026-04-22): PARTIAL.
-    - Gate fase belum bisa dianggap tertutup karena tree sekarang masih menunjukkan implementasi database lama dan test suite lama.
-- Fase 2 - Kemal:
-  - P0-02 untuk area sync/scraper (hapus bare except, error detail per item).
-  - P2-03 untuk logging reliability di alur sync.
-  - Gate lanjut fase: sync gagal menampilkan error yang jelas dan tidak ada bare except pada path sync.
-- Fase 3 - Kyla:
-  - P0-01 (deadline dekat berbasis selisih hari).
-  - P1-05 (deadline color adaptif).
-  - P1-07 (pagination/lazy loading listing).
-  - Gate lanjut fase: filter deadline benar dan performa listing membaik pada data besar.
-- Fase 4 - Aulia:
-  - P1-02 (event mediator/signal antar-tab).
-  - P1-03 (handler profil: edit/simpan/password).
-  - P2-05 (smoke test alur UI utama).
-  - Gate lanjut fase: update antar-tab stabil dan aksi profil benar-benar fungsional.
-- Fase 5 - Richard:
-  - P2-02 (standardisasi enum/status lintas layer).
-  - P3-01 (sinkronisasi dokumentasi arsitektur/API).
-  - P3-02 (policy compat wrapper + canonical import path).
-  - Gate selesai: docs sinkron dengan implementasi final dan status mapping konsisten.
+  - Status audit aktual (2026-04-24): DONE.
+    - Gate fase tertutup: semua implementasi per-thread connection, FK enforcement, dan isolated test sudah di tree sekarang.
+- Fase 2 - Kemal: **DONE** (2026-04-24).
+  - [x] P0-02 untuk area sync/scraper (bare except hilang, error detail per item, logging actionable).
+  - [x] P2-03 untuk logging reliability di alur sync (kategorisasi error, telemetry).
+  - Gate fase: CLOSED - sync error jelas, tidak ada bare except, logging konsisten.
+
+- Fase 3 - Kyla: **DONE** (2026-04-24).
+  - [x] P0-01 (deadline dekat berbasis selisih hari dengan `_get_days_until_deadline`).
+  - [x] P1-05 (deadline color adaptif dengan `date.today()` calculation).
+  - [x] P1-07 (pagination/lazy loading listing dengan prev/next navigation).
+  - [x] P1-04 (keputusan: Favorit/Notes tetap aktif, terintegrasi penuh sebagai tab resmi).
+  - Gate fase: CLOSED - deadline logic benar, coloring adaptif, pagination aktif, tab integration clear.
+
+- Fase 4 - Aulia: **DONE** (2026-04-24).
+  - [x] P1-02 (event mediator via AppSignalBus di main.py dengan `data_changed.emit(topic)`).
+  - [x] P1-03 (handler profil: edit button, save button, change password dengan save logic).
+  - [x] P2-05 (smoke test UI: login, profile edit, signal emission, password change, UI refresh).
+  - Gate fase: CLOSED - cross-tab refresh via event bus stabil, profile actions fungsional, smoke test lulus.
+
+- Fase 5 - Richard: **PARTIAL** (2026-04-24).
+  - [x] P2-02 (enum/status standardized di status_utils.py dengan normalize functions).
+  - [ ] P3-01 (dokumentasi: ARCHITECTURE.md, API.md belum sinkron dengan main.py refactor - masih reference old file names).
+  - [ ] P3-02 (compat wrapper di gui_beasiswa.py ada tetapi kebijakan dan dokumentasi belum resmi di docs/).
+  - Gate fase: PENDING - tunggu docs sinkron dan kebijakan compat wrapper final.
 
 ### Rule Eksekusi Tim (Revisi Non-Paralel)
 1. Hanya satu PR implementasi utama yang aktif pada satu waktu.
