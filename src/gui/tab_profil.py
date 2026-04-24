@@ -28,11 +28,12 @@ class ProfileTab(QWidget):
     - Right: Detailed sections (Informasi Pribadi, Keamanan, Preferensi, Aktivitas)
     """
     
-    def __init__(self, user_id: int, username: str = "", email: str = "", parent=None):
+    def __init__(self, user_id: int, username: str = "", email: str = "", event_bus=None, parent=None):
         super().__init__(parent)
         self.user_id = user_id
         self.username = username
         self.email = email
+        self.event_bus = event_bus
         self.user_data = {}
         self.profile_fields = {}
         self.editable_profile_field_keys = {"nama_lengkap", "email", "username", "jenjang"}
@@ -771,6 +772,11 @@ class ProfileTab(QWidget):
 
         logger.info("Profile edit mode %s", "enabled" if enabled else "disabled")
 
+    def _emit_data_changed(self, topic: str):
+        """Notify other tabs that user-related data changed."""
+        if self.event_bus is not None:
+            self.event_bus.data_changed.emit(topic)
+
     def _on_edit_profile_clicked(self):
         """Enable all profile fields for editing."""
         self._set_profile_edit_mode(True)
@@ -806,6 +812,7 @@ class ProfileTab(QWidget):
         self.load_user_data()
         self._set_profile_edit_mode(False)
         QMessageBox.information(self, "Berhasil", message)
+        self._emit_data_changed("profile.updated")
         logger.info("Profile update completed for user_id=%s", self.user_id)
 
     def _on_change_password_clicked(self):
@@ -830,6 +837,7 @@ class ProfileTab(QWidget):
         self.new_password_input.setText("")
         self.confirm_password_input.setText("")
         QMessageBox.information(self, "Berhasil", message)
+        self._emit_data_changed("profile.updated")
         logger.info("Password update completed for user_id=%s", self.user_id)
     
     def _validate_profile_fields(self) -> tuple[bool, str]:
