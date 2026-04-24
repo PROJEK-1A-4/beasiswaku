@@ -58,9 +58,10 @@ class TrackerTab(QWidget):
     2. Bottom: Analytics dengan donut chart dan bar chart
     """
     
-    def __init__(self, user_id: int, parent=None):
+    def __init__(self, user_id: int, event_bus=None, parent=None):
         super().__init__(parent)
         self.user_id = user_id
+        self.event_bus = event_bus
         self._status_counts = {label: 0 for label in APPLICATION_STATUS_ORDER}
         self._month_counts: Dict[str, int] = {}
         self.analytics_layout: Optional[QHBoxLayout] = None
@@ -71,6 +72,7 @@ class TrackerTab(QWidget):
         
         logger.info(f"Initializing TrackerTab for user {user_id}")
         self.init_ui()
+        self._bind_event_bus()
         self.populate_table(self.applications)
 
     def _fetch_applications(self) -> List[Dict[str, Any]]:
@@ -93,6 +95,23 @@ class TrackerTab(QWidget):
     def _get_month_counts(self) -> Dict[str, int]:
         """Ringkas jumlah lamaran per bulan (format YYYY-MM)."""
         return dict(sorted(self._month_counts.items()))
+
+    def _bind_event_bus(self):
+        """Subscribe to shared refresh events when available."""
+        if self.event_bus is None:
+            return
+
+        self.event_bus.data_changed.connect(self._on_data_changed)
+
+    def _on_data_changed(self, topic: str):
+        """Reload tracker data after a shared mutation event."""
+        if topic in {"lamaran.updated", "beasiswa.updated", "profile.updated"}:
+            self.load_applications()
+
+    def _emit_data_changed(self, topic: str):
+        """Notify other tabs that shared data changed."""
+        if self.event_bus is not None:
+            self.event_bus.data_changed.emit(topic)
     
     def init_ui(self):
         """Initialize Tracker Tab UI."""
@@ -769,7 +788,7 @@ class TrackerTab(QWidget):
         if success:
             QMessageBox.information(self, "Hapus Lamaran", message)
             self.load_applications()
-            self._refresh_related_tabs()
+            self._emit_data_changed("lamaran.updated")
             return
 
         QMessageBox.warning(self, "Hapus Lamaran", message)
@@ -822,21 +841,7 @@ class TrackerTab(QWidget):
         if success:
             QMessageBox.information(self, "Update Lamaran", message)
             self.load_applications()
-            self._refresh_related_tabs()
+            self._emit_data_changed("lamaran.updated")
             return
 
         QMessageBox.warning(self, "Update Lamaran", message)
-
-    def _refresh_related_tabs(self):
-        """Refresh beranda/statistik cards after tracker mutations."""
-        try:
-            main_window = self.window()
-            beranda_tab = getattr(main_window, "beranda_tab", None)
-            if beranda_tab and hasattr(beranda_tab, "load_dashboard_data"):
-                beranda_tab.load_dashboard_data()
-
-            statistik_tab = getattr(main_window, "statistik_tab", None)
-            if statistik_tab and hasattr(statistik_tab, "refresh_data"):
-                statistik_tab.refresh_data()
-        except Exception as exc:
-            logger.warning("Related tabs refresh skipped: %s", exc)

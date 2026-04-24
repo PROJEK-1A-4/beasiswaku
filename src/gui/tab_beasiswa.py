@@ -73,9 +73,10 @@ def _get_deadline_color(days_remaining: Optional[int]) -> str:
     - Action icons: View, Bookmark, Apply
     """
     
-    def __init__(self, user_id: int, parent=None):
+    def __init__(self, user_id: int, event_bus=None, parent=None):
         super().__init__(parent)
         self.user_id = user_id
+        self.event_bus = event_bus
         self.beasiswa_data: List[Dict[str, Any]] = []
         self.displayed_data: List[Dict[str, Any]] = []
         self.refresh_btn: Optional[QPushButton] = None
@@ -91,6 +92,7 @@ def _get_deadline_color(days_remaining: Optional[int]) -> str:
         
         logger.info(f"Initializing BeasiswaTab")
         self.init_ui()
+        self._bind_event_bus()
         loaded_count = self.load_beasiswa_data()
         if loaded_count == 0:
             self.sync_from_web(auto_trigger=True)
@@ -606,6 +608,23 @@ def _get_deadline_color(days_remaining: Optional[int]) -> str:
         except Exception:
             return "unknown"
 
+    def _bind_event_bus(self):
+        """Subscribe to shared refresh events when available."""
+        if self.event_bus is None:
+            return
+
+        self.event_bus.data_changed.connect(self._on_data_changed)
+
+    def _on_data_changed(self, topic: str):
+        """Reload scholarship data after a shared mutation event."""
+        if topic in {"beasiswa.updated", "favorit.updated", "lamaran.updated", "profile.updated"}:
+            self.refresh_data()
+
+    def _emit_data_changed(self, topic: str):
+        """Notify other tabs that shared data changed."""
+        if self.event_bus is not None:
+            self.event_bus.data_changed.emit(topic)
+
     def _set_sync_state(self, syncing: bool):
         """Toggle button states while sync is running."""
         self._sync_in_progress = syncing
@@ -629,6 +648,7 @@ def _get_deadline_color(days_remaining: Optional[int]) -> str:
             f"Total tampil {loaded} | "
             f"DB {self._current_db_name()}"
         )
+        self._emit_data_changed("beasiswa.updated")
         self._set_sync_state(False)
 
     def _on_sync_finished(self, scrape_payload: object):
@@ -941,7 +961,7 @@ def _get_deadline_color(days_remaining: Optional[int]) -> str:
             success, message = delete_favorit(self.user_id, beasiswa_id)
             if success:
                 QMessageBox.information(self, "Favorit", message)
-                self._refresh_beranda_tab()
+                self._emit_data_changed("favorit.updated")
                 return
             QMessageBox.warning(self, "Favorit Gagal", message)
             return
@@ -949,7 +969,7 @@ def _get_deadline_color(days_remaining: Optional[int]) -> str:
         success, message, _ = add_favorit(self.user_id, beasiswa_id)
         if success:
             QMessageBox.information(self, "Favorit", message)
-            self._refresh_beranda_tab()
+            self._emit_data_changed("favorit.updated")
             return
 
         QMessageBox.warning(self, "Favorit Gagal", message)
@@ -978,7 +998,7 @@ def _get_deadline_color(days_remaining: Optional[int]) -> str:
                 "Lamaran berhasil ditambahkan ke Tracker | "
                 f"DB {self._current_db_name()}"
             )
-            self._refresh_tracker_tab()
+            self._emit_data_changed("lamaran.updated")
             return
 
         QMessageBox.warning(self, "Lamaran Gagal", message)
