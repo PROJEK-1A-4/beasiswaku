@@ -402,3 +402,20 @@ finally:
 3. **Batch operations** when possible (add multiple records)
 4. **Use indexes** for frequently searched columns
 5. **Connection pooling** via DatabaseManager singleton (prevents recreating connections)
+
+
+## UI Data Services & Status Normalization
+
+Untuk integrasi antara data mentah SQLite dan grafik/tabel GUI, gunakan service layer berikut dari `src.services.status_utils` dan `src.services.dashboard_service`:
+
+### Status Standardization (P2-02)
+Pastikan semua status UI menggunakan fungsi normalisasi ini untuk mencegah inkonsistensi string pada *chart* (Statistik & Tracker):
+
+```python
+from src.services.status_utils import (
+    normalize_scholarship_status,  # Returns: "Buka", "Segera Tutup", atau "Tutup"
+    normalize_application_status   # Returns: "Pending", "Diterima", atau "Ditolak"
+)
+
+# Contoh penggunaan
+clean_status = normalize_application_status("accepted") # Output: "Diterima"

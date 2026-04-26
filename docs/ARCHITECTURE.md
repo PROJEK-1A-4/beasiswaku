@@ -273,3 +273,9 @@ python main.py
 - Async operations for long-running tasks
 - Unit test coverage for all modules
 - API server for remote access
+
+## Kebijakan Import & Compatibility Wrapper
+Untuk menjaga stabilitas saat proses refaktor besar, proyek menerapkan kebijakan Compatibility Wrapper:
+- **Canonical Path:** Import modul GUI yang baru wajib langsung mengarah ke file implementasi asli (contoh: from src.gui.tab_beasiswa import BeasiswaTab).
+- **Wrapper File:** File seperti src/gui/gui_beasiswa.py dipertahankan hanya sebagai jembatan (wrapper) bagi modul atau test lama yang masih memanggil path lama.
+- **Aturan Tim:** Dilarang menambahkan logika bisnis baru ke dalam file wrapper. Semua ekstensi fitur harus dilakukan di file canonical (tab_*.py).
